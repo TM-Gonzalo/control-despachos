@@ -1070,7 +1070,7 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [search, setSearch] = useState("");
   const [fst, setFst] = useState("all");
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("dc_apikey") || "");
+  const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_ANTHROPIC_API_KEY || localStorage.getItem("dc_apikey") || "");
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
@@ -1236,11 +1236,11 @@ export default function App() {
     <>
       <style>{G}</style>
       <div style={{ display:"flex", flexDirection:"column", height:"100vh" }}>
-        <div className="key-bar">
+        {!import.meta.env.VITE_ANTHROPIC_API_KEY && <div className="key-bar">
           <span>🔑 API Key:</span>
           <input type="password" value={apiKey} onChange={e => handleSaveKey(e.target.value)} placeholder="sk-ant-... (necesaria para importar PDFs)" />
           {apiKey ? <span style={{ fontSize:9, letterSpacing:1, color:"var(--lime)" }}>✓ Configurada</span> : <span style={{ fontSize:9, color:"var(--rose)" }}>Requerida para importar PDFs</span>}
-        </div>
+        </div>}
         <div className="app" style={{ flex:1, minHeight:0 }}>
           <aside className="rail">
             <div className="rail-brand">
@@ -1347,7 +1347,7 @@ export default function App() {
                 <>
                   <div className="ph">
                     <div><div className="pt">Ordenes <em>de Compra</em></div><div className="pm">{filtered.length} ORDENES</div></div>
-                    <button className="btn btn-gold" onClick={() => setShowImport(true)} disabled={!apiKey}>+ Importar OC</button>
+                    <button className="btn btn-gold" onClick={() => setShowImport(true)} >+ Importar OC</button>
                   </div>
                   <div className="toolbar">
                     <input className="srch" placeholder="Buscar por ID, cliente, N° OC..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -1397,7 +1397,7 @@ export default function App() {
                               <td>
                                 <div style={{ display:"flex", gap:5 }}>
                                   <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Ver</button>
-                                  <button className="btn btn-sky btn-sm" onClick={() => setShowDispatch(oc)} disabled={!apiKey}>+Doc.</button>
+                                  <button className="btn btn-sky btn-sm" onClick={() => setShowDispatch(oc)} >+Doc.</button>
                                   {isAdmin ? <button className="btn btn-rose btn-sm" onClick={() => handleDelOC(oc.id)}>✕</button> : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => setConfirmDel({ type:"request", label: oc.ocNumber || oc.id })}>✕</button>}
                                 </div>
                               </td>
