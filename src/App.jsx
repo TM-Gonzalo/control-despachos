@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 
+
+
 // Storage adapter: usa window.storage si está disponible (artifact Claude), sino localStorage
 const storage = {
   get: async (key) => {
@@ -99,7 +101,7 @@ const G = `
   --lime:#7fff5a;--sky:#4db8ff;--rose:#ff4d6d;--teal:#3dffc4;--violet:#a78bff;
   --fS:'Instrument Serif',serif;--fM:'Geist Mono',monospace;
 }
-html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(--fM);font-size:13px}
+html,body{height:100%;margin:0;padding:0;background:var(--ink);color:var(--white);font-family:var(--fM);font-size:13px}
 .app{display:flex;height:100vh;overflow:hidden}
 .rail{width:210px;background:var(--ink2);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
 .rail-brand{padding:20px 18px 16px;border-bottom:1px solid var(--line)}
@@ -116,7 +118,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .rail-user strong{display:block;color:var(--white);margin-bottom:2px}
 .rail-logout{font-size:9px;color:var(--fog);cursor:pointer;background:none;border:none;font-family:var(--fM);letter-spacing:1px;margin-top:5px;display:block;padding:0}
 .rail-logout:hover{color:var(--rose)}
-.body{flex:1;overflow-y:auto;scrollbar-width:none}.body::-webkit-scrollbar{display:none}
+.body{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.body::-webkit-scrollbar{width:6px;height:6px}.body::-webkit-scrollbar-track{background:transparent}.body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}.body::-webkit-scrollbar-thumb:hover{background:var(--fog)}
 .page{padding:26px 30px;max-width:1120px}
 .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
 .pt{font-family:var(--fS);font-size:32px;font-style:italic;color:var(--white);line-height:1}
@@ -145,9 +147,9 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .srch{flex:1;background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-family:var(--fM);font-size:11px;color:var(--white);outline:none}
 .srch:focus{border-color:var(--gold)}.srch::placeholder{color:var(--fog)}
 .fsel{background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font-family:var(--fM);font-size:11px;color:var(--fog2);outline:none;cursor:pointer}
-.tbl-card{background:var(--ink2);border:1px solid var(--line);border-radius:9px;overflow:hidden;overflow-x:auto;scrollbar-width:none}.tbl-card::-webkit-scrollbar{display:none}.tbl-card table{min-width:900px}
+.tbl-card{background:var(--ink2);border:1px solid var(--line);border-radius:9px;overflow:hidden;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.tbl-card::-webkit-scrollbar{height:5px}.tbl-card::-webkit-scrollbar-track{background:transparent}.tbl-card::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}.tbl-card::-webkit-scrollbar-thumb:hover{background:var(--fog)}.tbl-card table{min-width:900px}
 table{width:100%;border-collapse:collapse}
-thead{background:var(--ink3)}
+thead{background:var(--ink3)}thead th{position:sticky;top:0;z-index:1;background:var(--ink3)}
 th{padding:9px 14px;text-align:left;font-size:8px;letter-spacing:2.5px;color:var(--fog);font-weight:500}
 td{padding:12px 14px;font-size:11px;border-top:1px solid var(--line);vertical-align:middle}
 tr:hover td{background:rgba(255,255,255,.012)}
@@ -163,7 +165,7 @@ tr:hover td{background:rgba(255,255,255,.012)}
 .pbar-wrap{background:var(--ink);border-radius:99px;height:4px;overflow:hidden}
 .pbar{height:100%;border-radius:99px;transition:width .5s}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
-.modal{background:var(--ink2);border:1px solid var(--line2);border-radius:13px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:26px 30px;scrollbar-width:none}.modal::-webkit-scrollbar{display:none}
+.modal{background:var(--ink2);border:1px solid var(--line2);border-radius:13px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:26px 30px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.modal::-webkit-scrollbar{width:5px}.modal::-webkit-scrollbar-track{background:transparent}.modal::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}.modal::-webkit-scrollbar-thumb:hover{background:var(--fog)}
 .modal-xl{max-width:840px}
 .modal-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
 .modal-title{font-family:var(--fS);font-size:22px;font-style:italic;color:var(--white)}
@@ -269,7 +271,7 @@ tr:hover td{background:rgba(255,255,255,.012)}
 .cli-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
 .cli-name{font-family:var(--fS);font-size:18px;font-style:italic;color:var(--white)}
 .cli-ocs{font-size:9px;letter-spacing:2px;color:var(--fog);margin-top:2px}
-.cli-totals{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);align-items:end}
+.cli-totals{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink2);align-items:end}
 .cli-total{background:var(--ink2);padding:12px 16px}
 .cli-total label{font-size:8px;letter-spacing:2px;color:var(--fog);display:block;margin-bottom:5px}
 .cli-total p{font-size:15px;font-weight:600;white-space:nowrap}
@@ -635,7 +637,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
   const save = async () => {
     if (!num || !items.length) return setErr("Completa numero de documento e items.");
     // Validación neto para facturas
-    if (docType === "factura" && ext?.netTotal) {
+    if (docType === "factura" && (ext && ext.netTotal)) {
       const mappedNet = items.reduce((s, it, i) => {
         return s + Number(it.qty) * Number(it.unitPrice || 0);
       }, 0);
@@ -654,7 +656,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
         return { desc: it.desc, unit: it.unit || "Unidad", qty: Number(it.qty), unitPrice, ocItemId, splitPrice: splitPrice[i] ? true : undefined };
       });
       const dispTotal = mapped.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
-      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, total: ext?.total || dispTotal || 0, netTotal: ext?.netTotal || dispTotal || 0, items: mapped });
+      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, total: (ext && ext.total) || dispTotal || 0, netTotal: (ext && ext.netTotal) || dispTotal || 0, items: mapped });
       // resetear para agregar otro despacho sin cerrar
       setSavedCount(c => c + 1);
       setLastSaved({ num, docType });
@@ -704,7 +706,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
               </div>
               <div className="fg"><label>N° DOCUMENTO *</label><input value={num} onChange={e => setNum(e.target.value)} placeholder={docType === "factura" ? "Ej: 12345" : "Ej: 8821"} /></div>
               <div className="fg"><label>FECHA</label><input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-              {docType === "factura" && <div className="fg"><label>MONTO NETO FACTURA *</label><input type="number" value={ext?.netTotal || 0} onChange={e => setExt(p => ({ ...p, netTotal: Number(e.target.value) }))} placeholder="Monto neto sin IVA" /></div>}
+              {docType === "factura" && <div className="fg"><label>MONTO NETO FACTURA *</label><input type="number" value={(ext && ext.netTotal) || 0} onChange={e => setExt(p => ({ ...p, netTotal: Number(e.target.value) }))} placeholder="Monto neto sin IVA" /></div>}
             </div>
             <div className="slbl">ITEMS DEL DOCUMENTO</div>
             <div className="itbl">
@@ -858,7 +860,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
                 <div style={{ fontSize:13, color:"var(--gold)", fontWeight:600 }}>
                   Total mapeado: {fmtCLP(items.reduce((s,it,i) => s + Number(it.qty) * Number(it.unitPrice || 0), 0))}
                 </div>
-                {ext?.netTotal && <div style={{ fontSize:10, color:"var(--fog2)" }}>Neto factura: {fmtCLP(ext.netTotal)}</div>}
+                {(ext && ext.netTotal) && <div style={{ fontSize:10, color:"var(--fog2)" }}>Neto factura: {fmtCLP(ext.netTotal)}</div>}
               </div>
             </div>
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginBottom:11, marginTop:8 }}>⚠ {err}</div>}
@@ -1045,8 +1047,10 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   );
                 })}
                 {d.docType === "factura" && (() => {
-                  const neto = Number(d.netTotal || 0) || (d.items || []).reduce((s, it) => {
-                    return s + (Number(it.qty)||0) * Number(it.unitPrice || 0);
+                  const neto = Number(d.netTotal || 0) || (d.items || []).filter(it => !it.splitPrice).reduce((s, it) => {
+                    const ocIt = oc.items.find(o => o.id === it.ocItemId);
+                    const price = Number(it.unitPrice || (ocIt ? ocIt.unitPrice : 0) || 0);
+                    return s + (Number(it.qty)||0) * price;
                   }, 0);
                   return neto > 0 ? (
                     <div style={{ display:"flex", justifyContent:"flex-end", borderTop:"1px solid var(--line)", marginTop:6, paddingTop:6 }}>
@@ -1063,14 +1067,14 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   );
 }
 
-export default function App() {
+function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("dc_user")); } catch(e) { return null; } });
   const [ocs, setOcs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
   const [search, setSearch] = useState("");
   const [fst, setFst] = useState("all");
-  const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_ANTHROPIC_API_KEY || localStorage.getItem("dc_apikey") || "");
+  const [apiKey, setApiKey] = useState(localStorage.getItem("dc_apikey") || "");
   const [showImport, setShowImport] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
@@ -1103,7 +1107,7 @@ export default function App() {
   if (!user) return <><style>{G}</style><AuthScreen onAuth={u => setUser(u)} /></>;
 
   const logout = () => { localStorage.removeItem("dc_user"); setUser(null); setOcs([]); };
-  const isAdmin = user?.isAdmin === true;
+  const isAdmin = (user && user.isAdmin) === true;
 
   const enriched = ocs.map(oc => ({
     ...oc,
@@ -1136,7 +1140,7 @@ export default function App() {
 
   const handleSaveDispatch = async (ocId, dispatch) => {
     const oc = ocs.find(o => o.id === ocId);
-    const existing = (oc?.dispatches || []);
+    const existing = ((oc && oc.dispatches) || []);
     if (dispatch.number && dispatch.number.trim()) {
       const norm = dispatch.number.trim().toLowerCase();
       const dupe = existing.find(d => d.number && d.number.trim().toLowerCase() === norm && d.docType === dispatch.docType);
@@ -1154,7 +1158,7 @@ export default function App() {
 
   const handleDelDispatch = (ocId, dispId) => {
     const oc = ocs.find(o => o.id === ocId);
-    const disp = (oc?.dispatches || []).find(d => d.id === dispId);
+    const disp = ((oc && oc.dispatches) || []).find(d => d.id === dispId);
     setConfirmDel({ type:"dispatch", ocId, dispId, label: disp ? (disp.docType === "factura" ? "Factura" : "Guia") + " N° " + disp.number : "documento" });
   };
   const doDelDispatch = async () => {
@@ -1222,8 +1226,8 @@ export default function App() {
   const applySort = (arr, { col, dir }) => {
     if (!col) return arr;
     return [...arr].sort((a, b) => {
-      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches)] ?? 0) : 0;
-      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches)] ?? 0) : 0;
+      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches)] || 0) : 0;
+      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches)] || 0) : 0;
       return av < bv ? -dir : av > bv ? dir : 0;
     });
   };
@@ -1235,12 +1239,12 @@ export default function App() {
   return (
     <>
       <style>{G}</style>
-      <div style={{ display:"flex", flexDirection:"column", height:"100vh" }}>
-        {!import.meta.env.VITE_ANTHROPIC_API_KEY && <div className="key-bar">
+      <div style={{ display:"flex", flexDirection:"column", height:"100vh", overflow:"hidden" }}>
+        <div className="key-bar">
           <span>🔑 API Key:</span>
           <input type="password" value={apiKey} onChange={e => handleSaveKey(e.target.value)} placeholder="sk-ant-... (necesaria para importar PDFs)" />
           {apiKey ? <span style={{ fontSize:9, letterSpacing:1, color:"var(--lime)" }}>✓ Configurada</span> : <span style={{ fontSize:9, color:"var(--rose)" }}>Requerida para importar PDFs</span>}
-        </div>}
+        </div>
         <div className="app" style={{ flex:1, minHeight:0 }}>
           <aside className="rail">
             <div className="rail-brand">
@@ -1338,7 +1342,7 @@ export default function App() {
                           );
                         })}</tbody>
                       </table>
-                    </div>
+                    </div></div>
                   }
                 </>
               )}
@@ -1885,7 +1889,20 @@ export default function App() {
               style={{ width:"100%", height:320, background:"var(--ink)", border:"1px solid var(--line2)", borderRadius:7, padding:12, fontFamily:"var(--fM)", fontSize:10, color:"var(--fog2)", resize:"none", outline:"none" }}
             />
             <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }}>
-              <button className="btn btn-gold" onClick={() => { navigator.clipboard.writeText(showExport).then(() => notify("JSON copiado al portapapeles ✓")); }}>Copiar al portapapeles</button>
+              <button className="btn btn-gold" onClick={() => {
+                try {
+                  const ta = document.createElement("textarea");
+                  ta.value = showExport;
+                  ta.style.position = "fixed"; ta.style.opacity = "0";
+                  document.body.appendChild(ta);
+                  ta.focus(); ta.select();
+                  document.execCommand("copy");
+                  document.body.removeChild(ta);
+                  notify("JSON copiado al portapapeles ✓");
+                } catch(e) {
+                  navigator.clipboard && navigator.clipboard.writeText(showExport).then(() => notify("JSON copiado al portapapeles ✓")).catch(() => notify("Error al copiar", "err"));
+                }
+              }}>Copiar al portapapeles</button>
             </div>
           </div>
         </div>
