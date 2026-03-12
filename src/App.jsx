@@ -116,7 +116,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .rail-user strong{display:block;color:var(--white);margin-bottom:2px}
 .rail-logout{font-size:9px;color:var(--fog);cursor:pointer;background:none;border:none;font-family:var(--fM);letter-spacing:1px;margin-top:5px;display:block;padding:0}
 .rail-logout:hover{color:var(--rose)}
-.body{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.body::-webkit-scrollbar{width:5px}.body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}
+.body{flex:1;min-width:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.body::-webkit-scrollbar{width:5px}.body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}
 .page{padding:26px 30px;width:100%;box-sizing:border-box}
 .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
 .pt{font-family:var(--fS);font-size:32px;font-style:italic;color:var(--white);line-height:1}
