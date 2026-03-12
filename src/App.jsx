@@ -1,12 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 
+// Storage adapter: usa window.storage si está disponible (artifact Claude), sino localStorage
+const storage = {
+  get: async (key) => {
+    if (window.storage) return window.storage.get(key);
+    const v = localStorage.getItem(key);
+    return v ? { value: v } : null;
+  },
+  set: async (key, value) => {
+    if (window.storage) return window.storage.set(key, value);
+    localStorage.setItem(key, value);
+  }
+};
+
 async function loadOCs() {
-  try { const r = await window.storage.get("ocs-v3"); return r ? JSON.parse(r.value) : []; }
+  try { const r = await storage.get("ocs-v3"); return r ? JSON.parse(r.value) : []; }
   catch { return []; }
 }
 async function saveOCs(ocs) {
-  try { await window.storage.set("ocs-v3", JSON.stringify(ocs)); } catch(e) { console.error(e); }
+  try { await storage.set("ocs-v3", JSON.stringify(ocs)); } catch(e) { console.error(e); }
 }
 
 async function extractPDF(b64, type, apiKey) {
@@ -343,13 +356,13 @@ function AuthScreen({ onAuth }) {
     setLoading(true);
     try {
       let users = [];
-      try { const r = await window.storage.get("dc-users"); users = r ? JSON.parse(r.value) : []; } catch(e) {}
+      try { const r = await storage.get("dc-users"); users = r ? JSON.parse(r.value) : []; } catch(e) {}
       if (tab === "register") {
         if (!name || !email || password.length < 6) throw new Error("Completa todos los campos (contrasena min. 6 caracteres)");
         if (users.find(u => u.email === email)) throw new Error("Email ya registrado");
         const isAdmin = users.length === 0; // primer usuario = admin
         const nu = { id: Date.now(), name, email, password, isAdmin };
-        await window.storage.set("dc-users", JSON.stringify([...users, nu]));
+        await storage.set("dc-users", JSON.stringify([...users, nu]));
         localStorage.setItem("dc_user", JSON.stringify({ id: nu.id, name: nu.name, email: nu.email, isAdmin: nu.isAdmin }));
         onAuth({ id: nu.id, name: nu.name, email: nu.email, isAdmin: nu.isAdmin });
       } else {
@@ -1059,6 +1072,7 @@ export default function App() {
   const [fst, setFst] = useState("all");
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("dc_apikey") || "");
   const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [showDispatch, setShowDispatch] = useState(null);
   const [convertTarget, setConvertTarget] = useState(null);
@@ -1248,6 +1262,28 @@ export default function App() {
             <div className="rail-foot">
               <div className="rail-user"><strong>{user.name}</strong>{user.email}</div>
               <button className="rail-logout" onClick={logout}>Cerrar sesion</button>
+              {isAdmin && <div style={{ borderTop:"1px solid var(--line)", marginTop:10, paddingTop:10, display:"flex", flexDirection:"column", gap:5 }}>
+                <button className="rail-logout" style={{ color:"var(--sky)" }} onClick={() => {
+                  const data = { ocs, exportedAt: new Date().toISOString(), version: "ocs-v3" };
+                  setShowExport(JSON.stringify(data, null, 2));
+                }}>↓ Exportar datos</button>
+                <label className="rail-logout" style={{ color:"var(--teal)", cursor:"pointer" }}>
+                  ↑ Importar datos
+                  <input type="file" accept=".json" style={{ display:"none" }} onChange={async e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    try {
+                      const text = await file.text();
+                      const data = JSON.parse(text);
+                      const imported = data.ocs || [];
+                      if (!imported.length) { notify("No se encontraron datos en el archivo", "err"); return; }
+                      await persist(imported);
+                      notify(imported.length + " OCs importadas ✓");
+                      e.target.value = "";
+                    } catch(err) { notify("Error al leer el archivo", "err"); }
+                  }} />
+                </label>
+              </div>}
             </div>
           </aside>
           <main className="body">
@@ -1823,6 +1859,34 @@ export default function App() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+      {showExport && (
+        <div className="overlay">
+          <div className="modal modal-xl">
+            <div className="modal-hd">
+              <div><div className="modal-title">Exportar Datos</div><div className="modal-sub">Copia este JSON y guárdalo como archivo .json</div></div>
+              <div className="xbtn" onClick={() => setShowExport(false)}>✕</div>
+            </div>
+            <div style={{ background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:7, padding:14, marginBottom:14 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:8 }}>INSTRUCCIONES</div>
+              <div style={{ fontSize:11, color:"var(--fog2)", lineHeight:1.8 }}>
+                1. Selecciona todo el texto de abajo (<strong style={{color:"var(--white)"}}>Cmd+A</strong> dentro del área)<br/>
+                2. Cópialo (<strong style={{color:"var(--white)"}}>Cmd+C</strong>)<br/>
+                3. Abre un editor de texto (TextEdit o similar)<br/>
+                4. Pega y guarda como <strong style={{color:"var(--gold)"}}>backup.json</strong>
+              </div>
+            </div>
+            <textarea
+              readOnly
+              value={showExport}
+              onClick={e => e.target.select()}
+              style={{ width:"100%", height:320, background:"var(--ink)", border:"1px solid var(--line2)", borderRadius:7, padding:12, fontFamily:"var(--fM)", fontSize:10, color:"var(--fog2)", resize:"none", outline:"none" }}
+            />
+            <div style={{ display:"flex", justifyContent:"flex-end", marginTop:14 }}>
+              <button className="btn btn-gold" onClick={() => { navigator.clipboard.writeText(showExport).then(() => notify("JSON copiado al portapapeles ✓")); }}>Copiar al portapapeles</button>
+            </div>
           </div>
         </div>
       )}
