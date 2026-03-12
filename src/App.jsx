@@ -155,7 +155,7 @@ tr:hover td{background:rgba(255,255,255,.012)}
 .b-open{background:rgba(77,184,255,.1);color:var(--sky)}
 .b-partial{background:rgba(232,184,75,.1);color:var(--gold)}
 .b-closed{background:rgba(127,255,90,.1);color:var(--lime)}
-.b-toinvoice{background:rgba(167,139,255,.1);color:var(--violet)}
+.b-toinvoice{background:rgba(255,90,90,.1);color:var(--rose)}
 .b-warn{background:rgba(255,77,109,.1);color:var(--rose)}
 .bdoc-factura{background:rgba(61,255,196,.08);color:var(--teal);border:1px solid rgba(61,255,196,.2)}
 .bdoc-guia{background:rgba(167,139,255,.1);color:var(--violet);border:1px solid rgba(167,139,255,.22)}
@@ -1312,9 +1312,10 @@ export default function App() {
                   )}
                   <div className="kpis" style={{ marginBottom:18 }}>
                     {[
-                      { n:enriched.length, lbl:"Total OCs", c:"var(--gold)" },
+                      { n:enriched.length, lbl:"Total OCs", c:"var(--white)" },
                       { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
                       { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="partial").length, lbl:"Parciales", c:"var(--gold)" },
+                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="toinvoice").length, lbl:"Por Facturar", c:"var(--rose)" },
                       { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="closed").length, lbl:"Cerradas", c:"var(--lime)" },
                     ].map(({n,lbl,c}) => (
                       <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-n" style={{ color:c }}>{n}</div><div className="kpi-l">{lbl}</div></div>
@@ -1343,7 +1344,7 @@ export default function App() {
                                   <span style={{ fontSize:10, color:"var(--fog)", width:28 }}>{pct}%</span>
                                 </div>
                               </td>
-                              <td><span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--violet)" : "var(--lime)"} />{bLbl(s)}</span></td>
+                              <td><span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span></td>
                               <td><button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Ver</button></td>
                             </tr>
                           );
@@ -1404,7 +1405,7 @@ export default function App() {
                                   <span style={{ fontSize:10, color:"var(--fog)", width:28 }}>{pct}%</span>
                                 </div>
                               </td>
-                              <td><span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--violet)" : "var(--lime)"} />{bLbl(s)}</span></td>
+                              <td><span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span></td>
                               <td>
                                 <div style={{ display:"flex", gap:5 }}>
                                   <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Ver</button>
@@ -1491,7 +1492,7 @@ export default function App() {
                                   return (
                                     <div className="cli-oc-row" key={oc.id}>
                                       <span style={{ color:"var(--gold)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
-                                      <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--violet)" : "var(--lime)"} />{bLbl(s)}</span>
+                                      <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
                                       <span style={{ color:"var(--fog)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
                                       <span style={{ color:"var(--lime)", width:100, textAlign:"right" }}>{fmtCLP(dis)}</span>
                                       <span style={{ color: rem > 0 ? "var(--rose)" : "var(--fog2)", width:100, textAlign:"right", fontWeight: rem > 0 ? 600 : 400 }}>{fmtCLP(rem)}</span>
@@ -1674,7 +1675,7 @@ export default function App() {
                     </div>
                     <div className="kpis" style={{ marginBottom:22 }}>
                       {[
-                        { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--sky)" },
+                        { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--white)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--rose)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--violet)" },
@@ -1791,7 +1792,7 @@ export default function App() {
                             <div className="rep-id">{oc.ocNumber || oc.id}</div>
                           </div>
                           <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap", justifyContent:"flex-end" }}>
-                            <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--violet)" : "var(--lime)"} />{bLbl(s)}</span>
+                            <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
                             {d !== null && d <= 5 && s !== "closed" && s !== "toinvoice" && <span className="badge b-warn"><Dot c="var(--rose)" />{d < 0 ? "Vencida" : d + "d"}</span>}
                             {pendG > 0 && <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />{pendG} guia{pendG > 1 ? "s" : ""} sin fac.</span>}
                             <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
@@ -1806,7 +1807,7 @@ export default function App() {
                         <div className="rep-stats">
                           <div className="rep-stat"><label>MONTO OC</label><p style={{ color: s === "closed" ? "var(--lime)" : s === "toinvoice" ? "var(--gold)" : "var(--gold)" }}>{fmtCLP(tot)}</p></div>
                           <div className="rep-stat"><label>DESPACHADO</label><p style={{ color:"var(--lime)" }}>{fmtCLP(dis)}</p></div>
-                          <div className="rep-stat"><label>REMANENTE</label><p style={{ color: s === "closed" ? "var(--lime)" : s === "toinvoice" ? "var(--violet)" : "var(--rose)" }}>{fmtCLP(tot - dis)}</p></div>
+                          <div className="rep-stat"><label>REMANENTE</label><p style={{ color: s === "closed" ? "var(--lime)" : s === "toinvoice" ? "var(--rose)" : "var(--rose)" }}>{fmtCLP(tot - dis)}</p></div>
                           <div className="rep-stat"><label>ENTREGA</label><p style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</p></div>
                           <div className="rep-stat"><label>FACTURAS</label><p style={{ color:"var(--teal)" }}>{disp.filter(x => x.docType === "factura").length}</p></div>
                           <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--violet)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
