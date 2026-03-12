@@ -1240,11 +1240,11 @@ function App() {
     <>
       <style>{G}</style>
       <div style={{ display:"flex", flexDirection:"column", height:"100vh", overflow:"hidden" }}>
-        <div className="key-bar">
+        {!(window.__ENV__ && window.__ENV__.ANTHROPIC_API_KEY) && <div className="key-bar">
           <span>🔑 API Key:</span>
           <input type="password" value={apiKey} onChange={e => handleSaveKey(e.target.value)} placeholder="sk-ant-... (necesaria para importar PDFs)" />
           {apiKey ? <span style={{ fontSize:9, letterSpacing:1, color:"var(--lime)" }}>✓ Configurada</span> : <span style={{ fontSize:9, color:"var(--rose)" }}>Requerida para importar PDFs</span>}
-        </div>
+        </div>}
         <div className="app" style={{ flex:1, minHeight:0 }}>
           <aside className="rail">
             <div className="rail-brand">
