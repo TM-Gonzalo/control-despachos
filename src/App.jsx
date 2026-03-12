@@ -119,7 +119,7 @@ html,body{height:100%;margin:0;padding:0;background:var(--ink);color:var(--white
 .rail-logout{font-size:9px;color:var(--fog);cursor:pointer;background:none;border:none;font-family:var(--fM);letter-spacing:1px;margin-top:5px;display:block;padding:0}
 .rail-logout:hover{color:var(--rose)}
 .body{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.body::-webkit-scrollbar{width:6px;height:6px}.body::-webkit-scrollbar-track{background:transparent}.body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}.body::-webkit-scrollbar-thumb:hover{background:var(--fog)}
-.page{padding:26px 30px;max-width:1120px}
+.page{padding:26px 30px;width:100%}
 .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
 .pt{font-family:var(--fS);font-size:32px;font-style:italic;color:var(--white);line-height:1}
 .pt em{color:var(--gold)}
