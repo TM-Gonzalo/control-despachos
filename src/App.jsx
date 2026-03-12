@@ -100,7 +100,7 @@ const G = `
   --fS:'Instrument Serif',serif;--fM:'Geist Mono',monospace;
 }
 html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(--fM);font-size:13px}
-.app{display:flex;height:100vh;overflow:hidden}
+.app{display:flex;height:100vh;overflow:hidden;width:100%}
 .rail{width:210px;background:var(--ink2);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
 .rail-brand{padding:20px 18px 16px;border-bottom:1px solid var(--line)}
 .rail-name{font-family:var(--fS);font-size:17px;color:var(--gold);line-height:1.15;font-style:italic}
