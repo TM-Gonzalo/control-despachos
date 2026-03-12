@@ -1235,7 +1235,7 @@ export default function App() {
   return (
     <>
       <style>{G}</style>
-      <div style={{ display:"flex", flexDirection:"column", height:"100vh" }}>
+      <div style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100%" }}>
         {!import.meta.env.VITE_ANTHROPIC_API_KEY && <div className="key-bar">
           <span>🔑 API Key:</span>
           <input type="password" value={apiKey} onChange={e => handleSaveKey(e.target.value)} placeholder="sk-ant-... (necesaria para importar PDFs)" />
