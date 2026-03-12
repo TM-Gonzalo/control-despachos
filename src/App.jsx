@@ -1680,7 +1680,7 @@ export default function App() {
                           <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>{ocs.length} OC{ocs.length !== 1 ? "s" : ""}</div>
                         </div>
                         <div className="rep-grid">
-                          {[...ocs].sort((a, b) => (a.date || "").localeCompare(b.date || "")).map(oc => {
+                          {[...ocs].sort((a, b) => { const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0); const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0); return remB - remA; }).map(oc => {
                             const s = ocStatus(oc.items, oc.dispatches);
                             const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                             const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
