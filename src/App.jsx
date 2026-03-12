@@ -1315,7 +1315,7 @@ export default function App() {
                     <div className="tbl-card">
                       <table>
                         <thead><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><th>ESTADO</th><th /></tr></thead>
-                        <tbody>{applySort(enriched, dashSort).slice(0, 6).map(oc => {
+                        <tbody>{applySort(enriched, dashSort).slice(0, 15).map(oc => {
                           const s = ocStatus(oc.items, oc.dispatches);
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
