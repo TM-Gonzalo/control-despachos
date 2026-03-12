@@ -1241,7 +1241,7 @@ export default function App() {
           <input type="password" value={apiKey} onChange={e => handleSaveKey(e.target.value)} placeholder="sk-ant-... (necesaria para importar PDFs)" />
           {apiKey ? <span style={{ fontSize:9, letterSpacing:1, color:"var(--lime)" }}>✓ Configurada</span> : <span style={{ fontSize:9, color:"var(--rose)" }}>Requerida para importar PDFs</span>}
         </div>}
-        <div className="app" style={{ flex:1, minHeight:0 }}>
+        <div className="app" style={{ flex:1, minHeight:0, width:"100%" }}>
           <aside className="rail">
             <div className="rail-brand">
               <div className="rail-name">Control<br />Despachos</div>
