@@ -359,7 +359,7 @@ function AuthScreen({ onAuth }) {
       try { const r = await storage.get("dc-users"); users = r ? JSON.parse(r.value) : []; } catch(e) {}
       if (tab === "register") {
         if (!name || !email || password.length < 6) throw new Error("Completa todos los campos (contrasena min. 6 caracteres)");
-        if (users.find(u => u.email === email)) throw new Error("Email ya registrado");
+        if (!email.endsWith("@totalmetal.cl")) throw new Error("Solo se permiten cuentas @totalmetal.cl"); if (users.find(u => u.email === email)) throw new Error("Email ya registrado");
         const isAdmin = users.length === 0; // primer usuario = admin
         const nu = { id: Date.now(), name, email, password, isAdmin };
         await storage.set("dc-users", JSON.stringify([...users, nu]));
