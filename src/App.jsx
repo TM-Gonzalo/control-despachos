@@ -300,7 +300,7 @@ function DocBadge({ doc }) {
     return <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {doc.number}</span>;
   }
   if (doc.invoiceNumber) {
-    return <span className="badge bdoc-guia"><Dot c="var(--violet)" />Guia {doc.number} <span style={{ color:"var(--teal)", marginLeft:4 }}>Fac. {doc.invoiceNumber}</span></span>;
+    return <span className="badge bdoc-guia"><Dot c="var(--rose)" />Guia {doc.number} <span style={{ color:"var(--teal)", marginLeft:4 }}>Fac. {doc.invoiceNumber}</span></span>;
   }
   return <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />Guia {doc.number} <span style={{ color:"var(--fog)", marginLeft:4, fontSize:8 }}>sin factura</span></span>;
 }
@@ -688,7 +688,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
           <>
             <div className="ex-box">
               <div className="ex-ok">✓ DOCUMENTO DETECTADO</div>
-              <div className="ex-row"><span className="ex-k">Tipo</span><span className="ex-v" style={{ color: docType === "factura" ? "var(--teal)" : "var(--violet)" }}>{docType === "factura" ? "Factura" : "Guia de Despacho"}</span></div>
+              <div className="ex-row"><span className="ex-k">Tipo</span><span className="ex-v" style={{ color: docType === "factura" ? "var(--teal)" : "var(--rose)" }}>{docType === "factura" ? "Factura" : "Guia de Despacho"}</span></div>
               <div className="ex-row"><span className="ex-k">N° Documento</span><span className="ex-v">{ext && ext.docNumber ? ext.docNumber : "—"}</span></div>
               <div className="ex-row"><span className="ex-k">Fecha</span><span className="ex-v">{ext && ext.date ? ext.date : "—"}</span></div>
               {ext && ext.netTotal ? <div className="ex-row"><span className="ex-k">Neto</span><span className="ex-v" style={{ color:"var(--gold)" }}>{fmtCLP(ext.netTotal)}</span></div> : null}
@@ -759,9 +759,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
                       <div style={{ fontWeight:500, fontSize:12 }}>{it.desc}</div>
                       <div style={{ fontSize:9, color:"var(--sky)", marginTop:2 }}>Cant: {fmtNum(it.qty)} {it.unit}</div>
                       {sharedWithOther && (
-                        <label style={{ display:"flex", alignItems:"center", gap:5, marginTop:5, cursor:"pointer", fontSize:9, letterSpacing:1, color: isSplit ? "var(--violet)" : "var(--gold)" }}>
+                        <label style={{ display:"flex", alignItems:"center", gap:5, marginTop:5, cursor:"pointer", fontSize:9, letterSpacing:1, color: isSplit ? "var(--rose)" : "var(--gold)" }}>
                           <input type="checkbox" checked={isSplit} onChange={e => setSplitPrice(p => ({ ...p, [i]: e.target.checked }))}
-                            style={{ accentColor:"var(--violet)", width:11, height:11 }} />
+                            style={{ accentColor:"var(--rose)", width:11, height:11 }} />
                           {isSplit ? "✓ SUBDIVISIÓN DE PRECIO — qty no suma" : "⚠ Mismo item que otra línea — ¿subdivisión de precio?"}
                         </label>
                       )}
@@ -835,7 +835,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
                     <td>
                       <div style={{ fontSize:12, fontWeight:500 }}>{it.desc}</div>
                       <div style={{ fontSize:9, color:"var(--fog)" }}>{it.unit}</div>
-                      {isSplit && <div style={{ fontSize:9, color:"var(--violet)", marginTop:2, letterSpacing:1 }}>⚑ SUBDIVISIÓN — qty no suma</div>}
+                      {isSplit && <div style={{ fontSize:9, color:"var(--rose)", marginTop:2, letterSpacing:1 }}>⚑ SUBDIVISIÓN — qty no suma</div>}
                     </td>
                     <td className="map-arrow">→</td>
                     <td>{ocItem
@@ -844,7 +844,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
                     </td>
                     <td style={{ textAlign:"right", fontWeight:600, color: isSplit ? "var(--fog)" : "var(--sky)" }}>{fmtNum(it.qty)}</td>
                     <td style={{ textAlign:"right", color:"var(--fog2)", fontSize:11 }}>{fmtCLP(it.unitPrice || 0)}</td>
-                    <td style={{ textAlign:"right", fontWeight:600, color: isSplit ? "var(--violet)" : "var(--gold)", fontSize:12 }}>{fmtCLP(Number(it.qty) * Number(it.unitPrice || 0))}{isSplit && <span style={{ fontSize:8, color:"var(--fog)", marginLeft:3 }}>(÷qty)</span>}</td>
+                    <td style={{ textAlign:"right", fontWeight:600, color: isSplit ? "var(--rose)" : "var(--gold)", fontSize:12 }}>{fmtCLP(Number(it.qty) * Number(it.unitPrice || 0))}{isSplit && <span style={{ fontSize:8, color:"var(--fog)", marginLeft:3 }}>(÷qty)</span>}</td>
                   </tr>
                 );
               })}</tbody>
@@ -852,7 +852,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:14, padding:"10px 14px", background:"var(--ink3)", borderRadius:8, border:"1px solid var(--line)" }}>
               <div style={{ fontSize:11, color:"var(--fog)" }}>
                 {items.length} item{items.length !== 1 ? "s" : ""} · {items.filter((_,i) => map[i] && map[i] !== "NONE").length} vinculado{items.filter((_,i) => map[i] && map[i] !== "NONE").length !== 1 ? "s" : ""}
-                {items.some((_,i) => splitPrice[i]) && <span style={{ color:"var(--violet)", marginLeft:8 }}>· {items.filter((_,i) => splitPrice[i]).length} subdivisión</span>}
+                {items.some((_,i) => splitPrice[i]) && <span style={{ color:"var(--rose)", marginLeft:8 }}>· {items.filter((_,i) => splitPrice[i]).length} subdivisión</span>}
               </div>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3 }}>
                 <div style={{ fontSize:13, color:"var(--gold)", fontWeight:600 }}>
@@ -892,7 +892,7 @@ function ConvertModal({ dispatch, ocId, onClose, onSave }) {
           <div className="xbtn" onClick={onClose}>✕</div>
         </div>
         <div className="conv-box">
-          <div className="conv-hint">La guia <strong style={{ color:"var(--violet)" }}>N° {dispatch.number}</strong> ya tiene sus items registrados. Solo ingresa el N° de factura para vincularla.</div>
+          <div className="conv-hint">La guia <strong style={{ color:"var(--rose)" }}>N° {dispatch.number}</strong> ya tiene sus items registrados. Solo ingresa el N° de factura para vincularla.</div>
           <div className="slbl" style={{ marginBottom:8 }}>ITEMS QUE INCLUYE</div>
           {dispatch.items.map((it, i) => (
             <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:11, padding:"3px 0", color:"var(--fog2)" }}>
@@ -1315,7 +1315,6 @@ export default function App() {
                       { n:enriched.length, lbl:"Total OCs", c:"var(--white)" },
                       { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
                       { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="partial").length, lbl:"Parciales", c:"var(--gold)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="toinvoice").length, lbl:"Por Facturar", c:"var(--rose)" },
                       { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="closed").length, lbl:"Cerradas", c:"var(--lime)" },
                     ].map(({n,lbl,c}) => (
                       <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-n" style={{ color:c }}>{n}</div><div className="kpi-l">{lbl}</div></div>
@@ -1395,7 +1394,7 @@ export default function App() {
                               <td>
                                 <span style={{ color:"var(--teal)", fontSize:10 }}>{nFac} fac.</span>
                                 <span style={{ color:"var(--fog)" }}> · </span>
-                                <span style={{ color: pending > 0 ? "var(--violet)" : "var(--fog2)", fontSize:10 }}>{nGuia} guia{nGuia !== 1 ? "s" : ""}{pending > 0 ? " (" + pending + "✗)" : ""}</span>
+                                <span style={{ color: pending > 0 ? "var(--rose)" : "var(--fog2)", fontSize:10 }}>{nGuia} guia{nGuia !== 1 ? "s" : ""}{pending > 0 ? " (" + pending + "✗)" : ""}</span>
                               </td>
                               <td style={{ color:"var(--gold)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + Number(i.qty)*Number(i.unitPrice), 0))}</td>
                               <td style={{ color:"var(--rose)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0))}</td>
@@ -1450,7 +1449,7 @@ export default function App() {
                       <>
                         <div className="kpis" style={{ marginBottom:22 }}>
                           {[
-                            { n: fmtCLP(grandTotal),   lbl: "Total OCs",    c: "var(--gold)" },
+                            { n: fmtCLP(grandTotal),   lbl: "Total OCs",    c: "var(--white)" },
                             { n: fmtCLP(grandDis),     lbl: "Despachado",   c: "var(--lime)" },
                             { n: fmtCLP(grandPending), lbl: "Pendiente",    c: "var(--rose)" },
                             { n: rows.length,           lbl: "Clientes",     c: "var(--sky)"  },
@@ -1552,7 +1551,7 @@ export default function App() {
                             { n: months.length,         lbl: "Meses",      c: "var(--sky)"    },
                             { n: allFacs.length,        lbl: "Facturas",   c: "var(--teal)"   },
                             { n: fmtCLP(grandTotal),    lbl: "Total",      c: "var(--gold)"   },
-                            { n: new Set(allFacs.map(f => f.client)).size, lbl: "Clientes", c: "var(--violet)" },
+                            { n: new Set(allFacs.map(f => f.client)).size, lbl: "Clientes", c: "var(--rose)" },
                           ].map(({ n, lbl, c }) => (
                             <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 20 : 38 }}>{n}</div></div>
                           ))}
@@ -1581,7 +1580,7 @@ export default function App() {
                               <div className="mon-kpis">
                                 <div className="mon-kpi"><label>MONTO FACTURADO</label><p style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(monTotal)}</p></div>
                                 <div className="mon-kpi"><label>N° FACTURAS</label><p style={{ color:"var(--teal)" }}>{facs.length}</p></div>
-                                <div className="mon-kpi"><label>CLIENTES</label><p style={{ color:"var(--violet)" }}>{Object.keys(byClient).length}</p></div>
+                                <div className="mon-kpi"><label>CLIENTES</label><p style={{ color:"var(--rose)" }}>{Object.keys(byClient).length}</p></div>
                               </div>
                               <div className="mon-body">
                                 {Object.entries(byClient).map(([client, cfacs]) => (
@@ -1678,7 +1677,7 @@ export default function App() {
                         { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--white)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--rose)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
-                        { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--violet)" },
+                        { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
                         <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 20 : 38 }}>{n}</div></div>
                       ))}
@@ -1723,7 +1722,7 @@ export default function App() {
                                   <div className="rep-stat"><label>REMANENTE</label><p style={{ color:"var(--rose)" }}>{fmtCLP(tot - dis)}</p></div>
                                   <div className="rep-stat"><label>ENTREGA</label><p style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</p></div>
                                   <div className="rep-stat"><label>FACTURAS</label><p style={{ color:"var(--teal)" }}>{disp.filter(x => x.docType === "factura").length}</p></div>
-                                  <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--violet)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
+                                  <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--rose)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
                                 </div>
                                 <div className="rep-items">
                                   {oc.items.filter(it => Number(it.qty) - Number(it.dispatched || 0) > 0).map(it => {
@@ -1810,7 +1809,7 @@ export default function App() {
                           <div className="rep-stat"><label>REMANENTE</label><p style={{ color: s === "closed" ? "var(--lime)" : s === "toinvoice" ? "var(--rose)" : "var(--rose)" }}>{fmtCLP(tot - dis)}</p></div>
                           <div className="rep-stat"><label>ENTREGA</label><p style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</p></div>
                           <div className="rep-stat"><label>FACTURAS</label><p style={{ color:"var(--teal)" }}>{disp.filter(x => x.docType === "factura").length}</p></div>
-                          <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--violet)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
+                          <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--rose)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
                         </div>
                         <div className="rep-items">
                           {oc.items.filter(it => Number(it.qty) - Number(it.dispatched || 0) > 0).map(it => {
