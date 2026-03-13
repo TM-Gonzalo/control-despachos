@@ -116,6 +116,10 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .rail-user strong{display:block;color:var(--white);margin-bottom:2px}
 .rail-logout{font-size:9px;color:var(--fog);cursor:pointer;background:none;border:none;font-family:var(--fM);letter-spacing:1px;margin-top:5px;display:block;padding:0}
 .rail-logout:hover{color:var(--rose)}
+.online-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:20px;padding:2px 8px;font-size:8px;letter-spacing:0.8px;color:var(--lime);font-family:var(--fM);margin-bottom:6px}
+.online-dot{width:5px;height:5px;border-radius:50%;background:var(--lime);box-shadow:0 0 4px var(--lime);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.dash-copyright{text-align:center;padding:28px 0 10px;font-size:9px;color:var(--fog2);letter-spacing:1.2px;font-family:var(--fM);opacity:0.55}
 .body{flex:1;min-width:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.body::-webkit-scrollbar{width:5px}.body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}
 .page{padding:26px 30px;width:100%;box-sizing:border-box}
 .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
@@ -1163,6 +1167,38 @@ export default function App() {
   const [confirmDel, setConfirmDel] = useState(null); // { type:"oc"|"dispatch", ocId, dispId, label }
   const [dashSort, setDashSort] = useState({ col: null, dir: 1 });
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
+  const [onlineCount, setOnlineCount] = useState(1);
+
+  // Presencia: registra al usuario activo y cuenta cuántos hay
+  useEffect(() => {
+    if (!user) return;
+    const KEY = "dc_presence";
+    const myId = user.id || user.email;
+    const TIMEOUT = 30000; // 30s de inactividad = desconectado
+    const register = () => {
+      try {
+        const raw = localStorage.getItem(KEY);
+        const map = raw ? JSON.parse(raw) : {};
+        map[myId] = Date.now();
+        // Limpiar entradas viejas
+        const now = Date.now();
+        Object.keys(map).forEach(k => { if (now - map[k] > TIMEOUT) delete map[k]; });
+        localStorage.setItem(KEY, JSON.stringify(map));
+        setOnlineCount(Object.keys(map).length);
+      } catch(e) {}
+    };
+    register();
+    const interval = setInterval(register, 10000);
+    return () => {
+      clearInterval(interval);
+      try {
+        const raw = localStorage.getItem(KEY);
+        const map = raw ? JSON.parse(raw) : {};
+        delete map[myId];
+        localStorage.setItem(KEY, JSON.stringify(map));
+      } catch(e) {}
+    };
+  }, [user]);
 
   const notify = (msg, type) => { setToast({ msg, type: type || "ok" }); setTimeout(() => setToast(null), 3500); };
 
@@ -1362,6 +1398,7 @@ export default function App() {
               <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>Pendientes</div>
             </nav>
             <div className="rail-foot">
+              <div className="online-badge"><span className="online-dot" />{onlineCount} {onlineCount === 1 ? "usuario conectado" : "usuarios conectados"}</div>
               <div className="rail-user"><strong>{user.name}</strong>{user.email}</div>
               <button className="rail-logout" onClick={logout}>Cerrar sesion</button>
               {isAdmin && <div style={{ borderTop:"1px solid var(--line)", marginTop:10, paddingTop:10, display:"flex", flexDirection:"column", gap:5 }}>
@@ -1453,6 +1490,7 @@ export default function App() {
                       </table>
                     </div>
                   }
+                  <div className="dash-copyright">© {new Date().getFullYear()} TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS</div>
                 </>
               )}
 
