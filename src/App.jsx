@@ -1088,7 +1088,64 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   );
 }
 
-export default function App() {
+export default function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUserId }) {
+  const [text, setText] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+
+  const handleAdd = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    await onAdd(text.trim());
+    setText("");
+    setSaving(false);
+  };
+
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth:560 }}>
+        <div className="modal-hd">
+          <div>
+            <div className="modal-title">Gestión</div>
+            <div className="modal-sub">{oc.ocNumber || oc.id} · {oc.client}</div>
+          </div>
+          <div className="xbtn" onClick={onClose}>✕</div>
+        </div>
+        <div style={{ marginBottom:16 }}>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="Agregar comentario de gestión..."
+            style={{ width:"100%", minHeight:80, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:6, padding:"10px 12px", color:"var(--white)", fontSize:13, fontFamily:"inherit", resize:"vertical", boxSizing:"border-box" }}
+          />
+          <div style={{ display:"flex", justifyContent:"flex-end", marginTop:6 }}>
+            <button className="btn btn-sky btn-sm" onClick={handleAdd} disabled={saving || !text.trim()}>
+              {saving ? "Guardando..." : "+ Agregar"}
+            </button>
+          </div>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {gestiones.length === 0 && <div style={{ color:"var(--fog)", fontSize:12, textAlign:"center", padding:"20px 0" }}>Sin comentarios aún</div>}
+          {[...gestiones].reverse().map(g => (
+            <div key={g.id} style={{ background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"10px 14px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+                <div style={{ fontSize:13, color:"var(--white)", lineHeight:1.5, flex:1 }}>{g.text}</div>
+                {isAdmin && (
+                  <button className="btn btn-rose btn-sm" style={{ fontSize:10, padding:"2px 7px" }} onClick={() => onDel(g.id)}>✕</button>
+                )}
+              </div>
+              <div style={{ display:"flex", gap:10, marginTop:6 }}>
+                <span style={{ fontSize:10, color:"var(--fog)", letterSpacing:1 }}>{g.date}</span>
+                <span style={{ fontSize:10, color:"var(--fog2)" }}>{g.author}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("dc_user")); } catch(e) { return null; } });
   const [ocs, setOcs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1100,6 +1157,7 @@ export default function App() {
   const [showExport, setShowExport] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [showDispatch, setShowDispatch] = useState(null);
+  const [showGestion, setShowGestion] = useState(null); // oc
   const [convertTarget, setConvertTarget] = useState(null);
   const [toast, setToast] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null); // { type:"oc"|"dispatch", ocId, dispId, label }
@@ -1146,6 +1204,25 @@ export default function App() {
   }));
 
   const persist = async updated => { setOcs(updated); await saveOCs(updated); };
+
+  const handleAddGestion = async (ocId, comment) => {
+    const updated = ocs.map(o => {
+      if (o.id !== ocId) return o;
+      const gestiones = o.gestiones || [];
+      return { ...o, gestiones: [...gestiones, { id: "G-" + Date.now(), text: comment, date: today(), author: user.name, authorId: user.id }] };
+    });
+    await persist(updated);
+    setShowGestion(updated.find(o => o.id === ocId));
+  };
+
+  const handleDelGestion = async (ocId, gId) => {
+    const updated = ocs.map(o => {
+      if (o.id !== ocId) return o;
+      return { ...o, gestiones: (o.gestiones || []).filter(g => g.id !== gId) };
+    });
+    await persist(updated);
+    setShowGestion(updated.find(o => o.id === ocId));
+  };
   const handleSaveKey = v => { setApiKey(v); localStorage.setItem("dc_apikey", v); };
   const handleSaveOC = async (oc, keepOpen) => {
     if (oc.ocNumber && oc.ocNumber.trim()) {
@@ -1434,6 +1511,7 @@ export default function App() {
                                 <div style={{ display:"flex", gap:5 }}>
                                   <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Ver</button>
                                   <button className="btn btn-sky btn-sm" onClick={() => setShowDispatch(oc)} >+Doc.</button>
+                                  {s !== "closed" && <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => setShowGestion(oc)}>Gestión</button>}
                                   {isAdmin ? <button className="btn btn-rose btn-sm" onClick={() => handleDelOC(oc.id)}>✕</button> : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => setConfirmDel({ type:"request", label: oc.ocNumber || oc.id })}>✕</button>}
                                 </div>
                               </td>
