@@ -686,7 +686,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
         <Steps labels={["Subir PDF", "Revisar", "Mapear items"]} current={step} />
         {ocMismatch && (
           <div style={{ background:"rgba(255,90,90,.1)", border:"1px solid var(--rose)", borderRadius:8, padding:"14px 18px", marginBottom:16 }}>
-            <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ Documento rechazado — OC no coincide</div>
+            <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ {docType === "factura" ? "Factura" : "Guía"} rechazada — OC no coincide</div>
             <div style={{ fontSize:12, color:"var(--fog2)", lineHeight:1.6 }}>
               El PDF corresponde a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.pdfOC}</strong>, no a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.thisOC}</strong>.<br/>
               El ingreso fue anulado. Verifica que estás subiendo el documento correcto.
