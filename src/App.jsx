@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { ClerkProvider, SignIn, useUser, useClerk } from "@clerk/clerk-react";
 
 // Firebase config
 const firebaseConfig = {
@@ -395,75 +396,25 @@ function Steps({ labels, current }) {
   );
 }
 
-function AuthScreen({ onAuth }) {
-  const [tab, setTab] = useState("login");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState(null);
+const ALLOWED_EMAILS = [
+  "gsepulveda@totalmetal.cl",
+  "jvasquez@totalmetal.cl",
+  "mcarrillo@totalmetal.cl",
+  "eespinoza@totalmetal.cl",
+  "jhaeger@totalmetal.cl",
+  "npuente@totalmetal.cl"
+];
 
-  const submit = async () => {
-    setErr(null);
-    setLoading(true);
-    try {
-      let users = [];
-      try { const r = await storage.get("dc-users"); users = r ? JSON.parse(r.value) : []; } catch(e) {}
-      if (tab === "register") {
-        if (!name || !email || password.length < 6) throw new Error("Completa todos los campos (contrasena min. 6 caracteres)");
-        const ALLOWED = [
-          "gsepulveda@totalmetal.cl",
-          "jvasquez@totalmetal.cl",
-          "mcarrillo@totalmetal.cl",
-          "eespinoza@totalmetal.cl",
-          "jhaeger@totalmetal.cl",
-          "npuente@totalmetal.cl"
-        ];
-        if (!ALLOWED.includes(email.toLowerCase().trim())) throw new Error("Este correo no está autorizado para registrarse");
-        if (users.find(u => u.email === email)) throw new Error("Email ya registrado");
-        const isAdmin = email.toLowerCase().trim() === "gsepulveda@totalmetal.cl";
-        const nu = { id: Date.now(), name, email, password, isAdmin };
-        await storage.set("dc-users", JSON.stringify([...users, nu]));
-        localStorage.setItem("dc_user", JSON.stringify({ id: nu.id, name: nu.name, email: nu.email, isAdmin: nu.isAdmin }));
-        onAuth({ id: nu.id, name: nu.name, email: nu.email, isAdmin: nu.isAdmin });
-      } else {
-        const u = users.find(u => u.email === email && u.password === password);
-        if (!u) throw new Error("Email o contrasena incorrectos");
-        localStorage.setItem("dc_user", JSON.stringify({ id: u.id, name: u.name, email: u.email, isAdmin: u.isAdmin || false }));
-        onAuth({ id: u.id, name: u.name, email: u.email, isAdmin: u.isAdmin || false });
-      }
-    } catch(e) { setErr(e.message); }
-    setLoading(false);
-  };
-
+function AuthScreen() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-brand">Control Despachos</div>
         <div className="auth-tm">TM</div>
         <div className="auth-tag">SISTEMA DE ORDENES DE COMPRA</div>
-        <div className="auth-tabs">
-          <div className={"auth-tab" + (tab === "login" ? " on" : "")} onClick={() => { setTab("login"); setErr(null); }}>Ingresar</div>
-          <div className={"auth-tab" + (tab === "register" ? " on" : "")} onClick={() => { setTab("register"); setErr(null); }}>Registrarse</div>
+        <div style={{ marginTop: 24 }}>
+          <SignIn routing="hash" />
         </div>
-        {err && <div className="auth-err">⚠ {err}</div>}
-        {tab === "register" && (
-          <div className="fg" style={{ marginBottom:11 }}>
-            <label>NOMBRE</label>
-            <input placeholder="Tu nombre" value={name} onChange={e => setName(e.target.value)} />
-          </div>
-        )}
-        <div className="fg" style={{ marginBottom:11 }}>
-          <label>EMAIL</label>
-          <input type="email" placeholder="correo@empresa.com" value={email} onChange={e => setEmail(e.target.value)} />
-        </div>
-        <div className="fg" style={{ marginBottom:18 }}>
-          <label>CONTRASENA</label>
-          <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
-        </div>
-        <button className="btn btn-gold" style={{ width:"100%", justifyContent:"center" }} onClick={submit} disabled={loading}>
-          {loading ? <><div className="spin" />Procesando...</> : tab === "login" ? "Ingresar →" : "Crear cuenta →"}
-        </button>
       </div>
     </div>
   );
@@ -1231,8 +1182,12 @@ function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUs
   );
 }
 
-export default function App() {
-  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("dc_user")); } catch(e) { return null; } });
+const CLERK_PUBLISHABLE_KEY = "pk_test_Y29uY2lzZS1tYWdwaWUtMTcuY2xlcmsuYWNjb3VudHMuZGV2JA";
+
+function AppInner() {
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { signOut } = useClerk();
+  const [user, setUser] = useState(null);
   const [ocs, setOcs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
@@ -1284,6 +1239,20 @@ export default function App() {
 
   const notify = (msg, type) => { setToast({ msg, type: type || "ok" }); setTimeout(() => setToast(null), 3500); };
 
+  // Sincronizar usuario de Clerk con estado local
+  useEffect(() => {
+    if (!clerkLoaded) return;
+    if (!clerkUser) { setUser(null); setOcs([]); setLoading(false); return; }
+    const email = clerkUser.primaryEmailAddress?.emailAddress || "";
+    if (!ALLOWED_EMAILS.includes(email.toLowerCase())) {
+      signOut();
+      return;
+    }
+    const isAdmin = email.toLowerCase() === "gsepulveda@totalmetal.cl";
+    const name = clerkUser.fullName || clerkUser.firstName || email.split("@")[0];
+    setUser({ id: clerkUser.id, name, email, isAdmin });
+  }, [clerkUser, clerkLoaded]);
+
   // Cargar OCs desde Firestore y suscribirse a cambios en tiempo real
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -1309,9 +1278,10 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
-  if (!user) return <><style>{G}</style><AuthScreen onAuth={u => setUser(u)} /></>;
+  if (!clerkLoaded || (!user && clerkUser)) return <><style>{G}</style><div className="auth-wrap"><div className="auth-card"><div className="auth-brand">Control Despachos</div><div className="auth-tm">TM</div><div style={{textAlign:"center",color:"var(--fog)",marginTop:20}}>Cargando...</div></div></div></>;
+  if (!user) return <><style>{G}</style><AuthScreen /></>;
 
-  const logout = () => { localStorage.removeItem("dc_user"); setUser(null); setOcs([]); };
+  const logout = () => { signOut(); setUser(null); setOcs([]); };
   const isAdmin = user?.isAdmin === true;
 
   const enriched = ocs.map(oc => ({
@@ -2155,5 +2125,13 @@ export default function App() {
       )}
       {toast && <div className={"toast " + toast.type}>{toast.msg}</div>}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <AppInner />
+    </ClerkProvider>
   );
 }
