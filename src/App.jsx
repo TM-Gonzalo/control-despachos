@@ -25,7 +25,7 @@ async function saveOCs(ocs) {
 async function extractPDF(b64, type, apiKey) {
   const prompts = {
     oc: `Extrae los datos de esta Orden de Compra. El campo "client" debe ser el nombre de la empresa o persona que EMITE la orden de compra (el comprador, quien solicita los productos), NO el proveedor que recibe la orden. Busca este nombre en el encabezado de la OC, en el campo "De:", "Empresa compradora", "Razon social del cliente" o datos de facturacion del emisor. Para el campo "notes": extrae SOLO informacion operativa relevante como nombre de obra, OT, numero de proyecto, forma de pago, lugar de entrega o referencias internas (ejemplo: "Obra: EIMI00406 CONSTRUCCION DEFENSAS FLUVIALES. Forma de Pago: Contra Recepcion de Factura, a 30 dias"). NO incluyas texto legal, instrucciones de facturacion electronica, terminos y condiciones ni notas de cumplimiento legal. Si no hay notas operativas relevantes, usa null. Responde SOLO JSON sin texto extra ni backticks: {"ocNumber":"string o null","client":"string","date":"YYYY-MM-DD o null","deliveryDate":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"notes":"string o null"}`,
-    dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
+    dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. Extrae tambien el campo "ocNumber" con el numero de OC que aparece en el documento (busca "OC", "Orden de Compra", "N° OC", "PO", "Purchase Order"). Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
   };
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -608,6 +608,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [docType, setDocType] = useState("guia");
   const [savedCount, setSavedCount] = useState(0);
   const [lastSaved, setLastSaved] = useState(null);
+  const [ocMismatch, setOcMismatch] = useState(null); // { pdfOC, thisOC }
 
   const handleFile = async f => {
     setErr(null); setLoading(true);
@@ -621,6 +622,17 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       const am = {};
       its.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items) || "NONE"; });
       setMap(am);
+      // Validar OC del PDF vs OC actual
+      if (d.ocNumber) {
+        const pdfOC = String(d.ocNumber).replace(/\s/g, "");
+        const thisOC = String(oc.ocNumber || "").replace(/\s/g, "");
+        if (thisOC && pdfOC && !pdfOC.includes(thisOC) && !thisOC.includes(pdfOC)) {
+          setOcMismatch({ pdfOC: d.ocNumber, thisOC: oc.ocNumber });
+          setLoading(false);
+          return;
+        }
+      }
+      setOcMismatch(null);
       setStep(1);
     } catch(e) { setErr(e.message); }
     setLoading(false);
@@ -672,6 +684,18 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
           <div className="xbtn" onClick={onClose}>✕</div>
         </div>
         <Steps labels={["Subir PDF", "Revisar", "Mapear items"]} current={step} />
+        {ocMismatch && (
+          <div style={{ background:"rgba(255,90,90,.1)", border:"1px solid var(--rose)", borderRadius:8, padding:"14px 18px", marginBottom:16 }}>
+            <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ Documento rechazado — OC no coincide</div>
+            <div style={{ fontSize:12, color:"var(--fog2)", lineHeight:1.6 }}>
+              El PDF corresponde a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.pdfOC}</strong>, no a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.thisOC}</strong>.<br/>
+              El ingreso fue anulado. Verifica que estás subiendo el documento correcto.
+            </div>
+            <div style={{ marginTop:12 }}>
+              <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); }}>Cerrar</button>
+            </div>
+          </div>
+        )}
         {step === 0 && (
           <>
             {lastSaved && (
