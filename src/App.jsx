@@ -1089,8 +1089,8 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
 }
 
 function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUserId }) {
-  const [text, setText] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const handleAdd = async () => {
     if (!text.trim()) return;
