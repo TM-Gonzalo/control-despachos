@@ -445,6 +445,7 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
         const its = (d.items || []).map((it, k) => ({ ...it, id: k + 1 }));
         setQueue(q => q.map((e, j) => j === i ? { ...e, status: "done", data: { ...d, deliveryDate: "" }, items: its } : e));
       } catch(e) {
+        console.error("PDF Error:", e);
         setQueue(q => q.map((e, j) => j === i ? { ...e, status: "error", err: e.message } : e));
       }
     }
@@ -523,7 +524,7 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
                   {e.status === "processing" && <span style={{ fontSize:10, color:"var(--gold)" }}>Analizando...</span>}
                   {e.status === "done" && <button className="btn btn-sky btn-sm" onClick={() => startReview(i)}>Revisar →</button>}
                   {e.status === "saved" && <span style={{ fontSize:10, color:"var(--lime)" }}>Guardada ✓</span>}
-                  {e.status === "error" && <span style={{ fontSize:10, color:"var(--rose)" }}>Error: {e.err}</span>}
+                  {e.status === "error" && <span style={{ fontSize:10, color:"var(--rose)", wordBreak:"break-all", whiteSpace:"normal" }}>Error: {e.err}</span>}
                 </div>
               ))}
             </div>
