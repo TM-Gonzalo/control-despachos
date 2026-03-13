@@ -164,7 +164,7 @@ tr:hover td{background:rgba(255,255,255,.012)}
 .pbar{height:100%;border-radius:99px;transition:width .5s}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
 .modal{background:var(--ink2);border:1px solid var(--line2);border-radius:13px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:26px 30px;scrollbar-width:none}.modal::-webkit-scrollbar{display:none}
-.modal-xl{max-width:840px}
+.modal-xl{max-width:92vw;width:92vw}
 .modal-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
 .modal-title{font-family:var(--fS);font-size:22px;font-style:italic;color:var(--white)}
 .modal-sub{font-size:10px;color:var(--gold);margin-top:3px}
