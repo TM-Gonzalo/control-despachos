@@ -1,16 +1,38 @@
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 
-// Storage adapter: usa window.storage si está disponible (artifact Claude), sino localStorage
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyDVzhS67u-p34tUbe6CmSf4M802CUvEBSk",
+  authDomain: "control-despachos-6ff25.firebaseapp.com",
+  projectId: "control-despachos-6ff25",
+  storageBucket: "control-despachos-6ff25.firebasestorage.app",
+  messagingSenderId: "737509912296",
+  appId: "1:737509912296:web:748c1f21f26b93e90da35d"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+// Storage adapter: Firestore como backend principal, localStorage como caché
 const storage = {
   get: async (key) => {
-    if (window.storage) return window.storage.get(key);
+    try {
+      const snap = await getDoc(doc(db, "storage", key));
+      if (snap.exists()) return { value: snap.data().value };
+    } catch(e) { console.warn("Firestore get error:", e); }
     const v = localStorage.getItem(key);
     return v ? { value: v } : null;
   },
   set: async (key, value) => {
-    if (window.storage) return window.storage.set(key, value);
-    localStorage.setItem(key, value);
+    try {
+      await setDoc(doc(db, "storage", key), { value, updatedAt: Date.now() });
+      localStorage.setItem(key, value);
+    } catch(e) {
+      console.warn("Firestore set error, guardando en localStorage:", e);
+      localStorage.setItem(key, value);
+    }
   }
 };
 
@@ -20,6 +42,15 @@ async function loadOCs() {
 }
 async function saveOCs(ocs) {
   try { await storage.set("ocs-v3", JSON.stringify(ocs)); } catch(e) { console.error(e); }
+}
+
+// Escuchar cambios en tiempo real desde Firestore
+function subscribeOCs(callback) {
+  return onSnapshot(doc(db, "storage", "ocs-v3"), (snap) => {
+    if (snap.exists()) {
+      try { callback(JSON.parse(snap.data().value)); } catch(e) {}
+    }
+  }, (err) => console.warn("onSnapshot error:", err));
 }
 
 async function extractPDF(b64, type, apiKey) {
@@ -1229,21 +1260,29 @@ export default function App() {
 
   const notify = (msg, type) => { setToast({ msg, type: type || "ok" }); setTimeout(() => setToast(null), 3500); };
 
+  // Cargar OCs desde Firestore y suscribirse a cambios en tiempo real
   useEffect(() => {
     if (!user) { setLoading(false); return; }
+    const migrateOCs = d => d.map(oc => ({ ...oc, dispatches: (oc.dispatches || (oc.invoices || []).map(inv => ({ ...inv, docType: "factura", invoiceNumber: null }))).map(disp => {
+        if (disp.docType === "factura" && !disp.total && disp.items && disp.items.length) {
+          const calc = disp.items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
+          return calc > 0 ? { ...disp, total: calc } : disp;
+        }
+        return disp;
+      })
+    }));
+    // Carga inicial
     loadOCs().then(d => {
       if (d.length) _seq = Math.max(_seq, ...d.map(o => parseInt(o.id.replace("OC-", "")) || 0)) + 1;
-      const migrated = d.map(oc => ({ ...oc, dispatches: (oc.dispatches || (oc.invoices || []).map(inv => ({ ...inv, docType: "factura", invoiceNumber: null }))).map(disp => {
-          if (disp.docType === "factura" && !disp.total && disp.items && disp.items.length) {
-            const calc = disp.items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
-            return calc > 0 ? { ...disp, total: calc } : disp;
-          }
-          return disp;
-        })
-      }));
-      setOcs(migrated);
+      setOcs(migrateOCs(d));
       setLoading(false);
     });
+    // Suscripción en tiempo real — actualiza cuando otro usuario guarda
+    const unsub = subscribeOCs(d => {
+      if (d && d.length) _seq = Math.max(_seq, ...d.map(o => parseInt(o.id.replace("OC-", "")) || 0)) + 1;
+      if (d) setOcs(migrateOCs(d));
+    });
+    return () => unsub();
   }, [user]);
 
   if (!user) return <><style>{G}</style><AuthScreen onAuth={u => setUser(u)} /></>;
