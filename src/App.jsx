@@ -27,24 +27,41 @@ async function extractPDF(b64, type, apiKey) {
     oc: `Extrae los datos de esta Orden de Compra. El campo "client" debe ser el nombre de la empresa o persona que EMITE la orden de compra (el comprador, quien solicita los productos), NO el proveedor que recibe la orden. Busca este nombre en el encabezado de la OC, en el campo "De:", "Empresa compradora", "Razon social del cliente" o datos de facturacion del emisor. Para el campo "notes": extrae SOLO informacion operativa relevante como nombre de obra, OT, numero de proyecto, forma de pago, lugar de entrega o referencias internas (ejemplo: "Obra: EIMI00406 CONSTRUCCION DEFENSAS FLUVIALES. Forma de Pago: Contra Recepcion de Factura, a 30 dias"). NO incluyas texto legal, instrucciones de facturacion electronica, terminos y condiciones ni notas de cumplimiento legal. Si no hay notas operativas relevantes, usa null. Responde SOLO JSON sin texto extra ni backticks: {"ocNumber":"string o null","client":"string","date":"YYYY-MM-DD o null","deliveryDate":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"notes":"string o null"}`,
     dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. Extrae tambien el campo "ocNumber" con el numero de OC que aparece en el documento (busca "OC", "Orden de Compra", "N° OC", "PO", "Purchase Order"). Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
   };
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      system: "Eres un extractor de datos de PDFs. Responde SOLO JSON valido, sin texto adicional.",
-      messages: [{ role: "user", content: [
-        { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
-        { type: "text", text: prompts[type] }
-      ]}]
-    })
-  });
+
+  // Intenta primero el proxy seguro (API key server-side).
+  // Si falla (ej. dev local sin /api), cae al fetch directo usando apiKey del cliente.
+  const payload = {
+    system: "Eres un extractor de datos de PDFs. Responde SOLO JSON valido, sin texto adicional.",
+    messages: [{ role: "user", content: [
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+      { type: "text", text: prompts[type] }
+    ]}]
+  };
+
+  let res;
+  try {
+    res = await fetch("/api/claude", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    // Si el proxy devuelve 404 (dev local sin Edge Function), usar fallback
+    if (res.status === 404) throw new Error("proxy_not_found");
+  } catch {
+    // Fallback: llamada directa con la key del cliente (solo dev local)
+    if (!apiKey) throw new Error("No hay API Key configurada");
+    res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({ ...payload, model: "claude-sonnet-4-20250514", max_tokens: 1000 })
+    });
+  }
+
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   const text = data.content.map(c => c.text || "").join("");
