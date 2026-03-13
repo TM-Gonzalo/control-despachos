@@ -380,8 +380,17 @@ function AuthScreen({ onAuth }) {
       try { const r = await storage.get("dc-users"); users = r ? JSON.parse(r.value) : []; } catch(e) {}
       if (tab === "register") {
         if (!name || !email || password.length < 6) throw new Error("Completa todos los campos (contrasena min. 6 caracteres)");
-        if (!email.endsWith("@totalmetal.cl")) throw new Error("Solo se permiten cuentas @totalmetal.cl"); if (users.find(u => u.email === email)) throw new Error("Email ya registrado");
-        const isAdmin = users.length === 0; // primer usuario = admin
+        const ALLOWED = [
+          "gsepulveda@totalmetal.cl",
+          "jvasquez@totalmetal.cl",
+          "mcarrillo@totalmetal.cl",
+          "eespinoza@totalmetal.cl",
+          "jhaeger@totalmetal.cl",
+          "npuente@totalmetal.cl"
+        ];
+        if (!ALLOWED.includes(email.toLowerCase().trim())) throw new Error("Este correo no está autorizado para registrarse");
+        if (users.find(u => u.email === email)) throw new Error("Email ya registrado");
+        const isAdmin = email.toLowerCase().trim() === "gsepulveda@totalmetal.cl";
         const nu = { id: Date.now(), name, email, password, isAdmin };
         await storage.set("dc-users", JSON.stringify([...users, nu]));
         localStorage.setItem("dc_user", JSON.stringify({ id: nu.id, name: nu.name, email: nu.email, isAdmin: nu.isAdmin }));
