@@ -56,7 +56,7 @@ function subscribeOCs(callback) {
 async function extractPDF(b64, type, apiKey) {
   const prompts = {
     oc: `Extrae los datos de esta Orden de Compra. CONTEXTO IMPORTANTE: el receptor de esta OC es siempre "Total Metal" o "Industrial y Comercial Total Metal" (el proveedor). El campo "client" debe ser la empresa DIFERENTE a Total Metal que aparece como emisora o compradora. Busca el nombre del cliente en el encabezado como "Empresa:", "Razon Social:", "De:", "Cliente:", o en el bloque de datos del comprador/emisor. NUNCA uses "Total Metal", "Industrial y Comercial Total Metal" ni variantes como valor de "client". Para el campo "notes": extrae SOLO informacion operativa relevante como nombre de obra, OT, numero de proyecto, forma de pago, lugar de entrega o referencias internas. NO incluyas texto legal, instrucciones de facturacion electronica, terminos y condiciones ni notas de cumplimiento legal. Si no hay notas operativas relevantes, usa null. Responde SOLO JSON sin texto extra ni backticks: {"ocNumber":"string o null","client":"string","date":"YYYY-MM-DD o null","deliveryDate":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"notes":"string o null"}`,
-    dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. Extrae tambien el campo "ocNumber" con el numero de OC que aparece en el documento (busca "OC", "Orden de Compra", "N° OC", "PO", "Purchase Order"). Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
+    dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. Extrae el campo "ocNumber" con el numero de OC (busca "OC", "Orden de Compra", "N° OC", "PO", "Purchase Order"). Si el documento es una FACTURA, extrae tambien el campo "gdNumber" con el numero de Guia de Despacho referenciada (busca en la seccion "Referencias a otros Documentos" o "Referencias" el folio de tipo "Guia de Despacho Electronica", "Guia de Despacho" o "GD"). Si no hay GD referenciada, "gdNumber" debe ser null. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","gdNumber":"string o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
   };
 
   // Intenta primero el proxy seguro (API key server-side).
@@ -694,6 +694,30 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
           return;
         }
       }
+      // Si es factura con GD referenciada, buscar GD existente y vincular automáticamente
+      if (d.docType === "factura" && d.gdNumber) {
+        const normGD = s => String(s).replace(/[\s.]/g, "");
+        const gdRef = normGD(d.gdNumber);
+        const matchingGD = (oc.dispatches || []).find(disp =>
+          disp.docType === "guia" && normGD(disp.number || "") === gdRef
+        );
+        if (matchingGD) {
+          // Vincular factura a GD existente sin crear despacho nuevo
+          await onSave(oc.id, {
+            _gdLink: true,
+            gdId: matchingGD.id,
+            invoiceNumber: d.docNumber || "",
+            invoiceDate: d.date || today(),
+            netTotal: d.netTotal || 0,
+            total: d.total || 0
+          });
+          setLastSaved({ num: d.docNumber, docType: "factura", linked: true });
+          setSavedCount(c => c + 1);
+          setStep(0); setNum(""); setDate(today()); setDocType("guia"); setItems([]); setMap({}); setSplitPrice({}); setExt(null); setErr(null);
+          setLoading(false);
+          return;
+        }
+      }
       setOcMismatch(null);
       setStep(1);
     } catch(e) { setErr(e.message); }
@@ -763,7 +787,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
             {lastSaved && (
               <div style={{ background:"rgba(127,255,90,.08)", border:"1px solid rgba(127,255,90,.2)", borderRadius:7, padding:"10px 14px", marginBottom:14, display:"flex", alignItems:"center", gap:10 }}>
                 <span style={{ color:"var(--lime)", fontSize:14 }}>✓</span>
-                <span style={{ fontSize:12, color:"var(--lime)" }}>{lastSaved.docType === "factura" ? "Factura" : "Guia"} N° {lastSaved.num} registrada.</span>
+                <span style={{ fontSize:12, color:"var(--lime)" }}>{lastSaved.linked ? "Factura N° " + lastSaved.num + " vinculada a GD existente." : (lastSaved.docType === "factura" ? "Factura" : "Guia") + " N° " + lastSaved.num + " registrada."}</span>
                 <span style={{ fontSize:11, color:"var(--fog2)", marginLeft:"auto" }}>{savedCount} guardado{savedCount !== 1 ? "s" : ""} en esta sesión</span>
               </div>
             )}
@@ -1341,6 +1365,26 @@ export default function App() {
   const handleSaveDispatch = async (ocId, dispatch) => {
     const oc = ocs.find(o => o.id === ocId);
     const existing = (oc?.dispatches || []);
+
+    // Caso especial: vincular factura a GD existente sin crear despacho nuevo
+    if (dispatch._gdLink) {
+      const { gdId, invoiceNumber, invoiceDate, netTotal, total } = dispatch;
+      const updated = ocs.map(o => o.id === ocId ? {
+        ...o,
+        dispatches: (o.dispatches || []).map(d => d.id === gdId
+          ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total }
+          : d
+        )
+      } : o);
+      await persist(updated);
+      if (showDetail && showDetail.id === ocId) {
+        const live = enriched.find(o => o.id === ocId);
+        setShowDetail(live);
+      }
+      notify("Factura N° " + invoiceNumber + " vinculada a GD ✓");
+      return;
+    }
+
     if (dispatch.number && dispatch.number.trim()) {
       const norm = dispatch.number.trim().toLowerCase();
       const dupe = existing.find(d => d.number && d.number.trim().toLowerCase() === norm && d.docType === dispatch.docType);
