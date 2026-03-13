@@ -652,10 +652,11 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       const am = {};
       its.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items) || "NONE"; });
       setMap(am);
-      // Validar OC del PDF vs OC actual
+      // Validar OC del PDF vs OC actual (normalizar: sin puntos ni espacios)
       if (d.ocNumber) {
-        const pdfOC = String(d.ocNumber).replace(/\s/g, "");
-        const thisOC = String(oc.ocNumber || "").replace(/\s/g, "");
+        const norm = s => String(s).replace(/[\s.]/g, "");
+        const pdfOC = norm(d.ocNumber);
+        const thisOC = norm(oc.ocNumber || "");
         if (thisOC && pdfOC && !pdfOC.includes(thisOC) && !thisOC.includes(pdfOC)) {
           setOcMismatch({ pdfOC: d.ocNumber, thisOC: oc.ocNumber });
           setLoading(false);
@@ -1400,7 +1401,7 @@ export default function App() {
     <>
       <style>{G}</style>
       <div style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100%" }}>
-        {!import.meta.env.VITE_ANTHROPIC_API_KEY && <div className="key-bar">
+        {!import.meta.env.VITE_ANTHROPIC_API_KEY && isAdmin && <div className="key-bar">
           <span>🔑 API Key:</span>
           <input type="password" value={apiKey} onChange={e => handleSaveKey(e.target.value)} placeholder="sk-ant-... (necesaria para importar PDFs)" />
           {apiKey ? <span style={{ fontSize:9, letterSpacing:1, color:"var(--lime)" }}>✓ Configurada</span> : <span style={{ fontSize:9, color:"var(--rose)" }}>Requerida para importar PDFs</span>}
