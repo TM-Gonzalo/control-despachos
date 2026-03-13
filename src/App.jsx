@@ -1753,8 +1753,8 @@ export default function App() {
                   <div className="ph"><div><div className="pt">Reporte <em>Por OC</em></div><div className="pm">ESTADO DE DESPACHO POR ORDEN</div></div></div>
                   <div className="kpis" style={{ marginBottom:22 }}>
                     {[
-                      { n: total, lbl: "Total", c: "var(--gold)" },
-                      { n: open + enriched.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Pendientes", c: "var(--sky)" },
+                      { n: total, lbl: "Total", c: "var(--white)" },
+                      { n: open + enriched.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Pendientes", c: "var(--rose)" },
                       { n: enriched.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                       { n: closed, lbl: "Completadas", c: "var(--lime)" }
                     ].map(({ n, lbl, c }) => (
