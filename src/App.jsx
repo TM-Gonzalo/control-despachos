@@ -1088,7 +1088,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   );
 }
 
-export default function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUserId }) {
+function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUserId }) {
   const [text, setText] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
@@ -1145,7 +1145,7 @@ export default function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isA
   );
 }
 
-function App() {
+export default function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("dc_user")); } catch(e) { return null; } });
   const [ocs, setOcs] = useState([]);
   const [loading, setLoading] = useState(true);
