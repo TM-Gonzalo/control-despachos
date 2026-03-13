@@ -593,7 +593,7 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
   );
 }
 
-function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
+function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -654,7 +654,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey }) {
         return { desc: it.desc, unit: it.unit || "Unidad", qty: Number(it.qty), unitPrice, ocItemId, splitPrice: splitPrice[i] ? true : undefined };
       });
       const dispTotal = mapped.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
-      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, total: ext?.total || dispTotal || 0, netTotal: ext?.netTotal || dispTotal || 0, items: mapped });
+      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, total: ext?.total || dispTotal || 0, netTotal: ext?.netTotal || dispTotal || 0, items: mapped, createdBy: createdBy });
       // resetear para agregar otro despacho sin cerrar
       setSavedCount(c => c + 1);
       setLastSaved({ num, docType });
@@ -1026,7 +1026,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   <div className="disp-meta">
                     <span style={{ fontSize:10, color:"var(--fog)" }}>{d.date}</span>
                     {d.docType === "guia" && !d.invoiceNumber && <button className="btn btn-teal btn-sm" onClick={() => onConvert(oc.id, d)}>→ Vincular factura</button>}
-                    {canDelete ? <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id)}>Eliminar</button> : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => onRequestDel({ type:"request", label: (d.docType === "factura" ? "Factura" : "Guia") + " N° " + d.number })}>Eliminar</button>}
+                    {(isAdmin || d.createdBy === currentUserId) ? <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id)}>Eliminar</button> : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => onRequestDel({ type:"request", label: (d.docType === "factura" ? "Factura" : "Guia") + " N° " + d.number })}>Eliminar</button>}
                   </div>
                 </div>
                 {(d.items || []).map((it, i) => {
