@@ -1415,7 +1415,7 @@ export default function App() {
               <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>Pendientes</div>
             </nav>
             <div className="rail-foot">
-              <div className="online-badge"><span className="online-dot" />{onlineCount} {onlineCount === 1 ? "usuario conectado" : "usuarios conectados"}</div>
+              <div className="online-badge"><span className="online-dot" />Sesión activa</div>
               <div className="rail-user"><strong>{user.name}</strong>{user.email}</div>
               <button className="rail-logout" onClick={logout}>Cerrar sesion</button>
               {isAdmin && <div style={{ borderTop:"1px solid var(--line)", marginTop:10, paddingTop:10, display:"flex", flexDirection:"column", gap:5 }}>
