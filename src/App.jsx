@@ -162,8 +162,8 @@ tr:hover td{background:rgba(255,255,255,.012)}
 .bdoc-guia-pend{background:rgba(232,184,75,.08);color:var(--gold);border:1px solid rgba(232,184,75,.2)}
 .pbar-wrap{background:var(--ink);border-radius:99px;height:4px;overflow:hidden}
 .pbar{height:100%;border-radius:99px;transition:width .5s}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
-.modal{background:var(--ink2);border:1px solid var(--line2);border-radius:13px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:26px 30px;scrollbar-width:none}.modal::-webkit-scrollbar{display:none}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:400;display:flex;align-items:center;justify-content:center;padding:24px 40px;backdrop-filter:blur(3px)}
+.modal{background:var(--ink2);border:1px solid var(--line2);border-radius:6px;width:100%;max-width:1100px;max-height:94vh;overflow-y:auto;padding:26px 30px;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.modal::-webkit-scrollbar{width:5px}.modal::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}
 .modal-xl{max-width:840px}
 .modal-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
 .modal-title{font-family:var(--fS);font-size:22px;font-style:italic;color:var(--white)}
