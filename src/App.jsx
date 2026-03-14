@@ -816,19 +816,28 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [bsaleLoading, setBsaleLoading] = useState(false);
   const [bsaleSearch, setBsaleSearch] = useState("");
 
-  // Cargar documentos de Bsale al abrir el modal
+  // Cargar documentos de Bsale al abrir el modal — trae los más recientes paginando desde el final
   useEffect(() => {
-    const ocNum = (oc.ocNumber || "").replace(/[\s.]/g, "");
     setBsaleLoading(true);
+    // Primero obtener el total para calcular el offset del último página
     Promise.all([
-      fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0 }),
-      fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: 0 })
-    ]).then(([gds, facs]) => {
+      fetchBsale("/documents.json", { documentTypeId: "8", limit: 1, offset: 0 }),
+      fetchBsale("/documents.json", { documentTypeId: "1", limit: 1, offset: 0 })
+    ]).then(([gdMeta, facMeta]) => {
+      const gdTotal = gdMeta.count || 0;
+      const facTotal = facMeta.count || 0;
+      const gdOffset = Math.max(0, gdTotal - 50);
+      const facOffset = Math.max(0, facTotal - 50);
+      return Promise.all([
+        fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: gdOffset }),
+        fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: facOffset })
+      ]);
+    }).then(([gds, facs]) => {
       const all = [
         ...(gds.items || []).map(d => ({ ...d, _tipo: "guia" })),
         ...(facs.items || []).map(d => ({ ...d, _tipo: "factura" }))
-      ].sort((a, b) => (b.generationDate || 0) - (a.generationDate || 0));
-      setBsaleDocs(all.slice(0, 50));
+      ].sort((a, b) => (b.number || 0) - (a.number || 0));
+      setBsaleDocs(all);
       setBsaleLoading(false);
     }).catch((e) => { console.error("Bsale error:", e); setBsaleLoading(false); });
   }, [oc.id]);
