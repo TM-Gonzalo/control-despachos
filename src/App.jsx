@@ -2265,7 +2265,7 @@ export default function App() {
                               <div className="mon-kpis">
                                 <div className="mon-kpi"><label>MONTO FACTURADO</label><p style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(monTotal)}</p></div>
                                 <div className="mon-kpi"><label>N° FACTURAS</label><p style={{ color:"var(--teal)" }}>{facs.length}</p></div>
-                                <div className="mon-kpi"><label>CLIENTES</label><p style={{ color:"var(--rose)" }}>{Object.keys(byClient).length}</p></div>
+                                <div className="mon-kpi"><label>CLIENTES</label><p style={{ color:"var(--sky)" }}>{Object.keys(byClient).length}</p></div>
                               </div>
                               <div className="mon-body">
                                 {Object.entries(byClient).map(([client, cfacs]) => (
@@ -2360,7 +2360,7 @@ export default function App() {
                     <div className="kpis" style={{ marginBottom:22 }}>
                       {[
                         { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--white)" },
-                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--rose)" },
+                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
