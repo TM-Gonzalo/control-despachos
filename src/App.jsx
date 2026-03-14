@@ -814,6 +814,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [ocMismatch, setOcMismatch] = useState(null); // { pdfOC, thisOC }
   const [bsaleDocs, setBsaleDocs] = useState([]);
   const [bsaleLoading, setBsaleLoading] = useState(false);
+  const [bsaleSearch, setBsaleSearch] = useState("");
 
   // Cargar documentos de Bsale al abrir el modal
   useEffect(() => {
@@ -823,13 +824,11 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0 }),
       fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: 0 })
     ]).then(([gds, facs]) => {
-      console.log("Bsale GDs:", gds?.count, "Facturas:", facs?.count);
       const all = [
         ...(gds.items || []).map(d => ({ ...d, _tipo: "guia" })),
         ...(facs.items || []).map(d => ({ ...d, _tipo: "factura" }))
       ].sort((a, b) => (b.generationDate || 0) - (a.generationDate || 0));
-      console.log("Total docs:", all.length);
-      setBsaleDocs(all.slice(0, 20));
+      setBsaleDocs(all.slice(0, 50));
       setBsaleLoading(false);
     }).catch((e) => { console.error("Bsale error:", e); setBsaleLoading(false); });
   }, [oc.id]);
@@ -842,23 +841,31 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       const date = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0, 10) : today();
       const netTotal = doc.netAmount || 0;
       const total = doc.totalAmount || 0;
-      const details = doc.details || [];
-      const its = details.map((it, i) => ({
-        id: i + 1,
-        desc: it.comment || it.variantDescription || "",
-        unit: "UN",
-        qty: Number(it.quantity || 1),
-        unitPrice: Number(it.unitValue || it.netUnitValue || 0)
-      }));
 
-      const d = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber: null };
+      // Obtener detalles (items) del documento desde Bsale
+      let its = [];
+      try {
+        const detailsData = await fetchBsale("/documents/" + doc.id + "/details.json");
+        const detailItems = detailsData.items || [];
+        its = detailItems.map((it, i) => ({
+          id: i + 1,
+          desc: it.comment || it.variantDescription || it.description || "",
+          unit: it.unitAbbreviation || "UN",
+          qty: Number(it.quantity || 1),
+          unitPrice: Number(it.netUnitValue || it.unitValue || 0)
+        }));
+      } catch(e) { console.warn("No se pudieron cargar detalles:", e); }
 
-      // Si es factura, buscar referencia GD
-      if (tipo === "factura") {
-        const refs = doc.references || [];
+      // Obtener referencias del documento (OC, GD vinculada)
+      let gdNumber = null;
+      try {
+        const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
+        const refs = refsData.items || [];
         const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
-        if (gdRef) d.gdNumber = String(gdRef.number || "");
-      }
+        if (gdRef) gdNumber = String(gdRef.number || "");
+      } catch(e) {}
+
+      const d = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber };
 
       setExt(d); setNum(d.docNumber); setDate(d.date);
       setDocType(tipo);
@@ -1021,9 +1028,15 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
             {bsaleLoading && <div style={{ fontSize:11, color:"var(--fog)", marginBottom:10 }}>⚡ Buscando documentos en Bsale...</div>}
             {!bsaleLoading && bsaleDocs.length > 0 && (
               <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:8 }}>⚡ DOCUMENTOS DISPONIBLES EN BSALE</div>
-                <div style={{ maxHeight:180, overflowY:"auto", display:"flex", flexDirection:"column", gap:5 }}>
-                  {bsaleDocs.map(doc => {
+                <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:6 }}>⚡ DOCUMENTOS DISPONIBLES EN BSALE</div>
+                <input
+                  style={{ width:"100%", background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"5px 10px", fontFamily:"var(--fM)", fontSize:11, color:"var(--white)", marginBottom:8, outline:"none" }}
+                  placeholder="Filtrar por N° documento..."
+                  value={bsaleSearch || ""}
+                  onChange={e => setBsaleSearch(e.target.value)}
+                />
+                <div style={{ maxHeight:200, overflowY:"auto", display:"flex", flexDirection:"column", gap:5 }}>
+                  {bsaleDocs.filter(doc => !bsaleSearch || String(doc.number||"").includes(bsaleSearch)).map(doc => {
                     const num = String(doc.number || "");
                     const tipo = doc._tipo;
                     const fecha = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0,10) : "—";
