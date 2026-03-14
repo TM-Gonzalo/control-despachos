@@ -1615,7 +1615,54 @@ export default function App() {
                 <>
                   <div className="ph">
                     <div><div className="pt">Ordenes <em>de Compra</em></div><div className="pm">{filtered.length} ORDENES</div></div>
-                    <button className="btn btn-gold" onClick={() => setShowImport(true)} >+ Importar OC</button>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button className="btn btn-gold" onClick={() => setShowImport(true)}>+ Importar OC</button>
+                      <button className="btn btn-outline" onClick={() => {
+                        const rows = [];
+                        enriched.forEach(oc => {
+                          const ocTotal = oc.items ? oc.items.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0) : 0;
+                          const dispatched = (oc.dispatches || []);
+                          if (dispatched.length === 0) {
+                            rows.push({
+                              "Cliente": oc.client || "",
+                              "N° OC": oc.ocNumber || oc.id,
+                              "Fecha OC": oc.date || "",
+                              "N° GD": "",
+                              "N° Factura": "",
+                              "Total OC": ocTotal,
+                              "Total Despachado": 0,
+                              "Remanente": ocTotal,
+                              "Estado": ocStatus(oc.items, oc.dispatches)
+                            });
+                          } else {
+                            dispatched.forEach(d => {
+                              const isGD = d.docType === "guia";
+                              const isFac = d.docType === "factura";
+                              const dispTotal = d.netTotal || d.total || d.items?.reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0),0) || 0;
+                              const totalDespachado = dispatched.reduce((s, x) => s + (x.netTotal || x.total || 0), 0);
+                              rows.push({
+                                "Cliente": oc.client || "",
+                                "N° OC": oc.ocNumber || oc.id,
+                                "Fecha OC": oc.date || "",
+                                "N° GD": isGD ? (d.number || "") : (d.invoiceNumber ? "" : ""),
+                                "N° Factura": isFac ? (d.number || "") : (d.invoiceNumber || ""),
+                                "Total OC": ocTotal,
+                                "Total Despachado": dispTotal,
+                                "Remanente": ocTotal - totalDespachado,
+                                "Estado": ocStatus(oc.items, oc.dispatches)
+                              });
+                            });
+                          }
+                        });
+                        const ws = XLSX.utils.json_to_sheet(rows);
+                        ws["!cols"] = [
+                          {wch:30},{wch:15},{wch:12},{wch:12},{wch:12},{wch:15},{wch:15},{wch:15},{wch:12}
+                        ];
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Despachos");
+                        XLSX.writeFile(wb, "Despachos_OC_" + today() + ".xlsx");
+                      }}>↓ Excel</button>
+                    </div>
                   </div>
                   <div className="toolbar">
                     <input className="srch" placeholder="Buscar por ID, cliente, N° OC..." value={search} onChange={e => setSearch(e.target.value)} />
