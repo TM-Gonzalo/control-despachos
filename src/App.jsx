@@ -1627,6 +1627,7 @@ export default function App() {
   const [ocs, setOcs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
+  const [selectedYear, setSelectedYear] = useState("all");
   const [search, setSearch] = useState("");
   const [fst, setFst] = useState("all");
   const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_ANTHROPIC_API_KEY || localStorage.getItem("dc_apikey") || "");
@@ -2214,8 +2215,12 @@ export default function App() {
                     }
                   });
                 });
+                // Años disponibles
+                const availableYears = [...new Set(allFacs.map(f => f.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+                // Filtrar por año seleccionado
+                const filteredFacs = selectedYear === "all" ? allFacs : allFacs.filter(f => f.date.startsWith(selectedYear));
                 // Agrupar por año-mes
-                const byMonth = allFacs.reduce((acc, fac) => {
+                const byMonth = filteredFacs.reduce((acc, fac) => {
                   const key = fac.date.slice(0, 7); // "YYYY-MM"
                   if (!acc[key]) acc[key] = [];
                   acc[key].push(fac);
@@ -2223,7 +2228,7 @@ export default function App() {
                 }, {});
                 const months = Object.keys(byMonth).sort((a, b) => b.localeCompare(a));
                 const fmtMonth = k => { const [y, m] = k.split("-"); const names = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]; return names[parseInt(m)-1] + " " + y; };
-                const grandTotal = allFacs.reduce((s, f) => s + Number(f.total || f.amount || 0), 0);
+                const grandTotal = filteredFacs.reduce((s, f) => s + Number(f.total || f.amount || 0), 0);
 
                 return (
                   <>
@@ -2234,12 +2239,25 @@ export default function App() {
                         <div className="kpis" style={{ marginBottom:22 }}>
                           {[
                             { n: months.length,         lbl: "Meses",      c: "var(--sky)"    },
-                            { n: allFacs.length,        lbl: "Facturas",   c: "var(--teal)"   },
+                            { n: filteredFacs.length,   lbl: "Facturas",   c: "var(--teal)"   },
                             { n: fmtCLP(grandTotal),    lbl: "Total",      c: "var(--gold)"   },
-                            { n: new Set(allFacs.map(f => f.client)).size, lbl: "Clientes", c: "var(--rose)" },
                           ].map(({ n, lbl, c }) => (
                             <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 20 : 38 }}>{n}</div></div>
                           ))}
+                          <div className="kpi">
+                            <div className="kpi-bar" style={{ background:"var(--violet)" }} />
+                            <div className="kpi-lbl">AÑO</div>
+                            <select
+                              value={selectedYear}
+                              onChange={e => setSelectedYear(e.target.value)}
+                              style={{ background:"transparent", border:"none", color:"var(--violet)", fontFamily:"var(--fS)", fontSize:28, fontStyle:"italic", cursor:"pointer", outline:"none", width:"100%", marginTop:4 }}
+                            >
+                              <option value="all" style={{ background:"var(--ink2)", color:"var(--white)" }}>Todos</option>
+                              {availableYears.map(y => (
+                                <option key={y} value={y} style={{ background:"var(--ink2)", color:"var(--white)" }}>{y}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:12 }}>
                         {months.map(mk => {
