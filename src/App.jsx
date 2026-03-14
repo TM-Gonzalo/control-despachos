@@ -1960,7 +1960,7 @@ export default function App() {
               <div className={"rail-parent" + (view === "reports" || view === "clients" || view === "monthly" || view === "pending" || view === "toinvoice" ? " on" : "")}><span>▤</span>Reportes</div>
               <div className={"rail-item-sub" + (view === "reports" ? " on" : "")} onClick={() => setView("reports")}>Por OC</div>
               <div className={"rail-item-sub" + (view === "clients" ? " on" : "")} onClick={() => setView("clients")}>Por Cliente</div>
-              <div className={"rail-item-sub" + (view === "monthly" ? " on" : "")} onClick={() => setView("monthly")}>Por Facturas</div>
+              {isAdmin && <div className={"rail-item-sub" + (view === "monthly" ? " on" : "")} onClick={() => setView("monthly")}>Por Facturas</div>}
               <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>OC Pendientes</div>
               <div className={"rail-item-sub" + (view === "toinvoice" ? " on" : "")} onClick={() => setView("toinvoice")}>Pend. Facturar</div>
             </nav>
