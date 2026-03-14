@@ -2444,11 +2444,12 @@ export default function App() {
                         XLSX.writeFile(wb, "Reporte_Pendientes_" + today() + ".xlsx");
                       }}>↓ Exportar Excel</button>}
                     </div>
-                    <div className="kpis" style={{ marginBottom:22 }}>
+                    <div className="kpis" style={{ marginBottom:22, gridTemplateColumns:"repeat(5,1fr)" }}>
                       {[
                         { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--white)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
+                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "toinvoice").length, lbl: "Por Facturar", c: "var(--rose)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
                         <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
