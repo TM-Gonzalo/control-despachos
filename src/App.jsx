@@ -150,7 +150,7 @@ const autoMatch = (desc, ocItems) => {
   const partial = ocItems.find(i => n(desc).includes(n(i.desc)) || n(i.desc).includes(n(desc)));
   return partial ? partial.id : null;
 };
-const pc = p => p >= 100 ? "var(--lime)" : p >= 50 ? "var(--gold)" : "var(--sky)";
+const pc = p => p >= 100 ? "var(--lime)" : p > 0 ? "var(--gold)" : "var(--sky)";
 const bCls = s => ({ open: "b-open", partial: "b-partial", closed: "b-closed", toinvoice: "b-toinvoice", warn: "b-warn" }[s] || "b-open");
 const bLbl = s => ({ open: "Abierta", partial: "Parcial", closed: "Cerrada", toinvoice: "Por Facturar", warn: "Alerta" }[s] || s);
 
