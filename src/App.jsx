@@ -186,6 +186,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .dash-copyright{text-align:center;padding:28px 0 10px;font-size:9px;color:var(--fog2);letter-spacing:1.2px;font-family:var(--fM);opacity:0.55}
 .body{flex:1;min-width:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.body::-webkit-scrollbar{width:5px}.body::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}
+*{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}*::-webkit-scrollbar{width:5px;height:5px}*::-webkit-scrollbar-track{background:transparent}*::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}*::-webkit-scrollbar-thumb:hover{background:var(--fog)}
 .page{padding:26px 30px;width:100%;box-sizing:border-box}
 .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
 .pt{font-family:var(--fS);font-size:32px;font-style:italic;color:var(--white);line-height:1}
@@ -2026,13 +2027,13 @@ export default function App() {
                       <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-n" style={{ color:c }}>{n}</div><div className="kpi-l">{lbl}</div></div>
                     ))}
                   </div>
-                  <div className="slbl">Ordenes recientes</div>
+                  <div className="slbl">Todas las Ordenes</div>
                   {loading ? <div className="pgload"><div className="spin" /> Cargando...</div> :
                     enriched.length === 0 ? <div className="empty"><div className="empty-ico">◈</div><p>Sin ordenes aun.<br />Ingresa tu API Key e importa una OC desde PDF.</p></div> :
-                    <div className="tbl-card">
+                    <div className="tbl-card" style={{ maxHeight:520, overflowY:"auto", scrollbarWidth:"thin", scrollbarColor:"var(--line2) transparent" }}>
                       <table>
-                        <thead><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><th>ESTADO</th><th /></tr></thead>
-                        <tbody>{applySort(enriched, dashSort).slice(0, 10).map(oc => {
+                        <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--ink3)" }}><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><th>ESTADO</th><th /></tr></thead>
+                        <tbody>{applySort(enriched, dashSort).map(oc => {
                           const s = ocStatus(oc.items, oc.dispatches);
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
