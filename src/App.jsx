@@ -1155,7 +1155,17 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                 const tipo = doc._tipo;
                 const fecha = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0,10) : "—";
                 const monto = doc.netAmount ? "$" + Number(doc.netAmount).toLocaleString("es-CL") : "—";
-                const alreadyAdded = (oc.dispatches || []).some(d => String(d.number||"") === num || String(d.invoiceNumber||"") === num);
+                const alreadyAdded = (oc.dispatches || []).some(d => {
+                  const docNum = String(d.number||"");
+                  const invNum = String(d.invoiceNumber||"");
+                  if (tipo === "guia") {
+                    // Una GD está agregada si su número coincide con un despacho de tipo guia
+                    return d.docType === "guia" && docNum === num;
+                  } else {
+                    // Una factura está agregada si su número coincide con factura directa o con invoiceNumber de una guia
+                    return (d.docType === "factura" && docNum === num) || invNum === num;
+                  }
+                });
                 return (
                   <button disabled={alreadyAdded || loading} onClick={() => handleSelectBsale(doc)}
                     style={{ marginTop:8, width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:7, cursor: alreadyAdded ? "default" : "pointer", opacity: alreadyAdded ? 0.4 : 1, textAlign:"left" }}>
