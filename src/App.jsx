@@ -1297,10 +1297,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                           })
                           .map(o => {
                             const pend = Number(o.qty) - Number(o.dispatched || 0);
-                            // Solo mostrar ⊕ MERGE si otra línea YA está mapeada a este mismo item OC
-                            const alreadyMapped = Object.entries(map).some(([k, v]) => Number(k) !== i && v !== "NONE" && String(v) === String(o.id));
-                            const label = alreadyMapped ? "⊕ MERGE — " : "";
-                            return <option key={o.id} value={o.id}>{label}{o.desc} · {pend > 0 ? fmtNum(pend) + " " + o.unit + " pend." : "✓ despachado"}</option>;
+                            return <option key={o.id} value={o.id}>{o.desc} · {pend > 0 ? fmtNum(pend) + " " + o.unit + " pend." : "✓ despachado"}</option>;
                           })}
                       </select>
                       {!matched && <div className="map-note">⚠ No descontara del remanente</div>}
