@@ -1639,6 +1639,7 @@ export default function App() {
               {[{ id:"dashboard", ico:"◈", lbl:"Dashboard" }, { id:"orders", ico:"◫", lbl:"Ordenes" }].map(n => (
                 <div key={n.id} className={"rail-item" + (view === n.id ? " on" : "")} onClick={() => setView(n.id)}><span>{n.ico}</span>{n.lbl}</div>
               ))}
+              <div className={"rail-item" + (view === "bsale" ? " on" : "")} onClick={() => setView("bsale")}><span>⚡</span>Bsale</div>
               <div className={"rail-parent" + (view === "reports" || view === "clients" || view === "monthly" || view === "pending" ? " on" : "")}><span>▤</span>Reportes</div>
               <div className={"rail-item-sub" + (view === "reports" ? " on" : "")} onClick={() => setView("reports")}>Por OC</div>
               <div className={"rail-item-sub" + (view === "clients" ? " on" : "")} onClick={() => setView("clients")}>Por Cliente</div>
