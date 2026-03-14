@@ -372,10 +372,8 @@ function DocBadge({ doc }) {
     return <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {doc.number}</span>;
   }
   if (doc.invoiceNumber) {
-    // Guía con factura vinculada → violeta (neutral, todo OK)
-    return <span className="badge bdoc-guia"><Dot c="var(--violet)" />Guia {doc.number} <span style={{ color:"var(--teal)", marginLeft:4 }}>Fac. {doc.invoiceNumber}</span></span>;
+    return <span className="badge bdoc-guia"><Dot c="var(--rose)" />Guia {doc.number} <span style={{ color:"var(--teal)", marginLeft:4 }}>Fac. {doc.invoiceNumber}</span></span>;
   }
-  // Guía sin factura → dorado (pendiente de facturar)
   return <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />Guia {doc.number} <span style={{ color:"var(--fog)", marginLeft:4, fontSize:8 }}>sin factura</span></span>;
 }
 
@@ -1524,26 +1522,27 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                 </div>
                 {(d.items || []).map((it, i) => {
                   const mapped = oc.items.find(o => o.id === it.ocItemId);
+                  const price = Number(it.unitPrice || (mapped ? mapped.unitPrice : 0) || 0);
                   return (
                     <div className="disp-row" key={i}>
                       <span>{it.desc}{mapped ? <span style={{ fontSize:9, color:"var(--lime)", marginLeft:6 }}>→ {mapped.desc}</span> : <span style={{ fontSize:9, color:"var(--fog)", marginLeft:6 }}>sin vincular</span>}</span>
                       <span style={{ display:"flex", gap:10, alignItems:"center" }}>
                         <span style={{ color:"var(--fog)", fontSize:10 }}>{fmtNum(it.qty)} {it.unit}</span>
-                        {d.docType === "factura" && (() => {
-                          const price = Number(it.unitPrice || (mapped ? mapped.unitPrice : 0) || 0);
-                          return price > 0 ? <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(it.qty * price)}</span> : null;
-                        })()}
+                        {price > 0 && <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(it.qty * price)}</span>}
                       </span>
                     </div>
                   );
                 })}
-                {d.docType === "factura" && (() => {
+                {(() => {
                   const neto = Number(d.netTotal || 0) || (d.items || []).reduce((s, it) => {
-                    return s + (Number(it.qty)||0) * Number(it.unitPrice || 0);
+                    const mapped = oc.items.find(o => o.id === it.ocItemId);
+                    const price = Number(it.unitPrice || (mapped ? mapped.unitPrice : 0) || 0);
+                    return s + (Number(it.qty)||0) * price;
                   }, 0);
+                  const label = d.docType === "factura" ? "NETO FACTURA" : "TOTAL GD";
                   return neto > 0 ? (
                     <div style={{ display:"flex", justifyContent:"flex-end", borderTop:"1px solid var(--line)", marginTop:6, paddingTop:6 }}>
-                      <span style={{ fontSize:10, color:"var(--fog)", marginRight:8, letterSpacing:1 }}>NETO FACTURA</span>
+                      <span style={{ fontSize:10, color:"var(--fog)", marginRight:8, letterSpacing:1 }}>{label}</span>
                       <span style={{ color:"var(--gold)", fontWeight:600, fontSize:13 }}>{fmtCLP(neto)}</span>
                     </div>
                   ) : null;
