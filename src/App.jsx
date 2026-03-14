@@ -2380,7 +2380,8 @@ export default function App() {
               })()}
 
               {view === "pending" && (() => {
-                const pendingOCs = enriched.filter(o => ocStatus(o.items, o.dispatches) !== "closed");
+                // Solo OCs con despacho pendiente (excluir toinvoice y closed — ya están 100% despachadas)
+                const pendingOCs = enriched.filter(o => { const s = ocStatus(o.items, o.dispatches); return s === "open" || s === "partial"; });
                 const byClient = pendingOCs.reduce((acc, oc) => { const k = oc.client; if (!acc[k]) acc[k] = []; acc[k].push(oc); return acc; }, {});
                 const totalPend = pendingOCs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty) - Number(i.dispatched||0)) * Number(i.unitPrice), 0), 0);
                 return (
@@ -2444,12 +2445,11 @@ export default function App() {
                         XLSX.writeFile(wb, "Reporte_Pendientes_" + today() + ".xlsx");
                       }}>↓ Exportar Excel</button>}
                     </div>
-                    <div className="kpis" style={{ marginBottom:22, gridTemplateColumns:"repeat(5,1fr)" }}>
+                    <div className="kpis" style={{ marginBottom:22 }}>
                       {[
                         { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--white)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
-                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "toinvoice").length, lbl: "Por Facturar", c: "var(--rose)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
                         <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
