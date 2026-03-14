@@ -1880,8 +1880,9 @@ export default function App() {
   const pendingGuias = enriched.reduce((s, o) => s + (o.dispatches || []).filter(d => d.docType === "guia" && !d.invoiceNumber).length, 0);
 
   const filtered = enriched.filter(o => {
-    const s = search.toLowerCase();
-    return (!s || o.id.toLowerCase().includes(s) || o.client.toLowerCase().includes(s) || (o.ocNumber || "").toLowerCase().includes(s))
+    const norm = v => v.toLowerCase().replace(/\./g, "");
+    const s = norm(search);
+    return (!s || norm(o.id).includes(s) || norm(o.client).includes(s) || norm(o.ocNumber || "").includes(s))
       && (fst === "all" || ocStatus(o.items, o.dispatches) === fst);
   });
 
