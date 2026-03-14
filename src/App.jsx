@@ -886,35 +886,28 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [savedCount, setSavedCount] = useState(0);
   const [lastSaved, setLastSaved] = useState(null);
   const [ocMismatch, setOcMismatch] = useState(null); // { pdfOC, thisOC }
-  const [bsaleDocs, setBsaleDocs] = useState([]);
-  const [bsaleLoading, setBsaleLoading] = useState(false);
   const [bsaleSearch, setBsaleSearch] = useState("");
+  const [bsaleResult, setBsaleResult] = useState(null); // { doc } | null
+  const [bsaleLoading, setBsaleLoading] = useState(false);
+  const [bsaleErr, setBsaleErr] = useState(null);
 
-  // Cargar documentos de Bsale al abrir el modal — trae los más recientes paginando desde el final
-  useEffect(() => {
-    setBsaleLoading(true);
-    // Primero obtener el total para calcular el offset del último página
-    Promise.all([
-      fetchBsale("/documents.json", { documentTypeId: "8", limit: 1, offset: 0 }),
-      fetchBsale("/documents.json", { documentTypeId: "1", limit: 1, offset: 0 })
-    ]).then(([gdMeta, facMeta]) => {
-      const gdTotal = gdMeta.count || 0;
-      const facTotal = facMeta.count || 0;
-      const gdOffset = Math.max(0, gdTotal - 50);
-      const facOffset = Math.max(0, facTotal - 50);
-      return Promise.all([
-        fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: gdOffset }),
-        fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: facOffset })
+  const searchBsale = async (num) => {
+    if (!num || num.length < 2) { setBsaleResult(null); return; }
+    setBsaleLoading(true); setBsaleErr(null); setBsaleResult(null);
+    try {
+      // Buscar en GDs y Facturas por número exacto
+      const [gds, facs] = await Promise.all([
+        fetchBsale("/documents.json", { documentTypeId: "8", number: num }),
+        fetchBsale("/documents.json", { documentTypeId: "1", number: num })
       ]);
-    }).then(([gds, facs]) => {
-      const all = [
-        ...(gds.items || []).map(d => ({ ...d, _tipo: "guia" })),
-        ...(facs.items || []).map(d => ({ ...d, _tipo: "factura" }))
-      ].sort((a, b) => (b.number || 0) - (a.number || 0));
-      setBsaleDocs(all);
-      setBsaleLoading(false);
-    }).catch((e) => { console.error("Bsale error:", e); setBsaleLoading(false); });
-  }, [oc.id]);
+      const gdMatch = (gds.items || []).find(d => String(d.number) === String(num));
+      const facMatch = (facs.items || []).find(d => String(d.number) === String(num));
+      const match = gdMatch ? { ...gdMatch, _tipo: "guia" } : facMatch ? { ...facMatch, _tipo: "factura" } : null;
+      setBsaleResult(match);
+      if (!match) setBsaleErr("No se encontró ningún documento con ese número");
+    } catch(e) { setBsaleErr(e.message); }
+    setBsaleLoading(false);
+  };
 
   const handleSelectBsale = async (doc) => {
     setErr(null); setLoading(true);
@@ -1107,40 +1100,44 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                 <span style={{ fontSize:11, color:"var(--fog2)", marginLeft:"auto" }}>{savedCount} guardado{savedCount !== 1 ? "s" : ""} en esta sesión</span>
               </div>
             )}
-            {/* Selector Bsale */}
-            {bsaleLoading && <div style={{ fontSize:11, color:"var(--fog)", marginBottom:10 }}>⚡ Buscando documentos en Bsale...</div>}
-            {!bsaleLoading && bsaleDocs.length > 0 && (
-              <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:6 }}>⚡ DOCUMENTOS DISPONIBLES EN BSALE</div>
+            {/* Buscar en Bsale por N° */}
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:6 }}>⚡ BUSCAR EN BSALE POR N° DE DOCUMENTO</div>
+              <div style={{ display:"flex", gap:8 }}>
                 <input
-                  style={{ width:"100%", background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"5px 10px", fontFamily:"var(--fM)", fontSize:11, color:"var(--white)", marginBottom:8, outline:"none" }}
-                  placeholder="Filtrar por N° documento..."
-                  value={bsaleSearch || ""}
-                  onChange={e => setBsaleSearch(e.target.value)}
+                  style={{ flex:1, background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"6px 10px", fontFamily:"var(--fM)", fontSize:12, color:"var(--white)", outline:"none" }}
+                  placeholder="Ej: 1903"
+                  value={bsaleSearch}
+                  onChange={e => { setBsaleSearch(e.target.value); setBsaleResult(null); setBsaleErr(null); }}
+                  onKeyDown={e => e.key === "Enter" && searchBsale(bsaleSearch)}
                 />
-                <div style={{ maxHeight:200, overflowY:"auto", display:"flex", flexDirection:"column", gap:5 }}>
-                  {bsaleDocs.filter(doc => !bsaleSearch || String(doc.number||"").includes(bsaleSearch)).map(doc => {
-                    const num = String(doc.number || "");
-                    const tipo = doc._tipo;
-                    const fecha = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0,10) : "—";
-                    const monto = doc.netAmount ? "$" + Number(doc.netAmount).toLocaleString("es-CL") : "—";
-                    const alreadyAdded = (oc.dispatches || []).some(d => String(d.number||"") === num || String(d.invoiceNumber||"") === num);
-                    return (
-                      <button key={doc.id} disabled={alreadyAdded || loading}
-                        onClick={() => handleSelectBsale(doc)}
-                        style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:7, cursor: alreadyAdded ? "default" : "pointer", opacity: alreadyAdded ? 0.4 : 1, textAlign:"left" }}>
-                        <span className={"badge " + (tipo === "guia" ? "bdoc-guia" : "bdoc-fac")}>{tipo === "guia" ? "GD" : "FAC"}</span>
-                        <span style={{ color:"var(--gold)", fontFamily:"var(--fM)", fontSize:12 }}>{num}</span>
-                        <span style={{ color:"var(--fog2)", fontSize:11 }}>{fecha}</span>
-                        <span style={{ color:"var(--lime)", fontSize:11, marginLeft:"auto" }}>{monto}</span>
-                        {alreadyAdded && <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ YA AGREGADO</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ fontSize:9, color:"var(--fog)", marginTop:8, letterSpacing:1 }}>O sube un PDF manualmente:</div>
+                <button className="btn btn-outline btn-sm" onClick={() => searchBsale(bsaleSearch)} disabled={bsaleLoading}>
+                  {bsaleLoading ? "..." : "Buscar"}
+                </button>
               </div>
-            )}
+              {bsaleErr && <div style={{ fontSize:11, color:"var(--rose)", marginTop:6 }}>⚠ {bsaleErr}</div>}
+              {bsaleResult && (() => {
+                const doc = bsaleResult;
+                const num = String(doc.number || "");
+                const tipo = doc._tipo;
+                const fecha = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0,10) : "—";
+                const monto = doc.netAmount ? "$" + Number(doc.netAmount).toLocaleString("es-CL") : "—";
+                const alreadyAdded = (oc.dispatches || []).some(d => String(d.number||"") === num || String(d.invoiceNumber||"") === num);
+                return (
+                  <button disabled={alreadyAdded || loading} onClick={() => handleSelectBsale(doc)}
+                    style={{ marginTop:8, width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:7, cursor: alreadyAdded ? "default" : "pointer", opacity: alreadyAdded ? 0.4 : 1, textAlign:"left" }}>
+                    <span className={"badge " + (tipo === "guia" ? "bdoc-guia" : "bdoc-fac")}>{tipo === "guia" ? "GD" : "FAC"}</span>
+                    <span style={{ color:"var(--gold)", fontFamily:"var(--fM)", fontSize:13 }}>{num}</span>
+                    <span style={{ color:"var(--fog2)", fontSize:11 }}>{fecha}</span>
+                    <span style={{ color:"var(--lime)", fontSize:12, marginLeft:"auto" }}>{monto}</span>
+                    {alreadyAdded
+                      ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ YA AGREGADO</span>
+                      : <span style={{ fontSize:9, color:"var(--sky)", letterSpacing:1 }}>← USAR ESTE</span>}
+                  </button>
+                );
+              })()}
+              <div style={{ fontSize:9, color:"var(--fog)", marginTop:10, letterSpacing:1 }}>O sube un PDF manualmente:</div>
+            </div>
             <UploadZone onFile={handleFile} loading={loading} label={lastSaved ? "Subir otro documento o" : "Arrastra la factura o guia aqui o"} />
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginTop:9 }}>⚠ {err}</div>}
           </>
@@ -1847,7 +1844,6 @@ export default function App() {
               {[{ id:"dashboard", ico:"◈", lbl:"Dashboard" }, { id:"orders", ico:"◫", lbl:"Ordenes" }].map(n => (
                 <div key={n.id} className={"rail-item" + (view === n.id ? " on" : "")} onClick={() => setView(n.id)}><span>{n.ico}</span>{n.lbl}</div>
               ))}
-              <div className={"rail-item" + (view === "bsale" ? " on" : "")} onClick={() => setView("bsale")}><span>⚡</span>Bsale</div>
               <div className={"rail-parent" + (view === "reports" || view === "clients" || view === "monthly" || view === "pending" ? " on" : "")}><span>▤</span>Reportes</div>
               <div className={"rail-item-sub" + (view === "reports" ? " on" : "")} onClick={() => setView("reports")}>Por OC</div>
               <div className={"rail-item-sub" + (view === "clients" ? " on" : "")} onClick={() => setView("clients")}>Por Cliente</div>
@@ -2483,9 +2479,7 @@ export default function App() {
                 </>
               )}
 
-              {view === "bsale" && (
-                <BsaleView enriched={enriched} onAssign={(ocId, dispatch) => handleSaveDispatch(ocId, dispatch)} />
-              )}
+
 
             </div>
           </main>
