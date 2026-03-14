@@ -948,14 +948,31 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
         }));
       } catch(e) { console.warn("No se pudieron cargar detalles:", e); }
 
-      // Obtener referencias del documento (OC, GD vinculada)
+      // Obtener referencias del documento (OC, GD vinculada) y validar que pertenece a la OC actual
       let gdNumber = null;
       try {
         const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
         const refs = refsData.items || [];
+        // Buscar referencia a GD
         const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
         if (gdRef) gdNumber = String(gdRef.number || "");
-      } catch(e) {}
+        // Validar que el documento referencia la OC actual
+        const norm = s => String(s).replace(/[\s.]/g, "");
+        const thisOC = norm(oc.ocNumber || "");
+        if (thisOC) {
+          const ocRef = refs.find(r => {
+            const refNum = norm(String(r.number || ""));
+            return refNum === thisOC || refNum.includes(thisOC) || thisOC.includes(refNum);
+          });
+          if (!ocRef) {
+            const ocRefs = refs.map(r => r.number).filter(Boolean).join(", ");
+            throw new Error("Este documento no pertenece a la OC " + oc.ocNumber + ". Referencias encontradas: " + (ocRefs || "ninguna"));
+          }
+        }
+      } catch(e) {
+        if (e.message.includes("no pertenece")) throw e;
+        // Si falla la consulta de referencias, continuar igual
+      }
 
       const d = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber };
 
