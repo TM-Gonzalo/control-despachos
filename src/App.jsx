@@ -2381,8 +2381,15 @@ export default function App() {
 
               {view === "pending" && (() => {
                 // Solo OCs con despacho pendiente (excluir toinvoice y closed — ya están 100% despachadas)
+                const normClient = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\./g, "").replace(/\s+/g, " ").trim().toUpperCase();
                 const pendingOCs = enriched.filter(o => { const s = ocStatus(o.items, o.dispatches); return s === "open" || s === "partial"; });
-                const byClient = pendingOCs.reduce((acc, oc) => { const k = oc.client; if (!acc[k]) acc[k] = []; acc[k].push(oc); return acc; }, {});
+                // Agrupar normalizando el nombre del cliente
+                const byClient = pendingOCs.reduce((acc, oc) => {
+                  const k = normClient(oc.client);
+                  if (!acc[k]) acc[k] = { label: oc.client, ocs: [] };
+                  acc[k].ocs.push(oc);
+                  return acc;
+                }, {});
                 const totalPend = pendingOCs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty) - Number(i.dispatched||0)) * Number(i.unitPrice), 0), 0);
                 return (
                   <>
@@ -2456,10 +2463,14 @@ export default function App() {
                       ))}
                     </div>
                     {pendingOCs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay ordenes pendientes.</p></div>}
-                    {pendingOCs.length > 0 && Object.entries(byClient).sort(([a], [b]) => a.localeCompare(b)).map(([client, ocs]) => (
-                      <div key={client} style={{ marginBottom:28 }}>
+                    {pendingOCs.length > 0 && Object.entries(byClient).sort(([, a], [, b]) => {
+                        const remA = a.ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0), 0);
+                        const remB = b.ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0), 0);
+                        return remB - remA;
+                      }).map(([, { label, ocs }]) => (
+                      <div key={label} style={{ marginBottom:28 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-                          <div style={{ fontWeight:500, fontSize:16, color:"var(--fog2)" }}>{client}</div>
+                          <div style={{ fontWeight:500, fontSize:16, color:"var(--fog2)" }}>{label}</div>
                           <div style={{ flex:1, height:1, background:"var(--line)" }} />
                           <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>{ocs.length} OC{ocs.length !== 1 ? "s" : ""}</div>
                         </div>
