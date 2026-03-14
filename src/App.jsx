@@ -62,6 +62,14 @@ function subscribeOCs(callback) {
   }, (err) => console.warn("onSnapshot error:", err));
 }
 
+// Bsale API helper — llama al proxy Edge Function
+async function fetchBsale(path, params = {}) {
+  const qs = new URLSearchParams({ path, ...params }).toString();
+  const res = await fetch(`/api/bsale?${qs}`);
+  if (!res.ok) throw new Error("Error consultando Bsale");
+  return res.json();
+}
+
 async function extractPDF(b64, type, apiKey) {
   const prompts = {
     oc: `Extrae los datos de esta Orden de Compra. CONTEXTO IMPORTANTE: el receptor de esta OC es siempre "Total Metal" o "Industrial y Comercial Total Metal" (el proveedor). El campo "client" debe ser la empresa DIFERENTE a Total Metal que aparece como emisora o compradora. Busca el nombre del cliente en el encabezado como "Empresa:", "Razon Social:", "De:", "Cliente:", o en el bloque de datos del comprador/emisor. NUNCA uses "Total Metal", "Industrial y Comercial Total Metal" ni variantes como valor de "client". Para el campo "notes": extrae SOLO informacion operativa relevante como nombre de obra, OT, numero de proyecto, forma de pago, lugar de entrega o referencias internas. NO incluyas texto legal, instrucciones de facturacion electronica, terminos y condiciones ni notas de cumplimiento legal. Si no hay notas operativas relevantes, usa null. Responde SOLO JSON sin texto extra ni backticks: {"ocNumber":"string o null","client":"string","date":"YYYY-MM-DD o null","deliveryDate":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"notes":"string o null"}`,
@@ -213,6 +221,9 @@ th{padding:9px 14px;text-align:left;font-size:8px;letter-spacing:2.5px;color:var
 td{padding:12px 14px;font-size:11px;border-top:1px solid var(--line);vertical-align:middle}
 tr:hover td{background:rgba(255,255,255,.012)}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:9px;letter-spacing:.8px;font-weight:500}
+.bdoc-guia{background:rgba(255,90,90,.15);color:var(--rose);border:1px solid rgba(255,90,90,.3)}
+.bdoc-fac{background:rgba(90,200,255,.15);color:var(--sky);border:1px solid rgba(90,200,255,.3)}
+.bdoc-guia-pend{background:rgba(255,200,0,.1);color:var(--gold);border:1px solid rgba(255,200,0,.2)}
 .b-open{background:rgba(77,184,255,.1);color:var(--sky)}
 .b-partial{background:rgba(232,184,75,.1);color:var(--gold)}
 .b-closed{background:rgba(127,255,90,.1);color:var(--lime)}
@@ -663,6 +674,126 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
         )}
       </div>
     </div>
+  );
+}
+
+function BsaleView({ enriched, onAssign }) {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [filter, setFilter] = useState("all"); // all | guia | factura
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const LIMIT = 50;
+
+  const loadDocs = async (offset = 0) => {
+    setLoading(true); setErr(null);
+    try {
+      // Cargar GDs (tipo 8) y Facturas (tipo 1) en paralelo
+      const [gds, facs] = await Promise.all([
+        fetchBsale("/documents.json", { documentTypeId: "8", limit: LIMIT, offset, expand: "details" }),
+        fetchBsale("/documents.json", { documentTypeId: "1", limit: LIMIT, offset, expand: "details" })
+      ]);
+      const gdItems = (gds.items || []).map(d => ({ ...d, _tipo: "guia" }));
+      const facItems = (facs.items || []).map(d => ({ ...d, _tipo: "factura" }));
+      const all = [...gdItems, ...facItems].sort((a, b) => (b.generationDate || 0) - (a.generationDate || 0));
+      setDocs(all);
+      setTotalCount((gds.count || 0) + (facs.count || 0));
+    } catch(e) { setErr(e.message); }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadDocs(page * LIMIT); }, [page]);
+
+  // Verificar si un doc ya está asignado a alguna OC
+  const assignedNums = new Set();
+  enriched.forEach(oc => {
+    (oc.dispatches || []).forEach(d => {
+      if (d.number) assignedNums.add(String(d.number).trim());
+      if (d.invoiceNumber) assignedNums.add(String(d.invoiceNumber).trim());
+    });
+  });
+
+  const filtered = docs.filter(d => {
+    const num = String(d.number || d.urlPublicTemplate || "");
+    const client = d.client?.firstName || d.client?.lastName || "";
+    const matchSearch = !search || num.includes(search) || client.toLowerCase().includes(search.toLowerCase());
+    const matchFilter = filter === "all" || d._tipo === filter;
+    return matchSearch && matchFilter;
+  });
+
+  const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : "—";
+  const fmtMonto = n => n ? "$" + Number(n).toLocaleString("es-CL") : "—";
+
+  return (
+    <>
+      <div className="ph">
+        <div><div className="pt">Repositorio <em>Bsale</em></div><div className="pm">{totalCount} DOCUMENTOS</div></div>
+        <button className="btn btn-outline btn-sm" onClick={() => loadDocs(page * LIMIT)}>↺ Actualizar</button>
+      </div>
+      <div className="toolbar">
+        <input className="srch" placeholder="Buscar por N° o cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+        <select className="fsel" value={filter} onChange={e => setFilter(e.target.value)}>
+          <option value="all">Todos</option>
+          <option value="guia">Solo GDs</option>
+          <option value="factura">Solo Facturas</option>
+        </select>
+      </div>
+      {loading && <div style={{ textAlign:"center", padding:40, color:"var(--fog)" }}>Cargando documentos Bsale...</div>}
+      {err && <div style={{ color:"var(--rose)", padding:20 }}>⚠ {err}</div>}
+      {!loading && !err && (
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+            <thead>
+              <tr style={{ borderBottom:"1px solid var(--line)", color:"var(--fog)", fontSize:10, letterSpacing:1 }}>
+                <th style={{ padding:"8px 12px", textAlign:"left" }}>TIPO</th>
+                <th style={{ padding:"8px 12px", textAlign:"left" }}>N°</th>
+                <th style={{ padding:"8px 12px", textAlign:"left" }}>FECHA</th>
+                <th style={{ padding:"8px 12px", textAlign:"left" }}>CLIENTE</th>
+                <th style={{ padding:"8px 12px", textAlign:"right" }}>NETO</th>
+                <th style={{ padding:"8px 12px", textAlign:"center" }}>ESTADO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(d => {
+                const num = String(d.number || "");
+                const isAssigned = assignedNums.has(num);
+                const client = [d.client?.firstName, d.client?.lastName].filter(Boolean).join(" ") || d.client?.code || "—";
+                const neto = d.netAmount || d.totalAmount || 0;
+                return (
+                  <tr key={d.id} style={{ borderBottom:"1px solid var(--line2)", opacity: isAssigned ? 0.5 : 1 }}>
+                    <td style={{ padding:"10px 12px" }}>
+                      <span className={"badge " + (d._tipo === "guia" ? "bdoc-guia" : "bdoc-fac")}>
+                        {d._tipo === "guia" ? "GD" : "FAC"}
+                      </span>
+                    </td>
+                    <td style={{ padding:"10px 12px", color:"var(--gold)", fontFamily:"var(--fM)" }}>{num || "—"}</td>
+                    <td style={{ padding:"10px 12px", color:"var(--fog2)" }}>{fmtDate(d.generationDate)}</td>
+                    <td style={{ padding:"10px 12px" }}>{client}</td>
+                    <td style={{ padding:"10px 12px", textAlign:"right", color:"var(--lime)" }}>{fmtMonto(neto)}</td>
+                    <td style={{ padding:"10px 12px", textAlign:"center" }}>
+                      {isAssigned
+                        ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ ASIGNADO</span>
+                        : <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>PENDIENTE</span>
+                      }
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <div className="empty"><div className="empty-ico">📄</div><div>No hay documentos</div></div>}
+        </div>
+      )}
+      {totalCount > LIMIT && (
+        <div style={{ display:"flex", gap:8, justifyContent:"center", marginTop:16 }}>
+          <button className="btn btn-outline btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Anterior</button>
+          <span style={{ fontSize:11, color:"var(--fog)", padding:"4px 8px" }}>Página {page + 1}</span>
+          <button className="btn btn-outline btn-sm" disabled={(page + 1) * LIMIT >= totalCount} onClick={() => setPage(p => p + 1)}>Siguiente →</button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2141,6 +2272,10 @@ export default function App() {
                     ));
                   })()}
                 </>
+              )}
+
+              {view === "bsale" && (
+                <BsaleView enriched={enriched} onAssign={(ocId, dispatch) => handleSaveDispatch(ocId, dispatch)} />
               )}
 
             </div>
