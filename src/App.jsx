@@ -2455,7 +2455,7 @@ export default function App() {
                       ))}
                     </div>
                     {pendingOCs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay ordenes pendientes.</p></div>}
-                    {pendingOCs.length > 0 && Object.entries(byClient).map(([client, ocs]) => (
+                    {pendingOCs.length > 0 && Object.entries(byClient).sort(([a], [b]) => a.localeCompare(b)).map(([client, ocs]) => (
                       <div key={client} style={{ marginBottom:28 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
                           <div style={{ fontWeight:500, fontSize:16, color:"var(--fog2)" }}>{client}</div>
@@ -2463,7 +2463,18 @@ export default function App() {
                           <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>{ocs.length} OC{ocs.length !== 1 ? "s" : ""}</div>
                         </div>
                         <div className="rep-grid">
-                          {[...ocs].sort((a, b) => { const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0); const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0); return remB - remA; }).map(oc => {
+                          {[...ocs].sort((a, b) => {
+                            const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0);
+                            const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0);
+                            const sA = ocStatus(a.items, a.dispatches);
+                            const sB = ocStatus(b.items, b.dispatches);
+                            // Prioridad: toinvoice (despachos pendientes de facturar) primero
+                            const prioA = sA === "toinvoice" ? 0 : 1;
+                            const prioB = sB === "toinvoice" ? 0 : 1;
+                            if (prioA !== prioB) return prioA - prioB;
+                            // Luego por mayor monto remanente
+                            return remB - remA;
+                          }).map(oc => {
                             const s = ocStatus(oc.items, oc.dispatches);
                             const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                             const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
