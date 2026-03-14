@@ -44,6 +44,15 @@ async function saveOCs(ocs) {
   try { await storage.set("ocs-v3", JSON.stringify(ocs)); } catch(e) { console.error(e); }
 }
 
+// Hash de contraseña usando Web Crypto API (SHA-256)
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + "tm-salt-2026");
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 // Escuchar cambios en tiempo real desde Firestore
 function subscribeOCs(callback) {
   return onSnapshot(doc(db, "storage", "ocs-v3"), (snap) => {
@@ -422,12 +431,14 @@ function AuthScreen({ onAuth }) {
         if (!ALLOWED.includes(email.toLowerCase().trim())) throw new Error("Este correo no está autorizado para registrarse");
         if (users.find(u => u.email === email)) throw new Error("Email ya registrado");
         const isAdmin = email.toLowerCase().trim() === "gsepulveda@totalmetal.cl";
-        const nu = { id: Date.now(), name, email, password, isAdmin };
+        const hashed = await hashPassword(password);
+        const nu = { id: Date.now(), name, email, password: hashed, isAdmin };
         await storage.set("dc-users", JSON.stringify([...users, nu]));
         localStorage.setItem("dc_user", JSON.stringify({ id: nu.id, name: nu.name, email: nu.email, isAdmin: nu.isAdmin }));
         onAuth({ id: nu.id, name: nu.name, email: nu.email, isAdmin: nu.isAdmin });
       } else {
-        const u = users.find(u => u.email === email && u.password === password);
+        const hashed = await hashPassword(password);
+        const u = users.find(u => u.email === email && u.password === hashed);
         if (!u) throw new Error("Email o contrasena incorrectos");
         localStorage.setItem("dc_user", JSON.stringify({ id: u.id, name: u.name, email: u.email, isAdmin: u.isAdmin || false }));
         onAuth({ id: u.id, name: u.name, email: u.email, isAdmin: u.isAdmin || false });
