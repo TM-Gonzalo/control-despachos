@@ -923,9 +923,17 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       try {
         const detailsData = await fetchBsale("/documents/" + doc.id + "/details.json");
         const detailItems = detailsData.items || [];
+        // Obtener nombre completo de cada variant
+        const variantNames = await Promise.all(detailItems.map(async (it) => {
+          if (!it.variant?.id) return it.variant?.description || "";
+          try {
+            const v = await fetchBsale("/variants/" + it.variant.id + ".json");
+            return v.description || it.variant?.description || "";
+          } catch { return it.variant?.description || ""; }
+        }));
         its = detailItems.map((it, i) => ({
           id: i + 1,
-          desc: it.variant?.description || it.comment || it.variantDescription || it.description || "",
+          desc: variantNames[i] || it.comment || "",
           unit: it.unitAbbreviation || "UN",
           qty: Number(it.quantity || 1),
           unitPrice: Number(it.netUnitValue || it.unitValue || 0)
