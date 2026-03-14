@@ -1252,17 +1252,18 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                 const val = map[i];
                 const matched = val && val !== "NONE";
                 // Detectar si este ocItemId ya está usado por otro item del doc
-                const sharedWithOther = matched && Object.entries(map).some(([k, v]) => Number(k) !== i && v === val);
+                const sharedWithOther = matched && Object.entries(map).some(([k, v]) => Number(k) !== i && String(v) === String(val) && v !== "NONE");
                 const isSplit = !!splitPrice[i];
-                // Calcular qty total ya asignada a este ocItemId desde otros items del doc (no split)
+                // Calcular qty disponible considerando otras líneas mergeadas al mismo ocItem
                 const ocItem = matched ? oc.items.find(o => String(o.id) === String(val)) : null;
                 const pendiente = ocItem ? Number(ocItem.qty) - Number(ocItem.dispatched || 0) : 0;
                 const qtyOtrasLineas = sharedWithOther ? items.reduce((s, it2, j) => {
-                  if (j !== i && map[j] === val && !splitPrice[j]) return s + Number(it2.qty || 0);
+                  if (j !== i && String(map[j]) === String(val) && !splitPrice[j]) return s + Number(it2.qty || 0);
                   return s;
                 }, 0) : 0;
                 const qtyDisponible = pendiente - qtyOtrasLineas;
-                const excede = matched && !isSplit && Number(it.qty) > qtyDisponible;
+                // Solo mostrar excede en contexto merge (cuando hay otras líneas al mismo item)
+                const excede = matched && !isSplit && sharedWithOther && Number(it.qty) > qtyDisponible;
                 return (
                   <tr key={it.id}>
                     <td>
@@ -1285,12 +1286,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                       <select className={"map-sel" + (matched ? (excede ? " warn" : " ok") : " warn")} value={val || "NONE"} onChange={e => {
                         const newVal = e.target.value;
                         setMap(p => ({ ...p, [i]: newVal }));
-                        if (newVal === "NONE") {
-                          setSplitPrice(p => ({ ...p, [i]: false }));
-                        } else {
-                          // Si este item ya está mapeado en otra línea, NO auto-split — es merge por defecto
-                          setSplitPrice(p => ({ ...p, [i]: false }));
-                        }
+                        setSplitPrice(p => ({ ...p, [i]: false }));
                       }}>
                         <option value="NONE">— Sin vincular —</option>
                         {oc.items
@@ -1301,6 +1297,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                           })
                           .map(o => {
                             const pend = Number(o.qty) - Number(o.dispatched || 0);
+                            // Solo mostrar ⊕ MERGE si otra línea YA está mapeada a este mismo item OC
                             const alreadyMapped = Object.entries(map).some(([k, v]) => Number(k) !== i && v !== "NONE" && String(v) === String(o.id));
                             const label = alreadyMapped ? "⊕ MERGE — " : "";
                             return <option key={o.id} value={o.id}>{label}{o.desc} · {pend > 0 ? fmtNum(pend) + " " + o.unit + " pend." : "✓ despachado"}</option>;
