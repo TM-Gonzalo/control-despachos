@@ -1889,11 +1889,12 @@ export default function App() {
               {[{ id:"dashboard", ico:"◈", lbl:"Dashboard" }, { id:"orders", ico:"◫", lbl:"Ordenes" }].map(n => (
                 <div key={n.id} className={"rail-item" + (view === n.id ? " on" : "")} onClick={() => setView(n.id)}><span>{n.ico}</span>{n.lbl}</div>
               ))}
-              <div className={"rail-parent" + (view === "reports" || view === "clients" || view === "monthly" || view === "pending" ? " on" : "")}><span>▤</span>Reportes</div>
+              <div className={"rail-parent" + (view === "reports" || view === "clients" || view === "monthly" || view === "pending" || view === "toinvoice" ? " on" : "")}><span>▤</span>Reportes</div>
               <div className={"rail-item-sub" + (view === "reports" ? " on" : "")} onClick={() => setView("reports")}>Por OC</div>
               <div className={"rail-item-sub" + (view === "clients" ? " on" : "")} onClick={() => setView("clients")}>Por Cliente</div>
               <div className={"rail-item-sub" + (view === "monthly" ? " on" : "")} onClick={() => setView("monthly")}>Por Facturas</div>
-              <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>Pendientes</div>
+              <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>OC Pendientes</div>
+              <div className={"rail-item-sub" + (view === "toinvoice" ? " on" : "")} onClick={() => setView("toinvoice")}>Pend. Facturar</div>
             </nav>
             <div className="rail-foot">
               <div className="online-badge"><span className="online-dot" />Sesión activa</div>
@@ -2317,7 +2318,7 @@ export default function App() {
                 return (
                   <>
                     <div className="ph">
-                      <div><div className="pt">Reporte <em>Pendientes</em></div><div className="pm">OCS SIN COMPLETAR</div></div>
+                      <div><div className="pt">Reporte <em>OC Pendientes</em></div><div className="pm">OCS SIN COMPLETAR</div></div>
                       {pendingOCs.length > 0 && <button className="btn btn-outline" onClick={() => {
                         const rows = [];
                         pendingOCs.forEach(oc => {
@@ -2447,6 +2448,101 @@ export default function App() {
                         </div>
                       </div>
                     ))}
+                  </>
+                );
+              })()}
+
+              {view === "toinvoice" && (() => {
+                // Clientes con tolerancia extendida (5 días)
+                const TOLERANCIA_EXTENDIDA = new Set([
+                  "syncore montajes spa",
+                  "echeverría izquierdo montajes industriales s.a.",
+                  "echeverria izquierdo montajes industriales s.a.",
+                  "76.543.046-1",
+                  "96.870.780-9"
+                ]);
+                const tolerancia = (client, rut) => {
+                  const c = (client || "").toLowerCase().trim();
+                  const r = (rut || "").toLowerCase().trim();
+                  return TOLERANCIA_EXTENDIDA.has(c) || TOLERANCIA_EXTENDIDA.has(r) ? 5 : 1;
+                };
+                const diffDays = dateStr => {
+                  if (!dateStr) return null;
+                  return Math.floor((new Date(today()) - new Date(dateStr)) / 86400000);
+                };
+                // Recolectar todas las GDs sin factura
+                const pendFacs = [];
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
+                    if (d.docType === "guia" && !d.invoiceNumber) {
+                      const dias = diffDays(d.date);
+                      const tol = tolerancia(oc.client, oc.rut);
+                      const atrasada = dias !== null && dias > tol;
+                      const neto = Number(d.netTotal || 0) || (d.items || []).reduce((s, it) => {
+                        const ocItem = it.ocItemId ? oc.items.find(o => o.id === it.ocItemId) : null;
+                        const price = Number(it.unitPrice || (ocItem ? ocItem.unitPrice : 0) || 0);
+                        return s + (Number(it.qty) || 0) * price;
+                      }, 0);
+                      pendFacs.push({ ...d, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, dias, tol, atrasada });
+                    }
+                  });
+                });
+                // Ordenar de más antigua a más nueva
+                pendFacs.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+                const totalNeto = pendFacs.reduce((s, g) => s + g.neto, 0);
+                const atrasadas = pendFacs.filter(g => g.atrasada).length;
+                return (
+                  <>
+                    <div className="ph"><div><div className="pt">Reporte <em>Pend. Facturar</em></div><div className="pm">GUÍAS SIN FACTURA VINCULADA</div></div></div>
+                    {pendFacs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay guías pendientes de facturar.</p></div>}
+                    {pendFacs.length > 0 && (
+                      <>
+                        <div className="kpis" style={{ marginBottom:22 }}>
+                          {[
+                            { n: pendFacs.length, lbl: "GDs Pendientes", c: "var(--gold)" },
+                            { n: atrasadas,        lbl: "Atrasadas",      c: atrasadas > 0 ? "var(--rose)" : "var(--lime)" },
+                            { n: fmtCLP(totalNeto), lbl: "Monto Neto",   c: "var(--white)" },
+                          ].map(({ n, lbl, c }) => (
+                            <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
+                          ))}
+                        </div>
+                        <div className="tbl-card">
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>ESTADO</th>
+                                <th>N° GD</th>
+                                <th>FECHA GD</th>
+                                <th>DÍAS</th>
+                                <th>CLIENTE</th>
+                                <th>OC</th>
+                                <th style={{ textAlign:"right" }}>MONTO NETO</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {pendFacs.map((g, i) => (
+                                <tr key={i}>
+                                  <td>
+                                    {g.atrasada
+                                      ? <span className="badge b-toinvoice"><Dot c="var(--rose)" />Atrasada</span>
+                                      : <span className="badge b-closed"><Dot c="var(--lime)" />Ok</span>}
+                                  </td>
+                                  <td style={{ color:"var(--violet)", fontFamily:"var(--fM)", fontWeight:600 }}>{g.number || "—"}</td>
+                                  <td style={{ color:"var(--fog2)" }}>{g.date || "—"}</td>
+                                  <td style={{ color: g.atrasada ? "var(--rose)" : "var(--fog2)" }}>
+                                    {g.dias !== null ? g.dias + "d" : "—"}
+                                    <span style={{ fontSize:9, color:"var(--fog)", marginLeft:4 }}>(tol. {g.tol}d)</span>
+                                  </td>
+                                  <td style={{ color:"var(--white)" }}>{g.client}</td>
+                                  <td style={{ color:"var(--fog2)", fontSize:10 }}>{g.ocNumber}</td>
+                                  <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(g.neto)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
                   </>
                 );
               })()}
