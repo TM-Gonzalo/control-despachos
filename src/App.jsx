@@ -934,7 +934,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
               // Nombre completo = nombre producto + descripción variant (si son distintos)
               const prodName = p.name || "";
               const varDesc = v.description || "";
-              return prodName || varDesc;
+              return [prodName, varDesc].filter(Boolean).join(" ");
             }
             return v.description || it.variant?.description || "";
           } catch { return it.variant?.description || ""; }
