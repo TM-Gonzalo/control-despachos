@@ -820,25 +820,18 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
     const ocNum = (oc.ocNumber || "").replace(/[\s.]/g, "");
     setBsaleLoading(true);
     Promise.all([
-      fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0, generationDateRange: "[" + (Math.floor(Date.now()/1000) - 31536000) + "," + Math.floor(Date.now()/1000) + "]" }),
-      fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: 0, generationDateRange: "[" + (Math.floor(Date.now()/1000) - 31536000) + "," + Math.floor(Date.now()/1000) + "]" })
+      fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0 }),
+      fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: 0 })
     ]).then(([gds, facs]) => {
+      console.log("Bsale GDs:", gds?.count, "Facturas:", facs?.count);
       const all = [
         ...(gds.items || []).map(d => ({ ...d, _tipo: "guia" })),
         ...(facs.items || []).map(d => ({ ...d, _tipo: "factura" }))
       ].sort((a, b) => (b.generationDate || 0) - (a.generationDate || 0));
-      // Si hay número de OC, filtrar por referencia; si no, mostrar los 20 más recientes
-      if (ocNum) {
-        const filtered = all.filter(d => {
-          const refs = (d.references || []).map(r => String(r.number || "").replace(/[\s.]/g, ""));
-          return refs.some(r => r.includes(ocNum) || ocNum.includes(r));
-        });
-        setBsaleDocs(filtered.length > 0 ? filtered : all.slice(0, 20));
-      } else {
-        setBsaleDocs(all.slice(0, 20));
-      }
+      console.log("Total docs:", all.length);
+      setBsaleDocs(all.slice(0, 20));
       setBsaleLoading(false);
-    }).catch(() => setBsaleLoading(false));
+    }).catch((e) => { console.error("Bsale error:", e); setBsaleLoading(false); });
   }, [oc.id]);
 
   const handleSelectBsale = async (doc) => {
