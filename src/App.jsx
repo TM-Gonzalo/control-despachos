@@ -2632,9 +2632,9 @@ export default function App() {
                   <div className="kpis" style={{ marginBottom:22 }}>
                     {[
                       { n: total, lbl: "Total", c: "var(--white)" },
-                      { n: open + enriched.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Pendientes", c: "var(--rose)" },
+                      { n: open, lbl: "Abiertas", c: "var(--sky)" },
                       { n: enriched.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
-                      { n: closed, lbl: "Completadas", c: "var(--lime)" }
+                      { n: enriched.filter(o => { const s = ocStatus(o.items, o.dispatches); return s === "closed" || s === "toinvoice"; }).length, lbl: "Completadas", c: "var(--lime)" }
                     ].map(({ n, lbl, c }) => (
                       <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
                     ))}
