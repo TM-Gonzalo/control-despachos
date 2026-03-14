@@ -1254,6 +1254,10 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                 // Detectar si este ocItemId ya está usado por otro item del doc
                 const sharedWithOther = matched && Object.entries(map).some(([k, v]) => Number(k) !== i && String(v) === String(val) && v !== "NONE");
                 const isSplit = !!splitPrice[i];
+                // Detectar si este ítem es una división de otro (mismo sourceId)
+                const isDiv = !!it._sourceId;
+                const siblingQty = isDiv ? items.filter((x, j) => j !== i && x._sourceId === it._sourceId).reduce((s, x) => s + Number(x.qty || 0), 0) : 0;
+                const sourceQty = isDiv ? it._sourceQty : Number(it.qty);
                 // Calcular qty disponible considerando otras líneas mergeadas al mismo ocItem
                 const ocItem = matched ? oc.items.find(o => String(o.id) === String(val)) : null;
                 const pendiente = ocItem ? Number(ocItem.qty) - Number(ocItem.dispatched || 0) : 0;
@@ -1262,13 +1266,16 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                   return s;
                 }, 0) : 0;
                 const qtyDisponible = pendiente - qtyOtrasLineas;
-                // Solo mostrar excede en contexto merge (cuando hay otras líneas al mismo item)
                 const excede = matched && !isSplit && sharedWithOther && Number(it.qty) > qtyDisponible;
                 return (
-                  <tr key={it.id}>
+                  <tr key={it.id || i}>
                     <td>
-                      <div style={{ fontWeight:500, fontSize:12 }}>{it.desc}</div>
+                      <div style={{ fontWeight:500, fontSize:12 }}>
+                        {it.desc}
+                        {isDiv && <span style={{ fontSize:9, color:"var(--violet)", marginLeft:6, letterSpacing:1 }}>÷ DIVISIÓN</span>}
+                      </div>
                       <div style={{ fontSize:9, color:"var(--sky)", marginTop:2 }}>Cant: {fmtNum(it.qty)} {it.unit}</div>
+                      {isDiv && <div style={{ fontSize:9, color:"var(--fog)", marginTop:1 }}>Total original: {fmtNum(sourceQty)} · Otras líneas: {fmtNum(siblingQty)}</div>}
                       {sharedWithOther && (
                         <div style={{ marginTop:5 }}>
                           <label style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer", fontSize:9, letterSpacing:1, color: isSplit ? "var(--rose)" : "var(--lime)" }}>
@@ -1291,8 +1298,6 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                         <option value="NONE">— Sin vincular —</option>
                         {oc.items
                           .filter(o => {
-                            // Usar qty/dispatched de la OC original (sin enriquecer con despachos actuales)
-                            // para no ocultar items que se están usando en este mapeo
                             const ocOriginal = oc.items.find(x => x.id === o.id);
                             const pend = Number(ocOriginal.qty) - Number(ocOriginal.dispatched || 0);
                             if (docType !== "factura" && pend <= 0) return false;
@@ -1300,7 +1305,6 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                           })
                           .map(o => {
                             const pend = Number(o.qty) - Number(o.dispatched || 0);
-                            // Calcular cuánto ya está siendo asignado a este item en otras líneas del mapeo actual
                             const qtyEnMapeo = items.reduce((s, it2, j) => {
                               if (String(map[j]) === String(o.id) && !splitPrice[j]) return s + Number(it2.qty || 0);
                               return s;
@@ -1314,11 +1318,42 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                       </select>
                       {!matched && <div className="map-note">⚠ No descontara del remanente</div>}
                     </td>
-                    <td><input type="number" className="map-qty" value={it.qty} onChange={e => updItem(i, "qty", e.target.value)} style={{ opacity: isSplit ? 0.4 : 1 }} /></td>
-                    <td><button className="btn btn-rose btn-sm" title="Eliminar item" onClick={() => {
-                      setItems(p => p.filter((_, j) => j !== i));
-                      setMap(p => { const n = {}; Object.keys(p).filter(k => Number(k) !== i).forEach((k, j) => n[j] = p[Number(k) > i ? Number(k) - 1 : Number(k)]); return n; });
-                    }}>✕</button></td>
+                    <td><input type="number" className="map-qty" value={it.qty} min={1} onChange={e => updItem(i, "qty", e.target.value)} style={{ opacity: isSplit ? 0.4 : 1 }} /></td>
+                    <td style={{ display:"flex", gap:4 }}>
+                      {/* Botón dividir: solo si qty > 1 y no es ya una división con qty=1 */}
+                      {Number(it.qty) > 1 && (
+                        <button className="btn btn-teal btn-sm" title="Dividir en dos líneas" onClick={() => {
+                          const srcId = it._sourceId || ("SRC-" + i + "-" + Date.now());
+                          const srcQty = it._sourceQty || Number(it.qty);
+                          const q1 = Math.floor(srcQty / 2);
+                          const q2 = srcQty - q1;
+                          // Reemplazar ítem actual con dos líneas
+                          setItems(p => {
+                            const newItems = [...p];
+                            newItems.splice(i, 1,
+                              { ...it, qty: q1, _sourceId: srcId, _sourceQty: srcQty },
+                              { ...it, id: it.id + "-div", qty: q2, _sourceId: srcId, _sourceQty: srcQty }
+                            );
+                            return newItems;
+                          });
+                          setMap(p => {
+                            const newMap = {};
+                            const keys = Object.keys(p).map(Number).sort((a,b) => a-b);
+                            let offset = 0;
+                            for (let k = 0; k <= Math.max(...keys, i); k++) {
+                              if (k < i) newMap[k] = p[k];
+                              else if (k === i) { newMap[k] = p[k]; newMap[k+1] = "NONE"; offset = 1; }
+                              else if (p[k] !== undefined) newMap[k + offset] = p[k];
+                            }
+                            return newMap;
+                          });
+                        }}>÷</button>
+                      )}
+                      <button className="btn btn-rose btn-sm" title="Eliminar item" onClick={() => {
+                        setItems(p => p.filter((_, j) => j !== i));
+                        setMap(p => { const n = {}; Object.keys(p).filter(k => Number(k) !== i).forEach((k, j) => n[j] = p[Number(k) > i ? Number(k) - 1 : Number(k)]); return n; });
+                      }}>✕</button>
+                    </td>
                   </tr>
                 );
               })}</tbody>
