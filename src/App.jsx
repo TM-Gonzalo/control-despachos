@@ -812,6 +812,94 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [savedCount, setSavedCount] = useState(0);
   const [lastSaved, setLastSaved] = useState(null);
   const [ocMismatch, setOcMismatch] = useState(null); // { pdfOC, thisOC }
+  const [bsaleDocs, setBsaleDocs] = useState([]);
+  const [bsaleLoading, setBsaleLoading] = useState(false);
+
+  // Cargar documentos de Bsale al abrir el modal, filtrados por número de OC
+  useEffect(() => {
+    const ocNum = (oc.ocNumber || "").replace(/[\s.]/g, "");
+    if (!ocNum) return;
+    setBsaleLoading(true);
+    Promise.all([
+      fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0 }),
+      fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: 0 })
+    ]).then(([gds, facs]) => {
+      const all = [
+        ...(gds.items || []).map(d => ({ ...d, _tipo: "guia" })),
+        ...(facs.items || []).map(d => ({ ...d, _tipo: "factura" }))
+      ];
+      // Filtrar por referencia a OC o mostrar todos los recientes
+      const filtered = all.filter(d => {
+        const refs = (d.references || []).map(r => String(r.number || "").replace(/[\s.]/g, ""));
+        return refs.some(r => r.includes(ocNum) || ocNum.includes(r));
+      });
+      setBsaleDocs(filtered.length > 0 ? filtered : all.slice(0, 20));
+      setBsaleLoading(false);
+    }).catch(() => setBsaleLoading(false));
+  }, [oc.ocNumber]);
+
+  const handleSelectBsale = async (doc) => {
+    setErr(null); setLoading(true);
+    try {
+      const tipo = doc._tipo === "factura" ? "factura" : "guia";
+      const num = String(doc.number || "");
+      const date = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0, 10) : today();
+      const netTotal = doc.netAmount || 0;
+      const total = doc.totalAmount || 0;
+      const details = doc.details || [];
+      const its = details.map((it, i) => ({
+        id: i + 1,
+        desc: it.comment || it.variantDescription || "",
+        unit: "UN",
+        qty: Number(it.quantity || 1),
+        unitPrice: Number(it.unitValue || it.netUnitValue || 0)
+      }));
+
+      const d = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber: null };
+
+      // Si es factura, buscar referencia GD
+      if (tipo === "factura") {
+        const refs = doc.references || [];
+        const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
+        if (gdRef) d.gdNumber = String(gdRef.number || "");
+      }
+
+      setExt(d); setNum(d.docNumber); setDate(d.date);
+      setDocType(tipo);
+      const its2 = its.map((it, i) => ({ ...it, id: i + 1 }));
+      setItems(its2);
+      const am = {};
+      its2.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items) || "NONE"; });
+      setMap(am);
+
+      // Si es factura con GD referenciada, vincular automáticamente
+      if (tipo === "factura" && d.gdNumber) {
+        const normGD = s => String(s).replace(/[\s.]/g, "");
+        const gdRef = normGD(d.gdNumber);
+        const matchingGD = (oc.dispatches || []).find(disp =>
+          disp.docType === "guia" && normGD(disp.number || "") === gdRef
+        );
+        if (matchingGD) {
+          await onSave(oc.id, {
+            _gdLink: true,
+            gdId: matchingGD.id,
+            invoiceNumber: d.docNumber || "",
+            invoiceDate: d.date || today(),
+            netTotal: d.netTotal || 0,
+            total: d.total || 0
+          });
+          setLastSaved({ num: d.docNumber, docType: "factura", linked: true });
+          setSavedCount(c => c + 1);
+          setStep(0); setNum(""); setDate(today()); setDocType("guia"); setItems([]); setMap({}); setSplitPrice({}); setExt(null); setErr(null);
+          setLoading(false);
+          return;
+        }
+      }
+      setOcMismatch(null);
+      setStep(1);
+    } catch(e) { setErr(e.message); }
+    setLoading(false);
+  };
 
   const handleFile = async f => {
     setErr(null); setLoading(true);
@@ -931,6 +1019,34 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                 <span style={{ color:"var(--lime)", fontSize:14 }}>✓</span>
                 <span style={{ fontSize:12, color:"var(--lime)" }}>{lastSaved.linked ? "Factura N° " + lastSaved.num + " vinculada a GD existente." : (lastSaved.docType === "factura" ? "Factura" : "Guia") + " N° " + lastSaved.num + " registrada."}</span>
                 <span style={{ fontSize:11, color:"var(--fog2)", marginLeft:"auto" }}>{savedCount} guardado{savedCount !== 1 ? "s" : ""} en esta sesión</span>
+              </div>
+            )}
+            {/* Selector Bsale */}
+            {bsaleLoading && <div style={{ fontSize:11, color:"var(--fog)", marginBottom:10 }}>⚡ Buscando documentos en Bsale...</div>}
+            {!bsaleLoading && bsaleDocs.length > 0 && (
+              <div style={{ marginBottom:16 }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:8 }}>⚡ DOCUMENTOS DISPONIBLES EN BSALE</div>
+                <div style={{ maxHeight:180, overflowY:"auto", display:"flex", flexDirection:"column", gap:5 }}>
+                  {bsaleDocs.map(doc => {
+                    const num = String(doc.number || "");
+                    const tipo = doc._tipo;
+                    const fecha = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0,10) : "—";
+                    const monto = doc.netAmount ? "$" + Number(doc.netAmount).toLocaleString("es-CL") : "—";
+                    const alreadyAdded = (oc.dispatches || []).some(d => String(d.number||"") === num || String(d.invoiceNumber||"") === num);
+                    return (
+                      <button key={doc.id} disabled={alreadyAdded || loading}
+                        onClick={() => handleSelectBsale(doc)}
+                        style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:7, cursor: alreadyAdded ? "default" : "pointer", opacity: alreadyAdded ? 0.4 : 1, textAlign:"left" }}>
+                        <span className={"badge " + (tipo === "guia" ? "bdoc-guia" : "bdoc-fac")}>{tipo === "guia" ? "GD" : "FAC"}</span>
+                        <span style={{ color:"var(--gold)", fontFamily:"var(--fM)", fontSize:12 }}>{num}</span>
+                        <span style={{ color:"var(--fog2)", fontSize:11 }}>{fecha}</span>
+                        <span style={{ color:"var(--lime)", fontSize:11, marginLeft:"auto" }}>{monto}</span>
+                        {alreadyAdded && <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ YA AGREGADO</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize:9, color:"var(--fog)", marginTop:8, letterSpacing:1 }}>O sube un PDF manualmente:</div>
               </div>
             )}
             <UploadZone onFile={handleFile} loading={loading} label={lastSaved ? "Subir otro documento o" : "Arrastra la factura o guia aqui o"} />
