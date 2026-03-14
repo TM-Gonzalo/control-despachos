@@ -1291,13 +1291,25 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                         <option value="NONE">— Sin vincular —</option>
                         {oc.items
                           .filter(o => {
-                            const pend = Number(o.qty) - Number(o.dispatched || 0);
+                            // Usar qty/dispatched de la OC original (sin enriquecer con despachos actuales)
+                            // para no ocultar items que se están usando en este mapeo
+                            const ocOriginal = oc.items.find(x => x.id === o.id);
+                            const pend = Number(ocOriginal.qty) - Number(ocOriginal.dispatched || 0);
                             if (docType !== "factura" && pend <= 0) return false;
                             return true;
                           })
                           .map(o => {
                             const pend = Number(o.qty) - Number(o.dispatched || 0);
-                            return <option key={o.id} value={o.id}>{o.desc} · {pend > 0 ? fmtNum(pend) + " " + o.unit + " pend." : "✓ despachado"}</option>;
+                            // Calcular cuánto ya está siendo asignado a este item en otras líneas del mapeo actual
+                            const qtyEnMapeo = items.reduce((s, it2, j) => {
+                              if (String(map[j]) === String(o.id) && !splitPrice[j]) return s + Number(it2.qty || 0);
+                              return s;
+                            }, 0);
+                            const disponible = pend - qtyEnMapeo;
+                            const enUso = Object.entries(map).some(([k, v]) => String(v) === String(o.id) && v !== "NONE");
+                            const label = enUso ? "⊕ " : "";
+                            const dispLabel = disponible > 0 ? fmtNum(disponible) + " " + o.unit + " dispon." : disponible === 0 && qtyEnMapeo > 0 ? "✓ cubierto" : "✓ despachado";
+                            return <option key={o.id} value={o.id}>{label}{o.desc} · {dispLabel}</option>;
                           })}
                       </select>
                       {!matched && <div className="map-note">⚠ No descontara del remanente</div>}
