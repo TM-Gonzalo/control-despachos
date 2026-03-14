@@ -1495,11 +1495,7 @@ export default function App() {
     <>
       <style>{G}</style>
       <div style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100%" }}>
-        {!import.meta.env.VITE_ANTHROPIC_API_KEY && isAdmin && <div className="key-bar">
-          <span>🔑 API Key:</span>
-          <input type="password" value={apiKey} onChange={e => handleSaveKey(e.target.value)} placeholder="sk-ant-... (necesaria para importar PDFs)" />
-          {apiKey ? <span style={{ fontSize:9, letterSpacing:1, color:"var(--lime)" }}>✓ Configurada</span> : <span style={{ fontSize:9, color:"var(--rose)" }}>Requerida para importar PDFs</span>}
-        </div>}
+
         <div className="app" style={{ flex:1, minHeight:0, width:"100%" }}>
           <aside className="rail">
             <div className="rail-brand">
