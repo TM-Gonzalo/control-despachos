@@ -1254,30 +1254,42 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                 // Detectar si este ocItemId ya está usado por otro item del doc
                 const sharedWithOther = matched && Object.entries(map).some(([k, v]) => Number(k) !== i && v === val);
                 const isSplit = !!splitPrice[i];
+                // Calcular qty total ya asignada a este ocItemId desde otros items del doc (no split)
+                const ocItem = matched ? oc.items.find(o => String(o.id) === String(val)) : null;
+                const pendiente = ocItem ? Number(ocItem.qty) - Number(ocItem.dispatched || 0) : 0;
+                const qtyOtrasLineas = sharedWithOther ? items.reduce((s, it2, j) => {
+                  if (j !== i && map[j] === val && !splitPrice[j]) return s + Number(it2.qty || 0);
+                  return s;
+                }, 0) : 0;
+                const qtyDisponible = pendiente - qtyOtrasLineas;
+                const excede = matched && !isSplit && Number(it.qty) > qtyDisponible;
                 return (
                   <tr key={it.id}>
                     <td>
                       <div style={{ fontWeight:500, fontSize:12 }}>{it.desc}</div>
                       <div style={{ fontSize:9, color:"var(--sky)", marginTop:2 }}>Cant: {fmtNum(it.qty)} {it.unit}</div>
                       {sharedWithOther && (
-                        <label style={{ display:"flex", alignItems:"center", gap:5, marginTop:5, cursor:"pointer", fontSize:9, letterSpacing:1, color: isSplit ? "var(--rose)" : "var(--gold)" }}>
-                          <input type="checkbox" checked={isSplit} onChange={e => setSplitPrice(p => ({ ...p, [i]: e.target.checked }))}
-                            style={{ accentColor:"var(--rose)", width:11, height:11 }} />
-                          {isSplit ? "✓ SUBDIVISIÓN DE PRECIO — qty no suma" : "⚠ Mismo item que otra línea — ¿subdivisión de precio?"}
-                        </label>
+                        <div style={{ marginTop:5 }}>
+                          <label style={{ display:"flex", alignItems:"center", gap:5, cursor:"pointer", fontSize:9, letterSpacing:1, color: isSplit ? "var(--rose)" : "var(--lime)" }}>
+                            <input type="checkbox" checked={isSplit} onChange={e => setSplitPrice(p => ({ ...p, [i]: e.target.checked }))}
+                              style={{ accentColor:"var(--rose)", width:11, height:11 }} />
+                            {isSplit ? "✓ SUBDIVISIÓN DE PRECIO — qty no suma" : "✓ MERGE — qty suma al mismo item OC"}
+                          </label>
+                          {!isSplit && <div style={{ fontSize:9, color:"var(--fog)", marginTop:2 }}>Disponible: {fmtNum(qtyDisponible)} {ocItem?.unit}</div>}
+                        </div>
                       )}
+                      {excede && <div style={{ fontSize:9, color:"var(--rose)", marginTop:3 }}>⚠ Excede el pendiente disponible ({fmtNum(qtyDisponible)} {ocItem?.unit})</div>}
                     </td>
                     <td className="map-arrow">→</td>
                     <td>
-                      <select className={"map-sel" + (matched ? " ok" : " warn")} value={val || "NONE"} onChange={e => {
+                      <select className={"map-sel" + (matched ? (excede ? " warn" : " ok") : " warn")} value={val || "NONE"} onChange={e => {
                         const newVal = e.target.value;
                         setMap(p => ({ ...p, [i]: newVal }));
                         if (newVal === "NONE") {
                           setSplitPrice(p => ({ ...p, [i]: false }));
                         } else {
-                          // Si este item ya está mapeado en otra línea, auto-marcar como split
-                          const alreadyUsed = Object.entries(map).some(([k, v]) => Number(k) !== i && v === newVal);
-                          if (alreadyUsed) setSplitPrice(p => ({ ...p, [i]: true }));
+                          // Si este item ya está mapeado en otra línea, NO auto-split — es merge por defecto
+                          setSplitPrice(p => ({ ...p, [i]: false }));
                         }
                       }}>
                         <option value="NONE">— Sin vincular —</option>
@@ -1285,13 +1297,12 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                           .filter(o => {
                             const pend = Number(o.qty) - Number(o.dispatched || 0);
                             if (docType !== "factura" && pend <= 0) return false;
-                            // Siempre mostrar todos — el usuario puede elegir el mismo item para split
                             return true;
                           })
                           .map(o => {
                             const pend = Number(o.qty) - Number(o.dispatched || 0);
                             const alreadyMapped = Object.entries(map).some(([k, v]) => Number(k) !== i && v !== "NONE" && String(v) === String(o.id));
-                            const label = alreadyMapped ? "⚑ SPLIT — " : "";
+                            const label = alreadyMapped ? "⊕ MERGE — " : "";
                             return <option key={o.id} value={o.id}>{label}{o.desc} · {pend > 0 ? fmtNum(pend) + " " + o.unit + " pend." : "✓ despachado"}</option>;
                           })}
                       </select>
@@ -1313,6 +1324,21 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
                 if (docType === "factura") {
                   const sinMapear = items.filter((_, i) => !map[i] || map[i] === "NONE").length;
                   if (sinMapear > 0) { setErr("Una factura debe tener todos sus items vinculados. Faltan " + sinMapear + " por vincular."); return; }
+                }
+                // Validar que ningún merge exceda el pendiente
+                const ocItemQty = {};
+                for (let i = 0; i < items.length; i++) {
+                  const val = map[i];
+                  if (!val || val === "NONE" || splitPrice[i]) continue;
+                  const ocItem = oc.items.find(o => String(o.id) === String(val));
+                  if (!ocItem) continue;
+                  const pend = Number(ocItem.qty) - Number(ocItem.dispatched || 0);
+                  if (!ocItemQty[val]) ocItemQty[val] = 0;
+                  ocItemQty[val] += Number(items[i].qty || 0);
+                  if (ocItemQty[val] > pend) {
+                    setErr(`El item "${ocItem.desc}" tiene ${fmtNum(pend)} ${ocItem.unit} pendientes pero se están asignando ${fmtNum(ocItemQty[val])} ${ocItem.unit}.`);
+                    return;
+                  }
                 }
                 setErr(null); setStep(3);
               }}>Revisar →</button>
