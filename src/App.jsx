@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
@@ -681,25 +681,34 @@ function BsaleView({ enriched, onAssign }) {
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
-  const [filter, setFilter] = useState("all"); // all | guia | factura
+  const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [sortCol, setSortCol] = useState("number");
+  const [sortDir, setSortDir] = useState(-1); // -1 = desc, 1 = asc
   const LIMIT = 50;
 
   const loadDocs = async (offset = 0) => {
     setLoading(true); setErr(null);
     try {
-      // Cargar GDs (tipo 8) y Facturas (tipo 1) en paralelo
+      // Primero obtener totales para calcular offset desde el final
+      const [gdMeta, facMeta] = await Promise.all([
+        fetchBsale("/documents.json", { documentTypeId: "8", limit: 1, offset: 0 }),
+        fetchBsale("/documents.json", { documentTypeId: "1", limit: 1, offset: 0 })
+      ]);
+      const gdTotal = gdMeta.count || 0;
+      const facTotal = facMeta.count || 0;
+      const gdOffset = Math.max(0, gdTotal - LIMIT - offset);
+      const facOffset = Math.max(0, facTotal - LIMIT - offset);
       const [gds, facs] = await Promise.all([
-        fetchBsale("/documents.json", { documentTypeId: "8", limit: LIMIT, offset }),
-        fetchBsale("/documents.json", { documentTypeId: "1", limit: LIMIT, offset })
+        fetchBsale("/documents.json", { documentTypeId: "8", limit: LIMIT, offset: gdOffset }),
+        fetchBsale("/documents.json", { documentTypeId: "1", limit: LIMIT, offset: facOffset })
       ]);
       const gdItems = (gds.items || []).map(d => ({ ...d, _tipo: "guia" }));
       const facItems = (facs.items || []).map(d => ({ ...d, _tipo: "factura" }));
-      const all = [...gdItems, ...facItems].sort((a, b) => (b.generationDate || 0) - (a.generationDate || 0));
-      setDocs(all);
-      setTotalCount((gds.count || 0) + (facs.count || 0));
+      setDocs([...gdItems, ...facItems]);
+      setTotalCount(gdTotal + facTotal);
     } catch(e) { setErr(e.message); }
     setLoading(false);
   };
@@ -715,16 +724,53 @@ function BsaleView({ enriched, onAssign }) {
     });
   });
 
-  const filtered = docs.filter(d => {
-    const num = String(d.number || d.urlPublicTemplate || "");
-    const client = d.address || "";
-    const matchSearch = !search || num.includes(search) || client.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "all" || d._tipo === filter;
-    return matchSearch && matchFilter;
+  // Construir árbol: GDs con sus Facturas vinculadas
+  const buildTree = (allDocs) => {
+    const guias = allDocs.filter(d => d._tipo === "guia");
+    const facturas = allDocs.filter(d => d._tipo === "factura");
+    // Agrupar facturas por número (misma fecha y monto que GD = probablemente relacionadas)
+    return guias.map(gd => {
+      const gdNum = String(gd.number || "");
+      const gdDate = gd.generationDate || 0;
+      // Buscar factura con mismo número o misma fecha y monto similar
+      const relFac = facturas.filter(f =>
+        String(f.number || "") === gdNum ||
+        (Math.abs((f.generationDate || 0) - gdDate) < 86400 && Math.abs((f.netAmount || 0) - (gd.netAmount || 0)) < 100)
+      );
+      return { ...gd, _facturas: relFac };
+    });
+  };
+
+  const sortedDocs = [...docs].sort((a, b) => {
+    const va = sortCol === "number" ? Number(a.number || 0) : (a.generationDate || 0);
+    const vb = sortCol === "number" ? Number(b.number || 0) : (b.generationDate || 0);
+    return sortDir * (vb - va);
   });
+
+  const tree = buildTree(sortedDocs);
+
+  const filteredTree = tree.filter(d => {
+    const num = String(d.number || "");
+    const addr = d.address || "";
+    const matchSearch = !search || num.includes(search) || addr.toLowerCase().includes(search.toLowerCase());
+    const matchFilter = filter === "all" || filter === "guia";
+    return matchSearch && matchFilter;
+  }).concat(
+    filter === "factura" ? sortedDocs.filter(d => d._tipo === "factura" && (() => {
+      const num = String(d.number || "");
+      const addr = d.address || "";
+      return !search || num.includes(search) || addr.toLowerCase().includes(search.toLowerCase());
+    })()) : []
+  );
 
   const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0, 10) : "—";
   const fmtMonto = n => n ? "$" + Number(n).toLocaleString("es-CL") : "—";
+  const SortBtn = ({ col, label }) => (
+    <th style={{ padding:"8px 12px", textAlign:"left", cursor:"pointer", userSelect:"none", color: sortCol === col ? "var(--gold)" : "var(--fog)", fontSize:10, letterSpacing:1 }}
+      onClick={() => { if (sortCol === col) setSortDir(d => -d); else { setSortCol(col); setSortDir(-1); } }}>
+      {label} <span style={{ opacity:0.6 }}>{sortCol === col ? (sortDir === -1 ? "▼" : "▲") : "⇅"}</span>
+    </th>
+  );
 
   return (
     <>
@@ -733,9 +779,9 @@ function BsaleView({ enriched, onAssign }) {
         <button className="btn btn-outline btn-sm" onClick={() => loadDocs(page * LIMIT)}>↺ Actualizar</button>
       </div>
       <div className="toolbar">
-        <input className="srch" placeholder="Buscar por N° o cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="srch" placeholder="Buscar por N° o dirección..." value={search} onChange={e => setSearch(e.target.value)} />
         <select className="fsel" value={filter} onChange={e => setFilter(e.target.value)}>
-          <option value="all">Todos</option>
+          <option value="all">Todos (árbol)</option>
           <option value="guia">Solo GDs</option>
           <option value="factura">Solo Facturas</option>
         </select>
@@ -746,51 +792,79 @@ function BsaleView({ enriched, onAssign }) {
         <div style={{ overflowX:"auto" }}>
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
             <thead>
-              <tr style={{ borderBottom:"1px solid var(--line)", color:"var(--fog)", fontSize:10, letterSpacing:1 }}>
-                <th style={{ padding:"8px 12px", textAlign:"left" }}>TIPO</th>
-                <th style={{ padding:"8px 12px", textAlign:"left" }}>N°</th>
-                <th style={{ padding:"8px 12px", textAlign:"left" }}>FECHA</th>
-                <th style={{ padding:"8px 12px", textAlign:"left" }}>CLIENTE</th>
-                <th style={{ padding:"8px 12px", textAlign:"right" }}>NETO</th>
-                <th style={{ padding:"8px 12px", textAlign:"center" }}>ESTADO</th>
+              <tr style={{ borderBottom:"1px solid var(--line)" }}>
+                <th style={{ padding:"8px 12px", textAlign:"left", color:"var(--fog)", fontSize:10, letterSpacing:1 }}>TIPO</th>
+                <SortBtn col="number" label="N°" />
+                <SortBtn col="date" label="FECHA" />
+                <th style={{ padding:"8px 12px", textAlign:"left", color:"var(--fog)", fontSize:10, letterSpacing:1 }}>DIRECCIÓN</th>
+                <th style={{ padding:"8px 12px", textAlign:"right", color:"var(--fog)", fontSize:10, letterSpacing:1 }}>NETO</th>
+                <th style={{ padding:"8px 12px", textAlign:"center", color:"var(--fog)", fontSize:10, letterSpacing:1 }}>ESTADO</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(d => {
-                const num = String(d.number || "");
+              {filter !== "factura" ? filteredTree.map(gd => {
+                const num = String(gd.number || "");
                 const isAssigned = assignedNums.has(num);
-                const client = d.address || "—";
-                const neto = d.netAmount || d.totalAmount || 0;
+                const neto = gd.netAmount || gd.totalAmount || 0;
                 return (
-                  <tr key={d.id} style={{ borderBottom:"1px solid var(--line2)", opacity: isAssigned ? 0.5 : 1 }}>
-                    <td style={{ padding:"10px 12px" }}>
-                      <span className={"badge " + (d._tipo === "guia" ? "bdoc-guia" : "bdoc-fac")}>
-                        {d._tipo === "guia" ? "GD" : "FAC"}
-                      </span>
-                    </td>
-                    <td style={{ padding:"10px 12px", color:"var(--gold)", fontFamily:"var(--fM)" }}>{num || "—"}</td>
-                    <td style={{ padding:"10px 12px", color:"var(--fog2)" }}>{fmtDate(d.generationDate)}</td>
-                    <td style={{ padding:"10px 12px" }}>{client}</td>
-                    <td style={{ padding:"10px 12px", textAlign:"right", color:"var(--lime)" }}>{fmtMonto(neto)}</td>
+                  <React.Fragment key={gd.id}>
+                    <tr style={{ borderBottom: gd._facturas?.length ? "none" : "1px solid var(--line2)", opacity: isAssigned ? 0.5 : 1 }}>
+                      <td style={{ padding:"10px 12px" }}><span className="badge bdoc-guia">GD</span></td>
+                      <td style={{ padding:"10px 12px", color:"var(--gold)", fontFamily:"var(--fM)" }}>{num || "—"}</td>
+                      <td style={{ padding:"10px 12px", color:"var(--fog2)" }}>{fmtDate(gd.generationDate)}</td>
+                      <td style={{ padding:"10px 12px", fontSize:11, color:"var(--fog2)" }}>{gd.address || "—"}</td>
+                      <td style={{ padding:"10px 12px", textAlign:"right", color:"var(--lime)" }}>{fmtMonto(neto)}</td>
+                      <td style={{ padding:"10px 12px", textAlign:"center" }}>
+                        {isAssigned ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ ASIGNADO</span>
+                          : <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>PENDIENTE</span>}
+                      </td>
+                    </tr>
+                    {(gd._facturas || []).map(fac => {
+                      const facNum = String(fac.number || "");
+                      const facAssigned = assignedNums.has(facNum);
+                      return (
+                        <tr key={fac.id} style={{ borderBottom:"1px solid var(--line2)", background:"rgba(90,200,255,.04)", opacity: facAssigned ? 0.5 : 1 }}>
+                          <td style={{ padding:"8px 12px 8px 28px" }}><span className="badge bdoc-fac" style={{ fontSize:8 }}>↳ FAC</span></td>
+                          <td style={{ padding:"8px 12px", color:"var(--sky)", fontFamily:"var(--fM)", fontSize:11 }}>{facNum || "—"}</td>
+                          <td style={{ padding:"8px 12px", color:"var(--fog2)", fontSize:11 }}>{fmtDate(fac.generationDate)}</td>
+                          <td style={{ padding:"8px 12px", fontSize:10, color:"var(--fog)" }}>{fac.address || "—"}</td>
+                          <td style={{ padding:"8px 12px", textAlign:"right", color:"var(--sky)", fontSize:11 }}>{fmtMonto(fac.netAmount || fac.totalAmount || 0)}</td>
+                          <td style={{ padding:"8px 12px", textAlign:"center" }}>
+                            {facAssigned ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ ASIGNADO</span>
+                              : <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>PENDIENTE</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              }) : sortedDocs.filter(d => d._tipo === "factura" && (!search || String(d.number||"").includes(search) || (d.address||"").toLowerCase().includes(search.toLowerCase()))).map(fac => {
+                const num = String(fac.number || "");
+                const isAssigned = assignedNums.has(num);
+                return (
+                  <tr key={fac.id} style={{ borderBottom:"1px solid var(--line2)", opacity: isAssigned ? 0.5 : 1 }}>
+                    <td style={{ padding:"10px 12px" }}><span className="badge bdoc-fac">FAC</span></td>
+                    <td style={{ padding:"10px 12px", color:"var(--sky)", fontFamily:"var(--fM)" }}>{num || "—"}</td>
+                    <td style={{ padding:"10px 12px", color:"var(--fog2)" }}>{fmtDate(fac.generationDate)}</td>
+                    <td style={{ padding:"10px 12px", fontSize:11 }}>{fac.address || "—"}</td>
+                    <td style={{ padding:"10px 12px", textAlign:"right", color:"var(--sky)" }}>{fmtMonto(fac.netAmount || fac.totalAmount || 0)}</td>
                     <td style={{ padding:"10px 12px", textAlign:"center" }}>
-                      {isAssigned
-                        ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ ASIGNADO</span>
-                        : <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>PENDIENTE</span>
-                      }
+                      {isAssigned ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ ASIGNADO</span>
+                        : <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>PENDIENTE</span>}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          {filtered.length === 0 && <div className="empty"><div className="empty-ico">📄</div><div>No hay documentos</div></div>}
+          {filteredTree.length === 0 && <div className="empty"><div className="empty-ico">📄</div><div>No hay documentos</div></div>}
         </div>
       )}
       {totalCount > LIMIT && (
         <div style={{ display:"flex", gap:8, justifyContent:"center", marginTop:16 }}>
           <button className="btn btn-outline btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Anterior</button>
           <span style={{ fontSize:11, color:"var(--fog)", padding:"4px 8px" }}>Página {page + 1}</span>
-          <button className="btn btn-outline btn-sm" disabled={(page + 1) * LIMIT >= totalCount} onClick={() => setPage(p => p + 1)}>Siguiente →</button>
+          <button className="btn btn-outline btn-sm" onClick={() => setPage(p => p + 1)}>Siguiente →</button>
         </div>
       )}
     </>
