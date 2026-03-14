@@ -923,11 +923,19 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       try {
         const detailsData = await fetchBsale("/documents/" + doc.id + "/details.json");
         const detailItems = detailsData.items || [];
-        // Obtener nombre completo de cada variant
+        // Obtener nombre completo desde producto (variant solo tiene nombre corto)
         const variantNames = await Promise.all(detailItems.map(async (it) => {
           if (!it.variant?.id) return it.variant?.description || "";
           try {
             const v = await fetchBsale("/variants/" + it.variant.id + ".json");
+            const productId = v.product?.id;
+            if (productId) {
+              const p = await fetchBsale("/products/" + productId + ".json");
+              // Nombre completo = nombre producto + descripción variant (si son distintos)
+              const prodName = p.name || "";
+              const varDesc = v.description || "";
+              return prodName || varDesc;
+            }
             return v.description || it.variant?.description || "";
           } catch { return it.variant?.description || ""; }
         }));
