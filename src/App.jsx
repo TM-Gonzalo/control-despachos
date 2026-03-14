@@ -815,10 +815,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [bsaleDocs, setBsaleDocs] = useState([]);
   const [bsaleLoading, setBsaleLoading] = useState(false);
 
-  // Cargar documentos de Bsale al abrir el modal, filtrados por número de OC
+  // Cargar documentos de Bsale al abrir el modal
   useEffect(() => {
     const ocNum = (oc.ocNumber || "").replace(/[\s.]/g, "");
-    if (!ocNum) return;
     setBsaleLoading(true);
     Promise.all([
       fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0 }),
@@ -827,16 +826,20 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       const all = [
         ...(gds.items || []).map(d => ({ ...d, _tipo: "guia" })),
         ...(facs.items || []).map(d => ({ ...d, _tipo: "factura" }))
-      ];
-      // Filtrar por referencia a OC o mostrar todos los recientes
-      const filtered = all.filter(d => {
-        const refs = (d.references || []).map(r => String(r.number || "").replace(/[\s.]/g, ""));
-        return refs.some(r => r.includes(ocNum) || ocNum.includes(r));
-      });
-      setBsaleDocs(filtered.length > 0 ? filtered : all.slice(0, 20));
+      ].sort((a, b) => (b.number || 0) - (a.number || 0));
+      // Si hay número de OC, filtrar por referencia; si no, mostrar los 20 más recientes
+      if (ocNum) {
+        const filtered = all.filter(d => {
+          const refs = (d.references || []).map(r => String(r.number || "").replace(/[\s.]/g, ""));
+          return refs.some(r => r.includes(ocNum) || ocNum.includes(r));
+        });
+        setBsaleDocs(filtered.length > 0 ? filtered : all.slice(0, 20));
+      } else {
+        setBsaleDocs(all.slice(0, 20));
+      }
       setBsaleLoading(false);
     }).catch(() => setBsaleLoading(false));
-  }, [oc.ocNumber]);
+  }, [oc.id]);
 
   const handleSelectBsale = async (doc) => {
     setErr(null); setLoading(true);
