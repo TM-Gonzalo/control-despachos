@@ -2242,7 +2242,7 @@ export default function App() {
                             { n: filteredFacs.length,   lbl: "Facturas",   c: "var(--teal)"   },
                             { n: fmtCLP(grandTotal),    lbl: "Total",      c: "var(--gold)"   },
                           ].map(({ n, lbl, c }) => (
-                            <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 20 : 38 }}>{n}</div></div>
+                            <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 28 : 38 }}>{n}</div></div>
                           ))}
                           <div className="kpi">
                             <div className="kpi-bar" style={{ background:"var(--violet)" }} />
@@ -2250,7 +2250,7 @@ export default function App() {
                             <select
                               value={selectedYear}
                               onChange={e => setSelectedYear(e.target.value)}
-                              style={{ background:"transparent", border:"none", color:"var(--violet)", fontFamily:"var(--fS)", fontSize:28, fontStyle:"italic", cursor:"pointer", outline:"none", width:"100%", marginTop:4 }}
+                              style={{ background:"transparent", border:"none", color:"var(--violet)", fontFamily:"var(--fS)", fontSize:38, fontStyle:"italic", cursor:"pointer", outline:"none", width:"100%", marginTop:4 }}
                             >
                               <option value="all" style={{ background:"var(--ink2)", color:"var(--white)" }}>Todos</option>
                               {availableYears.map(y => (
