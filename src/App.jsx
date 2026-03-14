@@ -372,7 +372,7 @@ function DocBadge({ doc }) {
     return <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {doc.number}</span>;
   }
   if (doc.invoiceNumber) {
-    return <span className="badge bdoc-guia"><Dot c="var(--rose)" />Guia {doc.number} <span style={{ color:"var(--teal)", marginLeft:4 }}>Fac. {doc.invoiceNumber}</span></span>;
+    return <span className="badge bdoc-guia"><Dot c="var(--violet)" />Guia {doc.number} <span style={{ color:"var(--teal)", marginLeft:4 }}>Fac. {doc.invoiceNumber}</span></span>;
   }
   return <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />Guia {doc.number} <span style={{ color:"var(--fog)", marginLeft:4, fontSize:8 }}>sin factura</span></span>;
 }
