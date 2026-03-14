@@ -2629,12 +2629,13 @@ export default function App() {
               {view === "reports" && (
                 <>
                   <div className="ph"><div><div className="pt">Reporte <em>Por OC</em></div><div className="pm">ESTADO DE DESPACHO POR ORDEN</div></div></div>
-                  <div className="kpis" style={{ marginBottom:22 }}>
+                  <div className="kpis" style={{ marginBottom:22, gridTemplateColumns:"repeat(5,1fr)" }}>
                     {[
                       { n: total, lbl: "Total", c: "var(--white)" },
                       { n: open, lbl: "Abiertas", c: "var(--sky)" },
                       { n: enriched.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
-                      { n: enriched.filter(o => { const s = ocStatus(o.items, o.dispatches); return s === "closed" || s === "toinvoice"; }).length, lbl: "Completadas", c: "var(--lime)" }
+                      { n: enriched.filter(o => ocStatus(o.items, o.dispatches) === "toinvoice").length, lbl: "Por Facturar", c: "var(--rose)" },
+                      { n: closed, lbl: "Completadas", c: "var(--lime)" }
                     ].map(({ n, lbl, c }) => (
                       <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
                     ))}
