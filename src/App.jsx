@@ -925,7 +925,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
         const detailItems = detailsData.items || [];
         its = detailItems.map((it, i) => ({
           id: i + 1,
-          desc: it.comment || it.variantDescription || it.description || "",
+          desc: it.variant?.description || it.comment || it.variantDescription || it.description || "",
           unit: it.unitAbbreviation || "UN",
           qty: Number(it.quantity || 1),
           unitPrice: Number(it.netUnitValue || it.unitValue || 0)
