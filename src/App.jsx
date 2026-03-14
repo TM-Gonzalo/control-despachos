@@ -692,8 +692,8 @@ function BsaleView({ enriched, onAssign }) {
     try {
       // Cargar GDs (tipo 8) y Facturas (tipo 1) en paralelo
       const [gds, facs] = await Promise.all([
-        fetchBsale("/documents.json", { documentTypeId: "8", limit: LIMIT, offset, expand: "details" }),
-        fetchBsale("/documents.json", { documentTypeId: "1", limit: LIMIT, offset, expand: "details" })
+        fetchBsale("/documents.json", { documentTypeId: "8", limit: LIMIT, offset }),
+        fetchBsale("/documents.json", { documentTypeId: "1", limit: LIMIT, offset })
       ]);
       const gdItems = (gds.items || []).map(d => ({ ...d, _tipo: "guia" }));
       const facItems = (facs.items || []).map(d => ({ ...d, _tipo: "factura" }));
@@ -717,7 +717,7 @@ function BsaleView({ enriched, onAssign }) {
 
   const filtered = docs.filter(d => {
     const num = String(d.number || d.urlPublicTemplate || "");
-    const client = d.client?.firstName || d.client?.lastName || "";
+    const client = d.address || "";
     const matchSearch = !search || num.includes(search) || client.toLowerCase().includes(search.toLowerCase());
     const matchFilter = filter === "all" || d._tipo === filter;
     return matchSearch && matchFilter;
@@ -759,7 +759,7 @@ function BsaleView({ enriched, onAssign }) {
               {filtered.map(d => {
                 const num = String(d.number || "");
                 const isAssigned = assignedNums.has(num);
-                const client = [d.client?.firstName, d.client?.lastName].filter(Boolean).join(" ") || d.client?.code || "—";
+                const client = d.address || "—";
                 const neto = d.netAmount || d.totalAmount || 0;
                 return (
                   <tr key={d.id} style={{ borderBottom:"1px solid var(--line2)", opacity: isAssigned ? 0.5 : 1 }}>
@@ -820,13 +820,13 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
     const ocNum = (oc.ocNumber || "").replace(/[\s.]/g, "");
     setBsaleLoading(true);
     Promise.all([
-      fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0 }),
-      fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: 0 })
+      fetchBsale("/documents.json", { documentTypeId: "8", limit: 50, offset: 0, generationDateRange: "[" + (Math.floor(Date.now()/1000) - 31536000) + "," + Math.floor(Date.now()/1000) + "]" }),
+      fetchBsale("/documents.json", { documentTypeId: "1", limit: 50, offset: 0, generationDateRange: "[" + (Math.floor(Date.now()/1000) - 31536000) + "," + Math.floor(Date.now()/1000) + "]" })
     ]).then(([gds, facs]) => {
       const all = [
         ...(gds.items || []).map(d => ({ ...d, _tipo: "guia" })),
         ...(facs.items || []).map(d => ({ ...d, _tipo: "factura" }))
-      ].sort((a, b) => (b.number || 0) - (a.number || 0));
+      ].sort((a, b) => (b.generationDate || 0) - (a.generationDate || 0));
       // Si hay número de OC, filtrar por referencia; si no, mostrar los 20 más recientes
       if (ocNum) {
         const filtered = all.filter(d => {
