@@ -195,7 +195,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .kpi{background:var(--ink2);border:1px solid var(--line);border-radius:9px;padding:15px 17px;position:relative;overflow:hidden}
 .kpi-bar{position:absolute;top:0;left:0;right:0;height:2px;border-radius:9px 9px 0 0}
 .kpi-lbl{font-size:8px;letter-spacing:2.5px;color:var(--fog);margin-bottom:8px}
-.kpi-n{font-family:var(--fS);font-size:38px;line-height:1}
+.kpi-n{font-family:var(--fS);font-size:38px;line-height:1.1}
 .kpi-sub{font-size:9px;color:var(--fog);margin-top:4px}
 .alert-bar{background:rgba(255,77,109,.06);border:1px solid rgba(255,77,109,.2);border-radius:9px;padding:12px 16px;margin-bottom:20px}
 .alert-hd{font-size:8px;letter-spacing:3px;color:var(--rose);margin-bottom:7px}
@@ -2140,7 +2140,7 @@ export default function App() {
                             { n: fmtCLP(grandPending), lbl: "Pendiente",    c: "var(--rose)" },
                             { n: rows.length,           lbl: "Clientes",     c: "var(--sky)"  },
                           ].map(({ n, lbl, c }) => (
-                            <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 22 : 38 }}>{n}</div></div>
+                            <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
                           ))}
                         </div>
                         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:12, marginBottom:0 }}>
@@ -2242,7 +2242,7 @@ export default function App() {
                             { n: filteredFacs.length,   lbl: "Facturas",   c: "var(--teal)"   },
                             { n: fmtCLP(grandTotal),    lbl: "Total",      c: "var(--gold)"   },
                           ].map(({ n, lbl, c }) => (
-                            <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 28 : 38 }}>{n}</div></div>
+                            <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
                           ))}
                           <div className="kpi">
                             <div className="kpi-bar" style={{ background:"var(--violet)" }} />
@@ -2382,7 +2382,7 @@ export default function App() {
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
-                        <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: typeof n === "string" ? 20 : 38 }}>{n}</div></div>
+                        <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
                       ))}
                     </div>
                     {pendingOCs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay ordenes pendientes.</p></div>}
