@@ -1560,12 +1560,14 @@ function ConvertModal({ dispatch, ocId, onClose, onSave }) {
   );
 }
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, canDelete, onRequestDel, currentUserId, isAdmin }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin }) {
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
   const [dateVal, setDateVal] = useState(oc.deliveryDate || "");
   const [editingClient, setEditingClient] = useState(false);
   const [clientVal, setClientVal] = useState(oc.client || "");
+  const [editingOCNumber, setEditingOCNumber] = useState(false);
+  const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
   const st = ocStatus(oc.items, oc.dispatches);
   const totAmt = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
   const disAmt = oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
@@ -1581,7 +1583,26 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
       <div className="modal modal-xl">
         <div className="modal-hd">
           <div>
-            <div className="modal-title">{oc.ocNumber || oc.id}</div>
+            <div className="modal-title" style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {editingOCNumber ? (
+                <>
+                  <input
+                    value={ocNumberVal}
+                    onChange={e => setOCNumberVal(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") { onUpdateOCNumber(oc.id, ocNumberVal); setEditingOCNumber(false); } if (e.key === "Escape") setEditingOCNumber(false); }}
+                    autoFocus
+                    style={{ background:"var(--ink3)", border:"1px solid var(--gold)", borderRadius:6, color:"var(--gold)", fontFamily:"var(--fS)", fontSize:22, fontStyle:"italic", padding:"2px 10px", width:220, outline:"none" }}
+                  />
+                  <button className="btn btn-teal btn-sm" onClick={() => { onUpdateOCNumber(oc.id, ocNumberVal); setEditingOCNumber(false); }}>✓</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setEditingOCNumber(false)}>✕</button>
+                </>
+              ) : (
+                <>
+                  <span>{oc.ocNumber || oc.id}</span>
+                  <span onClick={() => { setEditingOCNumber(true); setOCNumberVal(oc.ocNumber || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", fontFamily:"var(--fM)", fontStyle:"normal" }}>✎</span>
+                </>
+              )}
+            </div>
             <div className="modal-sub" style={{ display:"flex", alignItems:"center", gap:6 }}>
               {editingClient ? (
                 <>
@@ -1890,12 +1911,15 @@ export default function App() {
   };
   const handleSaveKey = v => { setApiKey(v); localStorage.setItem("dc_apikey", v); };
   const handleSaveOC = async (oc, keepOpen) => {
-    if (oc.ocNumber && oc.ocNumber.trim()) {
+    // Quitar puntos del número de OC al guardar
+    const cleanOcNumber = oc.ocNumber ? oc.ocNumber.replace(/\./g, "").trim() : oc.ocNumber;
+    const cleanOc = { ...oc, ocNumber: cleanOcNumber };
+    if (cleanOc.ocNumber && cleanOc.ocNumber.trim()) {
       const norm = s => s.replace(/[\.\s]/g, "").toLowerCase();
-      const dupe = ocs.find(o => o.ocNumber && norm(o.ocNumber) === norm(oc.ocNumber));
-      if (dupe) throw new Error("La OC N° " + oc.ocNumber + " ya existe (cliente: " + dupe.client + ").");
+      const dupe = ocs.find(o => o.ocNumber && norm(o.ocNumber) === norm(cleanOc.ocNumber));
+      if (dupe) throw new Error("La OC N° " + cleanOc.ocNumber + " ya existe (cliente: " + dupe.client + ").");
     }
-    await persist([oc, ...ocs]);
+    await persist([cleanOc, ...ocs]);
     if (!keepOpen) setShowImport(false);
     notify("OC importada ✓");
   };
@@ -1979,6 +2003,19 @@ export default function App() {
     await persist(updated);
     if (showDetail && showDetail.id === ocId) setShowDetail(d => ({ ...d, client: newClient }));
     notify("Cliente actualizado ✓");
+  };
+
+  const handleUpdateOCNumber = async (ocId, newNumber) => {
+    const clean = newNumber.replace(/\./g, "").trim();
+    if (clean) {
+      const norm = s => s.replace(/[\.\s]/g, "").toLowerCase();
+      const dupe = ocs.find(o => o.id !== ocId && o.ocNumber && norm(o.ocNumber) === norm(clean));
+      if (dupe) { notify("N° OC ya existe en " + dupe.client, "err"); return; }
+    }
+    const updated = ocs.map(o => o.id === ocId ? { ...o, ocNumber: clean } : o);
+    await persist(updated);
+    if (showDetail && showDetail.id === ocId) setShowDetail(d => ({ ...d, ocNumber: clean }));
+    notify("N° OC actualizado ✓");
   };
 
   const handleUpdateDelivery = async (ocId, newDate) => {
@@ -2069,6 +2106,13 @@ export default function App() {
                     } catch(err) { notify("Error al leer el archivo", "err"); }
                   }} />
                 </label>
+                <button className="rail-logout" style={{ color:"var(--gold)" }} onClick={async () => {
+                  const fixed = ocs.map(o => ({ ...o, ocNumber: o.ocNumber ? o.ocNumber.replace(/\./g, "").trim() : o.ocNumber }));
+                  const changed = fixed.filter((o, i) => o.ocNumber !== ocs[i].ocNumber).length;
+                  if (changed === 0) { notify("No hay puntos que quitar"); return; }
+                  await persist(fixed);
+                  notify(changed + " OC" + (changed !== 1 ? "s" : "") + " corregida" + (changed !== 1 ? "s" : "") + " ✓");
+                }}>✦ Quitar puntos OCs</button>
               </div>}
             </div>
           </aside>
@@ -2879,7 +2923,7 @@ export default function App() {
 
       {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} />}
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} />}
       {convertTarget && <ConvertModal dispatch={convertTarget.dispatch} ocId={convertTarget.ocId} onClose={() => setConvertTarget(null)} onSave={handleConvert} />}
       {confirmDel && (
