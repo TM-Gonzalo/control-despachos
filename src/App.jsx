@@ -115,16 +115,20 @@ async function extractPDF(b64, type, apiKey) {
   const text = data.content.map(c => c.text || "").join("");
   const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
   // Normalizar números chilenos: 2.463 → 2463, 1.234.567 → 1234567
-  // El punto de miles en Chile puede confundirse con decimal en JSON
   const fixNum = n => {
     if (typeof n !== "number") return n;
     const s = String(n);
-    // Si tiene exactamente 1 punto y 3 decimales → es punto de miles (ej: 2.463 → 2463)
     if (/^\d+\.\d{3}$/.test(s)) return Number(s.replace(".", ""));
-    // Si tiene múltiples puntos → todos son miles (ej: 1.234.567 no ocurre en JSON)
     return n;
   };
-  if (parsed.items) parsed.items = parsed.items.map(it => ({ ...it, qty: fixNum(it.qty), unitPrice: fixNum(it.unitPrice) }));
+  // Unidades válidas — cualquier otra cosa se reemplaza por "UN"
+  const VALID_UNITS = new Set(["UN","KG","MT","M","M2","M3","LT","GL","CJ","PK","PAR","JGO","HR","DIA","MES","TON","GR","MM","CM","KM","PZA","SET","ROL","BLS","SAC","TB","BAR","VAR"]);
+  const fixUnit = u => {
+    if (!u) return "UN";
+    const up = String(u).toUpperCase().trim();
+    return VALID_UNITS.has(up) ? up : "UN";
+  };
+  if (parsed.items) parsed.items = parsed.items.map(it => ({ ...it, qty: fixNum(it.qty), unitPrice: fixNum(it.unitPrice), unit: fixUnit(it.unit) }));
   if (parsed.netTotal) parsed.netTotal = fixNum(parsed.netTotal);
   if (parsed.total) parsed.total = fixNum(parsed.total);
   return parsed;
@@ -2105,7 +2109,7 @@ export default function App() {
                     enriched.length === 0 ? <div className="empty"><div className="empty-ico">◈</div><p>Sin ordenes aun.<br />Ingresa tu API Key e importa una OC desde PDF.</p></div> :
                     <div className="tbl-card" style={{ maxHeight:520, overflowY:"auto", scrollbarWidth:"thin", scrollbarColor:"var(--line2) transparent" }}>
                       <table>
-                        <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--ink3)" }}><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><th>ESTADO</th><th /></tr></thead>
+                        <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--ink3)" }}><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><SortTh label="ESTADO" col="status" state={dashSort} setState={setDashSort} /><th /></tr></thead>
                         <tbody>{applySort(enriched, dashSort).map(oc => {
                           const s = ocStatus(oc.items, oc.dispatches);
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
