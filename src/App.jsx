@@ -409,14 +409,20 @@ function DocBadge({ doc }) {
   return <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />Guia {doc.number} <span style={{ color:"var(--fog)", marginLeft:4, fontSize:8 }}>sin factura</span></span>;
 }
 
-function UploadZone({ onFile, loading, label }) {
+function UploadZone({ onFile, onFiles, loading, label }) {
   const [drag, setDrag] = useState(false);
   const ref = useRef();
-  const handle = f => { if (f && f.type === "application/pdf") onFile(f); };
+  const handle = files => {
+    const pdfs = Array.from(files).filter(f => f.type === "application/pdf");
+    if (!pdfs.length) return;
+    if (onFiles && pdfs.length > 1) onFiles(pdfs);
+    else if (pdfs.length === 1 && onFile) onFile(pdfs[0]);
+    else if (onFiles) onFiles(pdfs);
+  };
   return (
     <div
       className={"drop-zone" + (drag ? " drag" : "")}
-      onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]); }}
+      onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files); }}
       onDragOver={e => { e.preventDefault(); setDrag(true); }}
       onDragLeave={() => setDrag(false)}
       onClick={() => !loading && ref.current.click()}
@@ -424,9 +430,9 @@ function UploadZone({ onFile, loading, label }) {
       <div className="drop-ico">{loading ? "⏳" : "📄"}</div>
       {loading
         ? <div className="spin-row"><div className="spin" /> Analizando con IA...</div>
-        : <div className="drop-lbl">{label || "Arrastra el PDF aqui o"} <strong>haz clic para seleccionar</strong><small>PDF max 10 MB</small></div>
+        : <div className="drop-lbl">{label || "Arrastra el PDF aqui o"} <strong>haz clic para seleccionar</strong><small>Múltiples PDFs permitidos · max 10 MB c/u</small></div>
       }
-      <input ref={ref} type="file" accept=".pdf" style={{ display:"none" }} onChange={e => handle(e.target.files[0])} />
+      <input ref={ref} type="file" accept=".pdf" multiple style={{ display:"none" }} onChange={e => handle(e.target.files)} />
     </div>
   );
 }
@@ -922,6 +928,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [bsaleResult, setBsaleResult] = useState(null); // { doc } | null
   const [bsaleLoading, setBsaleLoading] = useState(false);
   const [bsaleErr, setBsaleErr] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]); // cola de PDFs pendientes
 
   const searchBsale = async (num) => {
     if (!num || num.length < 2) { setBsaleResult(null); return; }
@@ -1076,7 +1083,6 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
           disp.docType === "guia" && normGD(disp.number || "") === gdRef
         );
         if (matchingGD) {
-          // Vincular factura a GD existente sin crear despacho nuevo
           await onSave(oc.id, {
             _gdLink: true,
             gdId: matchingGD.id,
@@ -1088,6 +1094,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
           setLastSaved({ num: d.docNumber, docType: "factura", linked: true });
           setSavedCount(c => c + 1);
           setStep(0); setNum(""); setDate(today()); setDocType("guia"); setItems([]); setMap({}); setSplitPrice({}); setExt(null); setErr(null);
+          // Procesar siguiente en cola si hay
+          setPendingFiles(q => { if (q.length > 0) { setTimeout(() => handleFile(q[0]), 100); return q.slice(1); } return q; });
           setLoading(false);
           return;
         }
@@ -1096,6 +1104,14 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       setStep(1);
     } catch(e) { setErr(e.message); }
     setLoading(false);
+  };
+
+  // Manejar múltiples archivos — procesa el primero y encola el resto
+  const handleFiles = files => {
+    const pdfs = Array.from(files).filter(f => f.type === "application/pdf");
+    if (!pdfs.length) return;
+    if (pdfs.length > 1) setPendingFiles(pdfs.slice(1));
+    handleFile(pdfs[0]);
   };
 
   const updItem = (i, k, v) => setItems(p => {
@@ -1132,6 +1148,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       setSavedCount(c => c + 1);
       setLastSaved({ num, docType });
       setStep(0); setNum(""); setDate(today()); setDocType("guia"); setItems([]); setMap({}); setSplitPrice({}); setExt(null); setErr(null);
+      // Procesar siguiente PDF en cola si hay
+      setPendingFiles(q => { if (q.length > 0) { setTimeout(() => handleFile(q[0]), 100); return q.slice(1); } return q; });
     } catch(e) { setErr(e.message); }
     setSaving(false);
   };
@@ -1213,7 +1231,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
               })()}
               <div style={{ fontSize:9, color:"var(--fog)", marginTop:10, letterSpacing:1 }}>O sube un PDF manualmente:</div>
             </div>
-            <UploadZone onFile={handleFile} loading={loading} label={lastSaved ? "Subir otro documento o" : "Arrastra la factura o guia aqui o"} />
+            <UploadZone onFile={f => handleFiles([f])} onFiles={handleFiles} loading={loading} label={lastSaved ? "Subir otro documento o" : "Arrastra la factura o guia aqui o"} />
+            {pendingFiles.length > 0 && <div style={{ fontSize:11, color:"var(--gold)", marginTop:6 }}>⏳ {pendingFiles.length} PDF{pendingFiles.length !== 1 ? "s" : ""} en cola — se procesarán automáticamente</div>}
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginTop:9 }}>⚠ {err}</div>}
           </>
         )}
