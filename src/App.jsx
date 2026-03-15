@@ -2014,7 +2014,9 @@ export default function App() {
     }
     const updated = ocs.map(o => o.id === ocId ? { ...o, ocNumber: clean } : o);
     await persist(updated);
-    if (showDetail && showDetail.id === ocId) setShowDetail(d => ({ ...d, ocNumber: clean }));
+    // Cerrar y reabrir con datos frescos para evitar estado interno desincronizado
+    setShowDetail(null);
+    setTimeout(() => setShowDetail(updated.find(o => o.id === ocId) || null), 50);
     notify("N° OC actualizado ✓");
   };
 
