@@ -144,11 +144,33 @@ const ocStatus = (items, dispatches) => {
   return pendingGuias > 0 ? "toinvoice" : "closed";
 };
 const autoMatch = (desc, ocItems) => {
-  const n = s => s.toLowerCase().trim();
-  const exact = ocItems.find(i => n(i.desc) === n(desc));
+  // Normalizar: minúsculas, sin tildes, sin puntuación especial, sin stopwords
+  const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const stopwords = new Set(["de","la","el","en","y","a","x","nr","neg","nro","n°","no"]);
+  const tokens = s => norm(s).split(" ").filter(t => t.length > 1 && !stopwords.has(t));
+
+  const nd = norm(desc);
+  // 1. Exacto normalizado
+  const exact = ocItems.find(i => norm(i.desc) === nd);
   if (exact) return exact.id;
-  const partial = ocItems.find(i => n(desc).includes(n(i.desc)) || n(i.desc).includes(n(desc)));
-  return partial ? partial.id : null;
+
+  // 2. Inclusión (uno contiene al otro)
+  const partial = ocItems.find(i => nd.includes(norm(i.desc)) || norm(i.desc).includes(nd));
+  if (partial) return partial.id;
+
+  // 3. Token matching — % de tokens en común sobre el total único
+  const descTokens = tokens(desc);
+  let bestId = null, bestScore = 0;
+  for (const item of ocItems) {
+    const itemTokens = tokens(item.desc);
+    const common = descTokens.filter(t => itemTokens.some(it => it === t || it.startsWith(t) || t.startsWith(it))).length;
+    const total = new Set([...descTokens, ...itemTokens]).size;
+    const score = total > 0 ? common / total : 0;
+    if (score > bestScore) { bestScore = score; bestId = item.id; }
+  }
+  // Umbral: al menos 40% de tokens en común
+  return bestScore >= 0.4 ? bestId : null;
 };
 const pc = p => p >= 100 ? "var(--lime)" : p > 0 ? "var(--gold)" : "var(--sky)";
 const bCls = s => ({ open: "b-open", partial: "b-partial", closed: "b-closed", toinvoice: "b-toinvoice", warn: "b-warn" }[s] || "b-open");
