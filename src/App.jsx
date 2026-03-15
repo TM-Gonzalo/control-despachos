@@ -2039,11 +2039,13 @@ export default function App() {
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
                           const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
                           const d = daysLeft(oc.deliveryDate);
+                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = (oc.dispatches || []).filter(x => x.docType === "factura" && x.date).sort((a,b) => b.date.localeCompare(a.date)); return facs.length ? facs[0].date : null; })() : null;
+                          const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
                           return (
                             <tr key={oc.id}>
                               <td style={{ color:"var(--gold)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
                               <td style={{ fontWeight:500 }}>{oc.client}</td>
-                              <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</td>
+                              <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{entregaDisplay}</td>
                               <td style={{ minWidth:120 }}>
                                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
                                   <div className="pbar-wrap" style={{ flex:1 }}><div className="pbar" style={{ width:pct + "%", background:pc(pct) }} /></div>
@@ -2140,12 +2142,14 @@ export default function App() {
                           const pending = disp.filter(x => x.docType === "guia" && !x.invoiceNumber).length;
                           const nFac = disp.filter(x => x.docType === "factura").length;
                           const nGuia = disp.filter(x => x.docType === "guia").length;
+                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = disp.filter(x => x.docType === "factura" && x.date).sort((a,b) => b.date.localeCompare(a.date)); return facs.length ? facs[0].date : null; })() : null;
+                          const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
                           return (
                             <tr key={oc.id}>
                               <td style={{ color:"var(--gold)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
                               <td style={{ fontWeight:500 }}>{oc.client}</td>
                               <td style={{ color:"var(--fog)" }}>{oc.date}</td>
-                              <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</td>
+                              <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{entregaDisplay}</td>
                               <td>
                                 <span style={{ color:"var(--teal)", fontSize:10 }}>{nFac} fac.</span>
                                 <span style={{ color:"var(--fog)" }}> · </span>
