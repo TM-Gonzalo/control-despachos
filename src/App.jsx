@@ -144,10 +144,13 @@ const ocStatus = (items, dispatches) => {
   return pendingGuias > 0 ? "toinvoice" : "closed";
 };
 const autoMatch = (desc, ocItems) => {
-  // Normalizar: minúsculas, sin tildes, sin puntuación especial, sin stopwords
+  // Normalizar: sin tildes, guiones entre alfanum pegados (A-325→A325), sin puntuación, minúsculas
   const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-  const stopwords = new Set(["de","la","el","en","y","a","x","nr","neg","nro","n°","no"]);
+    .toLowerCase()
+    .replace(/([a-z0-9])-([a-z0-9])/g, "$1$2") // A-325 → A325, 3/4-10 → 3/410
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ").trim();
+  const stopwords = new Set(["de","la","el","en","y","a","x","nr","neg","nro","no","para","con"]);
   const tokens = s => norm(s).split(" ").filter(t => t.length > 1 && !stopwords.has(t));
 
   const nd = norm(desc);
@@ -155,22 +158,28 @@ const autoMatch = (desc, ocItems) => {
   const exact = ocItems.find(i => norm(i.desc) === nd);
   if (exact) return exact.id;
 
-  // 2. Inclusión (uno contiene al otro)
+  // 2. Inclusión
   const partial = ocItems.find(i => nd.includes(norm(i.desc)) || norm(i.desc).includes(nd));
   if (partial) return partial.id;
 
-  // 3. Token matching — % de tokens en común sobre el total único
+  // 3. Token matching con boost por primera palabra igual
   const descTokens = tokens(desc);
+  const descFirst = descTokens[0] || "";
   let bestId = null, bestScore = 0;
   for (const item of ocItems) {
     const itemTokens = tokens(item.desc);
+    const itemFirst = itemTokens[0] || "";
     const common = descTokens.filter(t => itemTokens.some(it => it === t || it.startsWith(t) || t.startsWith(it))).length;
     const total = new Set([...descTokens, ...itemTokens]).size;
-    const score = total > 0 ? common / total : 0;
+    let score = total > 0 ? common / total : 0;
+    // Boost si la primera palabra coincide (ej: "perno" === "perno")
+    if (descFirst && itemFirst && (descFirst === itemFirst || descFirst.startsWith(itemFirst) || itemFirst.startsWith(descFirst))) {
+      score += 0.15;
+    }
     if (score > bestScore) { bestScore = score; bestId = item.id; }
   }
-  // Umbral: al menos 40% de tokens en común
-  return bestScore >= 0.4 ? bestId : null;
+  // Umbral: 30% de tokens en común
+  return bestScore >= 0.30 ? bestId : null;
 };
 const pc = p => p >= 100 ? "var(--lime)" : p > 0 ? "var(--gold)" : "var(--sky)";
 const bCls = s => ({ open: "b-open", partial: "b-partial", closed: "b-closed", toinvoice: "b-toinvoice", warn: "b-warn" }[s] || "b-open");
