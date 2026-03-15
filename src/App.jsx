@@ -1095,7 +1095,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
           setSavedCount(c => c + 1);
           setStep(0); setNum(""); setDate(today()); setDocType("guia"); setItems([]); setMap({}); setSplitPrice({}); setExt(null); setErr(null);
           // Procesar siguiente en cola si hay
-          setPendingFiles(q => { if (q.length > 0) { setTimeout(() => handleFile(q[0]), 100); return q.slice(1); } return q; });
+          
           setLoading(false);
           return;
         }
@@ -1113,6 +1113,15 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
     if (pdfs.length > 1) setPendingFiles(pdfs.slice(1));
     handleFile(pdfs[0]);
   };
+
+  // Procesar siguiente PDF en cola cuando el modal vuelve al paso 0 y no está cargando
+  useEffect(() => {
+    if (step === 0 && !loading && !saving && pendingFiles.length > 0) {
+      const next = pendingFiles[0];
+      setPendingFiles(q => q.slice(1));
+      handleFile(next);
+    }
+  }, [step, loading, saving, pendingFiles.length]);
 
   const updItem = (i, k, v) => setItems(p => {
     const n = [...p]; n[i] = { ...n[i], [k]: k === "qty" ? Number(v) : v }; return n;
@@ -1149,7 +1158,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
       setLastSaved({ num, docType });
       setStep(0); setNum(""); setDate(today()); setDocType("guia"); setItems([]); setMap({}); setSplitPrice({}); setExt(null); setErr(null);
       // Procesar siguiente PDF en cola si hay
-      setPendingFiles(q => { if (q.length > 0) { setTimeout(() => handleFile(q[0]), 100); return q.slice(1); } return q; });
+      
     } catch(e) { setErr(e.message); }
     setSaving(false);
   };
