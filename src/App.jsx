@@ -1787,6 +1787,7 @@ export default function App() {
   const [dashSort, setDashSort] = useState({ col: null, dir: 1 });
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
+  const [pendExpanded, setPendExpanded] = useState({});
   const [onlineCount, setOnlineCount] = useState(1);
 
   // Presencia: registra al usuario activo y cuenta cuántos hay
@@ -2576,45 +2577,100 @@ export default function App() {
                               const pendG = disp.filter(x => x.docType==="guia" && !x.invoiceNumber).length;
                               const nFacts = disp.filter(x => x.docType==="factura").length;
                               const nGuias = disp.filter(x => x.docType==="guia").length;
+                              const pendItems = oc.items.filter(it => Number(it.qty) - Number(it.dispatched||0) > 0);
+                              const isExpanded = !!pendExpanded[oc.id];
+                              const COLS = 12;
                               return (
-                                <tr key={oc.id}>
-                                  <td>
-                                    <span className={"badge " + bCls(s)}>
-                                      <Dot c={s==="open"?"var(--sky)":s==="partial"?"var(--gold)":"var(--lime)"} />
-                                      {bLbl(s)}
-                                    </span>
-                                  </td>
-                                  <td style={{ color:"var(--violet)", fontFamily:"var(--fM)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
-                                  <td style={{ color:"var(--fog2)" }}>{oc.date || "—"}</td>
-                                  <td style={{ color:"var(--white)" }}>{oc.client}</td>
-                                  <td style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>
-                                    {oc.deliveryDate || "—"}
-                                    {d !== null && d <= 5 && s !== "closed" && (
-                                      <span style={{ fontSize:9, color: d < 0 ? "var(--rose)" : "var(--gold)", marginLeft:5 }}>
-                                        {d < 0 ? "Vencida" : d + "d"}
+                                <React.Fragment key={oc.id}>
+                                  <tr style={{ cursor: pendItems.length ? "pointer" : "default" }}
+                                      onClick={() => pendItems.length && setPendExpanded(e => ({ ...e, [oc.id]: !e[oc.id] }))}>
+                                    <td>
+                                      <span className={"badge " + bCls(s)}>
+                                        <Dot c={s==="open"?"var(--sky)":s==="partial"?"var(--gold)":"var(--lime)"} />
+                                        {bLbl(s)}
                                       </span>
-                                    )}
-                                  </td>
-                                  <td>
-                                    <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:100 }}>
-                                      <div className="pbar-wrap" style={{ flex:1, height:4 }}>
-                                        <div className="pbar" style={{ width:pct+"%", background:pc(pct) }} />
+                                    </td>
+                                    <td style={{ color:"var(--violet)", fontFamily:"var(--fM)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
+                                    <td style={{ color:"var(--fog2)" }}>{oc.date || "—"}</td>
+                                    <td style={{ color:"var(--white)" }}>{oc.client}</td>
+                                    <td style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>
+                                      {oc.deliveryDate || "—"}
+                                      {d !== null && d <= 5 && s !== "closed" && (
+                                        <span style={{ fontSize:9, color: d < 0 ? "var(--rose)" : "var(--gold)", marginLeft:5 }}>
+                                          {d < 0 ? "Vencida" : d + "d"}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:100 }}>
+                                        <div className="pbar-wrap" style={{ flex:1, height:4 }}>
+                                          <div className="pbar" style={{ width:pct+"%", background:pc(pct) }} />
+                                        </div>
+                                        <span style={{ fontSize:10, color:pc(pct), width:28, textAlign:"right" }}>{pct}%</span>
                                       </div>
-                                      <span style={{ fontSize:10, color:pc(pct), width:28, textAlign:"right" }}>{pct}%</span>
-                                    </div>
-                                  </td>
-                                  <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(tot)}</td>
-                                  <td style={{ textAlign:"right", color:"var(--lime)" }}>{fmtCLP(dis)}</td>
-                                  <td style={{ textAlign:"right", color:"var(--rose)", fontWeight:600 }}>{fmtCLP(tot-dis)}</td>
-                                  <td style={{ textAlign:"center", color:"var(--rose)" }}>
-                                    {nGuias}
-                                    {pendG > 0 && <span style={{ color:"var(--gold)", fontSize:9, marginLeft:3 }}>({pendG})</span>}
-                                  </td>
-                                  <td style={{ textAlign:"center", color:"var(--teal)" }}>{nFacts}</td>
-                                  <td>
-                                    <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
-                                  </td>
-                                </tr>
+                                    </td>
+                                    <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(tot)}</td>
+                                    <td style={{ textAlign:"right", color:"var(--lime)" }}>{fmtCLP(dis)}</td>
+                                    <td style={{ textAlign:"right", color:"var(--rose)", fontWeight:600 }}>{fmtCLP(tot-dis)}</td>
+                                    <td style={{ textAlign:"center", color:"var(--rose)" }}>
+                                      {nGuias}
+                                      {pendG > 0 && <span style={{ color:"var(--gold)", fontSize:9, marginLeft:3 }}>({pendG})</span>}
+                                    </td>
+                                    <td style={{ textAlign:"center", color:"var(--teal)" }}>{nFacts}</td>
+                                    <td onClick={e => e.stopPropagation()} style={{ display:"flex", gap:6, alignItems:"center", justifyContent:"flex-end" }}>
+                                      {pendItems.length > 0 && (
+                                        <button className="btn btn-ghost btn-sm"
+                                          style={{ fontSize:11, padding:"3px 8px", color: isExpanded ? "var(--gold)" : "var(--fog2)" }}
+                                          onClick={() => setPendExpanded(e => ({ ...e, [oc.id]: !e[oc.id] }))}>
+                                          {isExpanded ? "▲" : "▼"} {pendItems.length} ítem{pendItems.length !== 1 ? "s" : ""}
+                                        </button>
+                                      )}
+                                      <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
+                                    </td>
+                                  </tr>
+                                  {isExpanded && (
+                                    <tr style={{ background:"var(--ink3)" }}>
+                                      <td colSpan={COLS} style={{ padding:"0 0 0 0", borderBottom:"1px solid var(--line2)" }}>
+                                        <div style={{ padding:"10px 18px 12px 18px" }}>
+                                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:8 }}>ÍTEMS PENDIENTES DE DESPACHO</div>
+                                          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                                            <thead>
+                                              <tr>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"left", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)" }}>DESCRIPCIÓN</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"right", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:80 }}>QTY OC</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"right", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:90 }}>DESPACHADO</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"right", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:90 }}>PENDIENTE</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"center", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:130 }}>AVANCE</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {pendItems.map(it => {
+                                                const rem = Number(it.qty) - Number(it.dispatched||0);
+                                                const p = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched||0)/Number(it.qty)*100)) : 0;
+                                                return (
+                                                  <tr key={it.id}>
+                                                    <td style={{ fontSize:11, color:"var(--fog2)", padding:"6px 0" }}>{it.desc}</td>
+                                                    <td style={{ textAlign:"right", fontSize:11, color:"var(--fog)", padding:"6px 0" }}>{fmtNum(it.qty)} {it.unit}</td>
+                                                    <td style={{ textAlign:"right", fontSize:11, color:"var(--lime)", padding:"6px 0" }}>{fmtNum(Number(it.dispatched||0))} {it.unit}</td>
+                                                    <td style={{ textAlign:"right", fontSize:11, color:"var(--gold)", fontWeight:600, padding:"6px 0" }}>{fmtNum(rem)} {it.unit}</td>
+                                                    <td style={{ padding:"6px 0" }}>
+                                                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                                                        <div className="pbar-wrap" style={{ flex:1, height:4 }}>
+                                                          <div className="pbar" style={{ width:p+"%", background:pc(p) }} />
+                                                        </div>
+                                                        <span style={{ fontSize:10, color:pc(p), width:28, textAlign:"right" }}>{p}%</span>
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
                               );
                             })}
                           </tbody>
