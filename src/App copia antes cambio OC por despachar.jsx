@@ -1786,7 +1786,6 @@ export default function App() {
   const [confirmDel, setConfirmDel] = useState(null); // { type:"oc"|"dispatch", ocId, dispId, label }
   const [dashSort, setDashSort] = useState({ col: null, dir: 1 });
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
-  const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
   const [onlineCount, setOnlineCount] = useState(1);
 
   // Presencia: registra al usuario activo y cuenta cuántos hay
@@ -2040,7 +2039,7 @@ export default function App() {
               <div className={"rail-item-sub" + (view === "reports" ? " on" : "")} onClick={() => setView("reports")}>Por OC</div>
               <div className={"rail-item-sub" + (view === "clients" ? " on" : "")} onClick={() => setView("clients")}>Por Cliente</div>
               {isAdmin && <div className={"rail-item-sub" + (view === "monthly" ? " on" : "")} onClick={() => setView("monthly")}>Por Facturas</div>}
-              <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>Pend. Despachar</div>
+              <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>OC Pendientes</div>
               <div className={"rail-item-sub" + (view === "toinvoice" ? " on" : "")} onClick={() => setView("toinvoice")}>Pend. Facturar</div>
             </nav>
             <div className="rail-foot">
@@ -2463,76 +2462,76 @@ export default function App() {
               })()}
 
               {view === "pending" && (() => {
+                // Solo OCs con despacho pendiente (excluir toinvoice y closed — ya están 100% despachadas)
+                const normClient = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\./g, "").replace(/\s+/g, " ").trim().toUpperCase();
                 const pendingOCs = enriched.filter(o => { const s = ocStatus(o.items, o.dispatches); return s === "open" || s === "partial"; });
+                // Agrupar normalizando el nombre del cliente
+                const byClient = pendingOCs.reduce((acc, oc) => {
+                  const k = normClient(oc.client);
+                  if (!acc[k]) acc[k] = { label: oc.client, ocs: [] };
+                  acc[k].ocs.push(oc);
+                  return acc;
+                }, {});
                 const totalPend = pendingOCs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty) - Number(i.dispatched||0)) * Number(i.unitPrice), 0), 0);
-
-                // Sort helper para esta tabla
-                const PSortTh = ({ label, col }) => {
-                  const active = pendSort.col === col;
-                  return (
-                    <th className={"th-sort" + (active ? " active" : "")}
-                      onClick={() => setPendSort(s => ({ col, dir: s.col === col ? -s.dir : 1 }))}>
-                      {label}<span className="sort-ico">{active ? (pendSort.dir === 1 ? "▲" : "▼") : "⇅"}</span>
-                    </th>
-                  );
-                };
-
-                const sorted = [...pendingOCs].sort((a, b) => {
-                  const { col, dir } = pendSort;
-                  const totA = a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0);
-                  const totB = b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0);
-                  const disA = a.items.reduce((s,i) => s+Number(i.dispatched||0)*Number(i.unitPrice),0);
-                  const disB = b.items.reduce((s,i) => s+Number(i.dispatched||0)*Number(i.unitPrice),0);
-                  const remA = totA - disA;
-                  const remB = totB - disB;
-                  const pctA = totA > 0 ? Math.round(disA/totA*100) : 0;
-                  const pctB = totB > 0 ? Math.round(disB/totB*100) : 0;
-                  const sA = ocStatus(a.items, a.dispatches);
-                  const sB = ocStatus(b.items, b.dispatches);
-                  let av, bv;
-                  if (col === "ocNumber")     { av = a.ocNumber||a.id; bv = b.ocNumber||b.id; }
-                  else if (col === "date")    { av = a.date||""; bv = b.date||""; }
-                  else if (col === "client")  { av = a.client||""; bv = b.client||""; }
-                  else if (col === "delivery"){ av = a.deliveryDate||""; bv = b.deliveryDate||""; }
-                  else if (col === "status")  { av = statusOrder[sA]??0; bv = statusOrder[sB]??0; }
-                  else if (col === "monto")   { av = totA; bv = totB; }
-                  else if (col === "despachado") { av = disA; bv = disB; }
-                  else if (col === "remanente")  { av = remA; bv = remB; }
-                  else if (col === "pct")     { av = pctA; bv = pctB; }
-                  else                        { av = 0; bv = 0; }
-                  return av < bv ? -dir : av > bv ? dir : 0;
-                });
-
                 return (
                   <>
                     <div className="ph">
-                      <div><div className="pt">Reporte <em>Pend. Despachar</em></div><div className="pm">OCS SIN COMPLETAR</div></div>
+                      <div><div className="pt">Reporte <em>OC Pendientes</em></div><div className="pm">OCS SIN COMPLETAR</div></div>
                       {pendingOCs.length > 0 && <button className="btn btn-outline" onClick={() => {
                         const rows = [];
-                        sorted.forEach(oc => {
+                        pendingOCs.forEach(oc => {
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched||0) * Number(i.unitPrice), 0);
                           const pct = tot > 0 ? Math.round(dis/tot*100) : 0;
                           const s = ocStatus(oc.items, oc.dispatches);
+                          // Fila resumen OC
                           rows.push({
-                            "Estado": bLbl(s),
+                            "Cliente": oc.client,
                             "N° OC": oc.ocNumber || oc.id,
                             "Fecha OC": oc.date || "",
-                            "Cliente": oc.client,
                             "Fecha Entrega": oc.deliveryDate || "",
+                            "Estado": bLbl(s),
+                            "Item": "",
+                            "Unidad": "",
+                            "Qty OC": "",
+                            "Despachado": "",
+                            "Pendiente Qty": "",
+                            "Precio Unit.": "",
                             "Monto OC": tot,
-                            "Despachado": dis,
-                            "Remanente": tot - dis,
+                            "Monto Despachado": dis,
+                            "Monto Pendiente": tot - dis,
                             "Avance %": pct + "%",
-                            "Guias": (oc.dispatches||[]).filter(x=>x.docType==="guia").length,
-                            "Facturas": (oc.dispatches||[]).filter(x=>x.docType==="factura").length,
+                            "Notas": oc.notes || ""
+                          });
+                          // Filas por item pendiente
+                          oc.items.filter(it => Number(it.qty) - Number(it.dispatched||0) > 0).forEach(it => {
+                            const rem = Number(it.qty) - Number(it.dispatched||0);
+                            rows.push({
+                              "Cliente": "",
+                              "N° OC": "",
+                              "Fecha OC": "",
+                              "Fecha Entrega": "",
+                              "Estado": "",
+                              "Item": it.desc,
+                              "Unidad": it.unit || "",
+                              "Qty OC": Number(it.qty),
+                              "Despachado": Number(it.dispatched||0),
+                              "Pendiente Qty": rem,
+                              "Precio Unit.": Number(it.unitPrice||0),
+                              "Monto OC": Number(it.qty) * Number(it.unitPrice||0),
+                              "Monto Despachado": Number(it.dispatched||0) * Number(it.unitPrice||0),
+                              "Monto Pendiente": rem * Number(it.unitPrice||0),
+                              "Avance %": it.qty > 0 ? Math.round(Number(it.dispatched||0)/Number(it.qty)*100) + "%" : "0%",
+                              "Notas": ""
+                            });
                           });
                         });
                         const ws = XLSX.utils.json_to_sheet(rows);
-                        ws["!cols"] = [12,14,12,28,14,14,14,14,10,8,10].map(w => ({ wch: w }));
+                        // Ancho de columnas
+                        ws["!cols"] = [22,14,12,14,12,36,8,10,12,12,12,14,16,14,10,30].map(w => ({ wch: w }));
                         const wb = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(wb, ws, "Pend Despachar");
-                        XLSX.writeFile(wb, "Reporte_Pend_Despachar_" + today() + ".xlsx");
+                        XLSX.utils.book_append_sheet(wb, ws, "Pendientes");
+                        XLSX.writeFile(wb, "Reporte_Pendientes_" + today() + ".xlsx");
                       }}>↓ Exportar Excel</button>}
                     </div>
                     <div className="kpis" style={{ marginBottom:22 }}>
@@ -2542,85 +2541,86 @@ export default function App() {
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
-                        <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize:38 }}>{n}</div></div>
+                        <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
                       ))}
                     </div>
                     {pendingOCs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay ordenes pendientes.</p></div>}
-                    {pendingOCs.length > 0 && (
-                      <div className="tbl-card">
-                        <table>
-                          <thead>
-                            <tr>
-                              <PSortTh label="ESTADO"    col="status" />
-                              <PSortTh label="N° OC"     col="ocNumber" />
-                              <PSortTh label="FECHA OC"  col="date" />
-                              <PSortTh label="CLIENTE"   col="client" />
-                              <PSortTh label="ENTREGA"   col="delivery" />
-                              <PSortTh label="AVANCE"    col="pct" />
-                              <th style={{ textAlign:"right" }}>MONTO OC</th>
-                              <th style={{ textAlign:"right" }}>DESPACHADO</th>
-                              <th style={{ textAlign:"right" }}>REMANENTE</th>
-                              <th style={{ textAlign:"center" }}>GDS</th>
-                              <th style={{ textAlign:"center" }}>FACTS.</th>
-                              <th></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {sorted.map(oc => {
-                              const s = ocStatus(oc.items, oc.dispatches);
-                              const tot = oc.items.reduce((a,i) => a+Number(i.qty)*Number(i.unitPrice),0);
-                              const dis = oc.items.reduce((a,i) => a+Number(i.dispatched||0)*Number(i.unitPrice),0);
-                              const pct = tot > 0 ? Math.min(100, Math.round(dis/tot*100)) : 0;
-                              const d = daysLeft(oc.deliveryDate);
-                              const disp = oc.dispatches || [];
-                              const pendG = disp.filter(x => x.docType==="guia" && !x.invoiceNumber).length;
-                              const nFacts = disp.filter(x => x.docType==="factura").length;
-                              const nGuias = disp.filter(x => x.docType==="guia").length;
-                              return (
-                                <tr key={oc.id}>
-                                  <td>
-                                    <span className={"badge " + bCls(s)}>
-                                      <Dot c={s==="open"?"var(--sky)":s==="partial"?"var(--gold)":"var(--lime)"} />
-                                      {bLbl(s)}
-                                    </span>
-                                  </td>
-                                  <td style={{ color:"var(--violet)", fontFamily:"var(--fM)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
-                                  <td style={{ color:"var(--fog2)" }}>{oc.date || "—"}</td>
-                                  <td style={{ color:"var(--white)" }}>{oc.client}</td>
-                                  <td style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>
-                                    {oc.deliveryDate || "—"}
-                                    {d !== null && d <= 5 && s !== "closed" && (
-                                      <span style={{ fontSize:9, color: d < 0 ? "var(--rose)" : "var(--gold)", marginLeft:5 }}>
-                                        {d < 0 ? "Vencida" : d + "d"}
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td>
-                                    <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:100 }}>
-                                      <div className="pbar-wrap" style={{ flex:1, height:4 }}>
-                                        <div className="pbar" style={{ width:pct+"%", background:pc(pct) }} />
-                                      </div>
-                                      <span style={{ fontSize:10, color:pc(pct), width:28, textAlign:"right" }}>{pct}%</span>
-                                    </div>
-                                  </td>
-                                  <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(tot)}</td>
-                                  <td style={{ textAlign:"right", color:"var(--lime)" }}>{fmtCLP(dis)}</td>
-                                  <td style={{ textAlign:"right", color:"var(--rose)", fontWeight:600 }}>{fmtCLP(tot-dis)}</td>
-                                  <td style={{ textAlign:"center", color:"var(--rose)" }}>
-                                    {nGuias}
-                                    {pendG > 0 && <span style={{ color:"var(--gold)", fontSize:9, marginLeft:3 }}>({pendG})</span>}
-                                  </td>
-                                  <td style={{ textAlign:"center", color:"var(--teal)" }}>{nFacts}</td>
-                                  <td>
+                    {pendingOCs.length > 0 && Object.entries(byClient).sort(([, a], [, b]) => {
+                        const remA = a.ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0), 0);
+                        const remB = b.ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0), 0);
+                        return remB - remA;
+                      }).map(([, { label, ocs }]) => (
+                      <div key={label} style={{ marginBottom:28 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                          <div style={{ fontWeight:500, fontSize:16, color:"var(--fog2)" }}>{label}</div>
+                          <div style={{ flex:1, height:1, background:"var(--line)" }} />
+                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>{ocs.length} OC{ocs.length !== 1 ? "s" : ""}</div>
+                        </div>
+                        <div className="rep-grid">
+                          {[...ocs].sort((a, b) => {
+                            const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0);
+                            const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0);
+                            const sA = ocStatus(a.items, a.dispatches);
+                            const sB = ocStatus(b.items, b.dispatches);
+                            // Prioridad: toinvoice (despachos pendientes de facturar) primero
+                            const prioA = sA === "toinvoice" ? 0 : 1;
+                            const prioB = sB === "toinvoice" ? 0 : 1;
+                            if (prioA !== prioB) return prioA - prioB;
+                            // Luego por mayor monto remanente
+                            return remB - remA;
+                          }).map(oc => {
+                            const s = ocStatus(oc.items, oc.dispatches);
+                            const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
+                            const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
+                            const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
+                            const d = daysLeft(oc.deliveryDate);
+                            const disp = oc.dispatches || [];
+                            const pendG = disp.filter(x => x.docType === "guia" && !x.invoiceNumber).length;
+                            return (
+                              <div className="rep-card" key={oc.id}>
+                                <div className="rep-hd">
+                                  <div style={{ display:"flex", alignItems:"baseline", gap:8 }}><div className="rep-id">{oc.ocNumber || oc.id}</div>{oc.date && <span style={{ fontSize:10, color:"var(--fog)", fontFamily:"var(--fM)" }}>{oc.date}</span>}</div>
+                                  <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap", justifyContent:"flex-end" }}>
+                                    <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : "var(--gold)"} />{bLbl(s)}</span>
+                                    {d !== null && d <= 5 && <span className="badge b-warn"><Dot c="var(--rose)" />{d < 0 ? "Vencida" : d + "d"}</span>}
+                                    {pendG > 0 && <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />{pendG} guia{pendG > 1 ? "s" : ""} sin fac.</span>}
                                     <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"var(--fog)", marginBottom:4, letterSpacing:1 }}>
+                                    <span>AVANCE ECONOMICO</span><span style={{ color:pc(pct) }}>{pct}%</span>
+                                  </div>
+                                  <div className="pbar-wrap" style={{ height:5 }}><div className="pbar" style={{ width:pct + "%", background:pc(pct) }} /></div>
+                                </div>
+                                <div className="rep-stats">
+                                  <div className="rep-stat"><label>MONTO OC</label><p style={{ color:"var(--gold)" }}>{fmtCLP(tot)}</p></div>
+                                  <div className="rep-stat"><label>DESPACHADO</label><p style={{ color:"var(--lime)" }}>{fmtCLP(dis)}</p></div>
+                                  <div className="rep-stat"><label>REMANENTE</label><p style={{ color:"var(--rose)" }}>{fmtCLP(tot - dis)}</p></div>
+                                  <div className="rep-stat"><label>ENTREGA</label><p style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</p></div>
+                                  <div className="rep-stat"><label>FACTURAS</label><p style={{ color:"var(--teal)" }}>{disp.filter(x => x.docType === "factura").length}</p></div>
+                                  <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--rose)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
+                                </div>
+                                <div className="rep-items">
+                                  {oc.items.filter(it => Number(it.qty) - Number(it.dispatched || 0) > 0).map(it => {
+                                    const rem = Number(it.qty) - Number(it.dispatched || 0);
+                                    const p = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched || 0) / Number(it.qty) * 100)) : 0;
+                                    return (
+                                      <div key={it.id} className="rep-irow">
+                                        <span style={{ flex:1, color:"var(--fog2)" }}>{it.desc}</span>
+                                        <span style={{ color:"var(--gold)", width:130, textAlign:"right" }}>{fmtNum(rem)} {it.unit} pendiente</span>
+                                        <div className="pbar-wrap" style={{ width:66 }}><div className="pbar" style={{ width:p + "%", background:pc(p) }} /></div>
+                                        <span style={{ width:26, color:"var(--fog)", fontSize:10 }}>{p}%</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </>
                 );
               })()}
