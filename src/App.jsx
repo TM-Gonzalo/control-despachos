@@ -73,7 +73,7 @@ async function fetchBsale(path, params = {}) {
 async function extractPDF(b64, type, apiKey) {
   const prompts = {
     oc: `Extrae los datos de esta Orden de Compra. CONTEXTO IMPORTANTE: el receptor de esta OC es siempre "Total Metal" o "Industrial y Comercial Total Metal" (el proveedor). El campo "client" debe ser la empresa DIFERENTE a Total Metal que aparece como emisora o compradora. Busca el nombre del cliente en el encabezado como "Empresa:", "Razon Social:", "De:", "Cliente:", o en el bloque de datos del comprador/emisor. NUNCA uses "Total Metal", "Industrial y Comercial Total Metal" ni variantes como valor de "client". Para el campo "notes": extrae SOLO informacion operativa relevante como nombre de obra, OT, numero de proyecto, forma de pago, lugar de entrega o referencias internas. NO incluyas texto legal, instrucciones de facturacion electronica, terminos y condiciones ni notas de cumplimiento legal. Si no hay notas operativas relevantes, usa null. Responde SOLO JSON sin texto extra ni backticks: {"ocNumber":"string o null","client":"string","date":"YYYY-MM-DD o null","deliveryDate":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"notes":"string o null"}`,
-    dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. Extrae el campo "ocNumber" con el numero de OC (busca "OC", "Orden de Compra", "N° OC", "PO", "Purchase Order"). Si el documento es una FACTURA, extrae tambien el campo "gdNumber" con el numero de Guia de Despacho referenciada (busca en la seccion "Referencias a otros Documentos" o "Referencias" el folio de tipo "Guia de Despacho Electronica", "Guia de Despacho" o "GD"). Si no hay GD referenciada, "gdNumber" debe ser null. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","gdNumber":"string o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
+    dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. IMPORTANTE: todos los valores numericos (qty, unitPrice, netTotal, total) deben ser numeros enteros o decimales SIN puntos de miles ni separadores — por ejemplo 2463 NO 2.463, y 6090000 NO 6.090.000. Extrae el campo "ocNumber" con el numero de OC (busca "OC", "Orden de Compra", "N° OC", "PO", "Purchase Order"). Si el documento es una FACTURA, extrae tambien el campo "gdNumber" con el numero de Guia de Despacho referenciada (busca en la seccion "Referencias a otros Documentos" o "Referencias" el folio de tipo "Guia de Despacho Electronica", "Guia de Despacho" o "GD"). Si no hay GD referenciada, "gdNumber" debe ser null. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","gdNumber":"string o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
   };
 
   // Intenta primero el proxy seguro (API key server-side).
@@ -113,7 +113,21 @@ async function extractPDF(b64, type, apiKey) {
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   const text = data.content.map(c => c.text || "").join("");
-  return JSON.parse(text.replace(/```json|```/g, "").trim());
+  const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+  // Normalizar números chilenos: 2.463 → 2463, 1.234.567 → 1234567
+  // El punto de miles en Chile puede confundirse con decimal en JSON
+  const fixNum = n => {
+    if (typeof n !== "number") return n;
+    const s = String(n);
+    // Si tiene exactamente 1 punto y 3 decimales → es punto de miles (ej: 2.463 → 2463)
+    if (/^\d+\.\d{3}$/.test(s)) return Number(s.replace(".", ""));
+    // Si tiene múltiples puntos → todos son miles (ej: 1.234.567 no ocurre en JSON)
+    return n;
+  };
+  if (parsed.items) parsed.items = parsed.items.map(it => ({ ...it, qty: fixNum(it.qty), unitPrice: fixNum(it.unitPrice) }));
+  if (parsed.netTotal) parsed.netTotal = fixNum(parsed.netTotal);
+  if (parsed.total) parsed.total = fixNum(parsed.total);
+  return parsed;
 }
 
 const toB64 = f => new Promise((res, rej) => {
