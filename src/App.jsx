@@ -478,11 +478,11 @@ function AuthScreen({ onAuth }) {
         )}
         <div className="fg" style={{ marginBottom:11 }}>
           <label>EMAIL</label>
-          <input type="email" placeholder="correo@empresa.com" value={email} onChange={e => setEmail(e.target.value)} />
+          <input type="email" name="email" autoComplete="email" placeholder="correo@empresa.com" value={email} onChange={e => setEmail(e.target.value)} />
         </div>
         <div className="fg" style={{ marginBottom:18 }}>
           <label>CONTRASENA</label>
-          <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
+          <input type="password" name="password" autoComplete={tab === "login" ? "current-password" : "new-password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} />
         </div>
         <button className="btn btn-gold" style={{ width:"100%", justifyContent:"center" }} onClick={submit} disabled={loading}>
           {loading ? <><div className="spin" />Procesando...</> : tab === "login" ? "Ingresar →" : "Crear cuenta →"}
