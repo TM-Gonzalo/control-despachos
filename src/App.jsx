@@ -2169,7 +2169,7 @@ export default function App() {
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
                           const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
                           const d = daysLeft(oc.deliveryDate);
-                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = (oc.dispatches || []).filter(x => x.docType === "factura" && x.date).sort((a,b) => b.date.localeCompare(a.date)); return facs.length ? facs[0].date : null; })() : null;
+                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = (oc.dispatches || []).filter(x => (x.docType === "factura" && x.date) || (x.docType === "guia" && x.invoiceDate)).map(x => x.docType === "factura" ? x.date : x.invoiceDate).sort((a,b) => b.localeCompare(a)); return facs.length ? facs[0] : null; })() : null;
                           const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
                           return (
                             <tr key={oc.id}>
@@ -2272,7 +2272,7 @@ export default function App() {
                           const pending = disp.filter(x => x.docType === "guia" && !x.invoiceNumber).length;
                           const nFac = disp.filter(x => x.docType === "factura").length + disp.filter(x => x.docType === "guia" && x.invoiceNumber).length;
                           const nGuia = disp.filter(x => x.docType === "guia").length;
-                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = disp.filter(x => x.docType === "factura" && x.date).sort((a,b) => b.date.localeCompare(a.date)); return facs.length ? facs[0].date : null; })() : null;
+                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = disp.filter(x => (x.docType === "factura" && x.date) || (x.docType === "guia" && x.invoiceDate)).map(x => x.docType === "factura" ? x.date : x.invoiceDate).sort((a,b) => b.localeCompare(a)); return facs.length ? facs[0] : null; })() : null;
                           const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
                           return (
                             <tr key={oc.id}>
