@@ -2468,10 +2468,11 @@ export default function App() {
                 const totalPend = pendingOCs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty) - Number(i.dispatched||0)) * Number(i.unitPrice), 0), 0);
 
                 // Sort helper para esta tabla
-                const PSortTh = ({ label, col }) => {
+                const PSortTh = ({ label, col, align }) => {
                   const active = pendSort.col === col;
                   return (
                     <th className={"th-sort" + (active ? " active" : "")}
+                      style={align ? { textAlign: align } : {}}
                       onClick={() => setPendSort(s => ({ col, dir: s.col === col ? -s.dir : 1 }))}>
                       {label}<span className="sort-ico">{active ? (pendSort.dir === 1 ? "▲" : "▼") : "⇅"}</span>
                     </th>
@@ -2558,9 +2559,9 @@ export default function App() {
                               <PSortTh label="CLIENTE"   col="client" />
                               <PSortTh label="ENTREGA"   col="delivery" />
                               <PSortTh label="AVANCE"    col="pct" />
-                              <th style={{ textAlign:"right" }}>MONTO OC</th>
-                              <th style={{ textAlign:"right" }}>DESPACHADO</th>
-                              <th style={{ textAlign:"right" }}>REMANENTE</th>
+                              <PSortTh label="MONTO OC"   col="monto"      align="right" />
+                              <PSortTh label="DESPACHADO" col="despachado"  align="right" />
+                              <PSortTh label="REMANENTE"  col="remanente"   align="right" />
                               <th style={{ textAlign:"center" }}>GDS</th>
                               <th style={{ textAlign:"center" }}>FACTS.</th>
                               <th></th>
@@ -2617,15 +2618,17 @@ export default function App() {
                                       {pendG > 0 && <span style={{ color:"var(--gold)", fontSize:9, marginLeft:3 }}>({pendG})</span>}
                                     </td>
                                     <td style={{ textAlign:"center", color:"var(--teal)" }}>{nFacts}</td>
-                                    <td onClick={e => e.stopPropagation()} style={{ display:"flex", gap:6, alignItems:"center", justifyContent:"flex-end" }}>
-                                      {pendItems.length > 0 && (
-                                        <button className="btn btn-ghost btn-sm"
-                                          style={{ fontSize:11, padding:"3px 8px", color: isExpanded ? "var(--gold)" : "var(--fog2)" }}
-                                          onClick={() => setPendExpanded(e => ({ ...e, [oc.id]: !e[oc.id] }))}>
-                                          {isExpanded ? "▲" : "▼"} {pendItems.length} ítem{pendItems.length !== 1 ? "s" : ""}
-                                        </button>
-                                      )}
-                                      <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
+                                    <td onClick={e => e.stopPropagation()}>
+                                      <div style={{ display:"flex", gap:6, alignItems:"center", justifyContent:"flex-end" }}>
+                                        {pendItems.length > 0 && (
+                                          <button className="btn btn-ghost btn-sm"
+                                            style={{ fontSize:11, padding:"3px 8px", color: isExpanded ? "var(--gold)" : "var(--fog2)" }}
+                                            onClick={() => setPendExpanded(e => ({ ...e, [oc.id]: !e[oc.id] }))}>
+                                            {isExpanded ? "▲" : "▼"} {pendItems.length} ítem{pendItems.length !== 1 ? "s" : ""}
+                                          </button>
+                                        )}
+                                        <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
+                                      </div>
                                     </td>
                                   </tr>
                                   {isExpanded && (
