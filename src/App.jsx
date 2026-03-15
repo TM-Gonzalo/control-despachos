@@ -570,6 +570,11 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
   const handleFiles = async files => {
     const pdfs = Array.from(files).filter(f => f.type === "application/pdf");
     if (!pdfs.length) return;
+    const MAX = 2;
+    if (pdfs.length > MAX) {
+      setErr("Máximo " + MAX + " PDFs a la vez. Selecciona hasta " + MAX + " archivos.");
+      return;
+    }
     // build initial queue entries
     const entries = pdfs.map(f => ({ file: f, name: f.name, status: "pending", data: null, items: [], err: null }));
     setQueue(entries);
@@ -645,7 +650,7 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
               onDragLeave={() => setDrag(false)}
             >
               <div className="drop-ico">📄</div>
-              <div className="drop-lbl">Arrastra uno o varios PDFs aquí o <strong>haz clic para seleccionar</strong><small>Múltiples archivos con Ctrl/Cmd · PDF max 10 MB c/u</small></div>
+              <div className="drop-lbl">Arrastra uno o dos PDFs aquí o <strong>haz clic para seleccionar</strong><small>Máximo 2 archivos a la vez · PDF max 10 MB c/u</small></div>
               <input ref={fileRef} type="file" accept=".pdf" multiple style={{ display:"none" }} onChange={e => handleFiles(e.target.files)} />
             </div>
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginTop:9 }}>⚠ {err}</div>}
