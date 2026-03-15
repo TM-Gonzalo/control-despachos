@@ -2270,7 +2270,7 @@ export default function App() {
                           const d = daysLeft(oc.deliveryDate);
                           const disp = oc.dispatches || [];
                           const pending = disp.filter(x => x.docType === "guia" && !x.invoiceNumber).length;
-                          const nFac = disp.filter(x => x.docType === "factura").length;
+                          const nFac = disp.filter(x => x.docType === "factura").length + disp.filter(x => x.docType === "guia" && x.invoiceNumber).length;
                           const nGuia = disp.filter(x => x.docType === "guia").length;
                           const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = disp.filter(x => x.docType === "factura" && x.date).sort((a,b) => b.date.localeCompare(a.date)); return facs.length ? facs[0].date : null; })() : null;
                           const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
@@ -2281,9 +2281,10 @@ export default function App() {
                               <td style={{ color:"var(--fog)" }}>{oc.date}</td>
                               <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{entregaDisplay}</td>
                               <td>
-                                <span style={{ color:"var(--teal)", fontSize:10 }}>{nFac} fac.</span>
-                                <span style={{ color:"var(--fog)" }}> · </span>
-                                <span style={{ color: pending > 0 ? "var(--rose)" : "var(--fog2)", fontSize:10 }}>{nGuia} guia{nGuia !== 1 ? "s" : ""}{pending > 0 ? " (" + pending + "✗)" : ""}</span>
+                                {nFac > 0 && <span style={{ color:"var(--teal)", fontSize:10, fontWeight:600 }}>{nFac}F</span>}
+                                {nFac > 0 && nGuia > 0 && <span style={{ color:"var(--fog)" }}> · </span>}
+                                {nGuia > 0 && <span style={{ color: pending > 0 ? "var(--rose)" : "var(--fog2)", fontSize:10, fontWeight:600 }}>{nGuia}GD{pending > 0 ? <span style={{ color:"var(--gold)", fontWeight:400 }}> ({pending}✗)</span> : null}</span>}
+                                {nFac === 0 && nGuia === 0 && <span style={{ color:"var(--fog)", fontSize:10 }}>—</span>}
                               </td>
                               <td style={{ color:"var(--gold)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + Number(i.qty)*Number(i.unitPrice), 0))}</td>
                               <td style={{ color:"var(--rose)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0))}</td>
