@@ -1242,7 +1242,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
           <div><div className="modal-title">Registrar Despacho</div><div className="modal-sub">{oc.ocNumber || oc.id} · {oc.client}</div></div>
           <div className="xbtn" onClick={onClose}>✕</div>
         </div>
-        <Steps labels={["Subir PDF", "Revisar", "Mapear items"]} current={step} />
+        <Steps labels={["Subir Documento", "Revisar", "Mapear items"]} current={step} />
         {ocMismatch && (
           <div style={{ background:"rgba(255,90,90,.1)", border:"1px solid var(--rose)", borderRadius:8, padding:"14px 18px", marginBottom:16 }}>
             <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ Documento rechazado — OC no coincide</div>
@@ -1323,7 +1323,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                   </button>
                 );
               })()}
-              <div style={{ fontSize:9, color:"var(--fog)", marginTop:10, letterSpacing:1 }}>O sube un PDF manualmente:</div>
+              <div style={{ fontSize:9, color:"var(--fog)", marginTop:10, letterSpacing:1 }}>O sube un documento PDF manualmente:</div>
             </div>
             <UploadZone onFile={f => handleFiles([f])} onFiles={handleFiles} loading={loading} label={lastSaved ? "Subir otro documento o" : "Arrastra la factura o guia aqui o"} />
             {pendingFiles.length > 0 && <div style={{ fontSize:11, color:"var(--gold)", marginTop:6 }}>⏳ {pendingFiles.length} PDF{pendingFiles.length !== 1 ? "s" : ""} en cola — se procesarán automáticamente</div>}
@@ -1571,7 +1571,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                 <div style={{ fontSize:13, color:"var(--gold)", fontWeight:600 }}>
                   Total mapeado: {fmtCLP(items.reduce((s,it,i) => s + Number(it.qty) * Number(it.unitPrice || 0), 0))}
                 </div>
-                {ext?.netTotal && <div style={{ fontSize:10, color:"var(--fog2)" }}>Neto factura: {fmtCLP(ext.netTotal)}</div>}
+                {ext?.netTotal && <div style={{ fontSize:10, color:"var(--fog2)" }}>Neto {docType === "factura" ? "factura" : "GD"}: {fmtCLP(ext.netTotal)}</div>}
               </div>
             </div>
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginBottom:11, marginTop:8 }}>⚠ {err}</div>}
