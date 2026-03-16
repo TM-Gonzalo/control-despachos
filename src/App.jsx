@@ -2899,6 +2899,7 @@ export default function App() {
                                 <th>CLIENTE</th>
                                 <th>OC</th>
                                 <th style={{ textAlign:"right" }}>MONTO NETO</th>
+                                <th></th>
                               </tr>
                             </thead>
                             <tbody>
@@ -2918,6 +2919,9 @@ export default function App() {
                                   <td style={{ color:"var(--white)" }}>{g.client}</td>
                                   <td style={{ color:"var(--gold)", fontSize:10, fontWeight:600 }}>{g.ocNumber}</td>
                                   <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(g.neto)}</td>
+                                  <td>
+                                    <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => { const oc = enriched.find(o => o.id === g.ocId); if (oc) setShowGestion(oc); }}>Gestión</button>
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>
