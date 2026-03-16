@@ -582,7 +582,7 @@ function AuthScreen({ onAuth }) {
   );
 }
 
-function ImportOCModal({ onClose, onSave, apiKey }) {
+function ImportOCModal({ onClose, onSave, apiKey, existingOCs = [] }) {
   // queue = [{ file, status: "pending"|"processing"|"done"|"error", data, items, err }]
   const [queue, setQueue] = useState([]);
   const [current, setCurrent] = useState(null); // index being reviewed
@@ -696,16 +696,28 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
         {queue.length > 0 && current === null && (
           <>
             <div style={{ marginBottom:14 }}>
-              {queue.map((e, i) => (
-                <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background:"var(--ink3)", borderRadius:7, marginBottom:6, border:"1px solid var(--line)" }}>
-                  <span style={{ fontSize:13, color:statusColor(e.status) }}>{statusIcon(e.status)}</span>
+              {queue.map((e, i) => {
+                const norm = s => String(s).replace(/[\.\s]/g, "").toLowerCase();
+                const ocNum = e.data?.ocNumber ? norm(e.data.ocNumber) : null;
+                const isDupe = ocNum && existingOCs.some(o => o.ocNumber && norm(o.ocNumber) === ocNum);
+                const dupeOC = isDupe ? existingOCs.find(o => o.ocNumber && norm(o.ocNumber) === ocNum) : null;
+                return (
+                <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 12px", background: isDupe ? "rgba(255,77,109,.06)" : "var(--ink3)", borderRadius:7, marginBottom:6, border: isDupe ? "1px solid rgba(255,77,109,.3)" : "1px solid var(--line)", flexWrap:"wrap" }}>
+                  <span style={{ fontSize:13, color: isDupe ? "var(--rose)" : statusColor(e.status) }}>{isDupe ? "⚠" : statusIcon(e.status)}</span>
                   <span style={{ flex:1, fontSize:11, color:"var(--fog2)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{e.name}</span>
                   {e.status === "processing" && <span style={{ fontSize:10, color:"var(--gold)" }}>Analizando...</span>}
-                  {e.status === "done" && <button className="btn btn-sky btn-sm" onClick={() => startReview(i)}>Revisar →</button>}
+                  {e.status === "done" && isDupe && (
+                    <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                      <span style={{ fontSize:10, color:"var(--rose)" }}>OC {dupeOC?.ocNumber} ya existe · {dupeOC?.client}</span>
+                      <button className="btn btn-rose btn-sm" onClick={() => setQueue(q => q.map((x, j) => j === i ? { ...x, status:"error", err:"Duplicada — OC " + dupeOC?.ocNumber + " ya existe" } : x))}>Cancelar</button>
+                    </div>
+                  )}
+                  {e.status === "done" && !isDupe && <button className="btn btn-sky btn-sm" onClick={() => startReview(i)}>Revisar →</button>}
                   {e.status === "saved" && <span style={{ fontSize:10, color:"var(--lime)" }}>Guardada ✓</span>}
                   {e.status === "error" && <span style={{ fontSize:10, color:"var(--rose)", wordBreak:"break-all", whiteSpace:"normal" }}>Error: {e.err}</span>}
                 </div>
-              ))}
+                );
+              })}
             </div>
             {allDone
               ? <div style={{ display:"flex", justifyContent:"flex-end" }}>
@@ -3056,7 +3068,7 @@ export default function App() {
         </div>
       </div>
 
-      {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} />}
+      {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} existingOCs={ocs} />}
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
         {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} />}
