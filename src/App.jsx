@@ -170,6 +170,8 @@ const autoMatch = (desc, ocItems) => {
     .replace(/\s+/g, " ").trim();
   const stopwords = new Set(["de","la","el","en","y","a","x","nr","neg","nro","no","para","con"]);
   const tokens = s => norm(s).split(" ").filter(t => t.length > 1 && !stopwords.has(t));
+  const numTokens = s => tokens(s).filter(t => /\d/.test(t)); // tokens que contienen números
+  const wordTokens = s => tokens(s).filter(t => !/\d/.test(t)); // tokens solo letras
 
   const nd = norm(desc);
   // 1. Exacto normalizado
@@ -180,19 +182,46 @@ const autoMatch = (desc, ocItems) => {
   const partial = ocItems.find(i => nd.includes(norm(i.desc)) || norm(i.desc).includes(nd));
   if (partial) return partial.id;
 
-  // 3. Token matching con boost por primera palabra igual
+  // 3. Token matching con peso especial para números
   const descTokens = tokens(desc);
+  const descNums = numTokens(desc);
+  const descWords = wordTokens(desc);
   const descFirst = descTokens[0] || "";
+
   let bestId = null, bestScore = 0;
   for (const item of ocItems) {
     const itemTokens = tokens(item.desc);
+    const itemNums = numTokens(item.desc);
+    const itemWords = wordTokens(item.desc);
     const itemFirst = itemTokens[0] || "";
-    const common = descTokens.filter(t => itemTokens.some(it => it === t || it.startsWith(t) || t.startsWith(it))).length;
-    const total = new Set([...descTokens, ...itemTokens]).size;
-    let score = total > 0 ? common / total : 0;
-    // Boost si la primera palabra coincide (ej: "perno" === "perno")
+
+    // Score de palabras (sin números)
+    const commonWords = descWords.filter(t => itemWords.some(it => it === t || it.startsWith(t) || t.startsWith(it))).length;
+    const totalWords = new Set([...descWords, ...itemWords]).size;
+    const wordScore = totalWords > 0 ? commonWords / totalWords : 0;
+
+    // Score de números — penalización fuerte si hay números que no coinciden
+    let numScore = 0;
+    if (descNums.length > 0 && itemNums.length > 0) {
+      const commonNums = descNums.filter(t => itemNums.some(it => it === t)).length;
+      const missingNums = descNums.filter(t => !itemNums.some(it => it === t)).length;
+      const extraNums = itemNums.filter(t => !descNums.some(it => it === t)).length;
+      const totalNums = new Set([...descNums, ...itemNums]).size;
+      numScore = totalNums > 0 ? commonNums / totalNums : 0;
+      // Penalizar fuerte si hay números distintos (ej: 3mm vs 6mm)
+      if (missingNums > 0 || extraNums > 0) numScore -= 0.4 * (missingNums + extraNums);
+    } else if (descNums.length === 0 && itemNums.length === 0) {
+      numScore = 0; // sin números, no afecta
+    }
+
+    // Score combinado: palabras 50% + números 50% (si hay números en ambos)
+    let score = descNums.length > 0 && itemNums.length > 0
+      ? (wordScore * 0.5) + (numScore * 0.5)
+      : wordScore;
+
+    // Boost si la primera palabra coincide
     if (descFirst && itemFirst && (descFirst === itemFirst || descFirst.startsWith(itemFirst) || itemFirst.startsWith(descFirst))) {
-      score += 0.15;
+      score += 0.10;
     }
     if (score > bestScore) { bestScore = score; bestId = item.id; }
   }
