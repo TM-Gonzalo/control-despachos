@@ -2463,7 +2463,7 @@ export default function App() {
                                     <div className="cli-oc-row" key={oc.id}>
                                       <span style={{ color:"var(--gold)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
                                       <span style={{ color:"var(--fog2)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
-                                      <span style={{ color:"var(--fog2)", width:100, textAlign:"right" }}>{fmtCLP(dis)}</span>
+                                      <span style={{ color:"var(--lime)", width:100, textAlign:"right" }}>{fmtCLP(dis)}</span>
                                       <span style={{ color: rem > 0 ? "var(--rose)" : "var(--fog2)", width:100, textAlign:"right", fontWeight: rem > 0 ? 600 : 400 }}>{fmtCLP(rem)}</span>
                                       <span className={"badge " + bCls(s)} style={{ marginLeft:"auto" }}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
                                       <button className="btn btn-outline btn-sm" style={{ marginLeft:8 }} onClick={() => setShowDetail(oc)}>Ver</button>
