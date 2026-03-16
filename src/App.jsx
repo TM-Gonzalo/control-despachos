@@ -426,8 +426,8 @@ tr:hover td{background:rgba(255,255,255,.012)}
 .cli-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
 .cli-name{font-family:var(--fS);font-size:18px;font-style:italic;color:var(--white)}
 .cli-ocs{font-size:9px;letter-spacing:2px;color:var(--fog);margin-top:2px}
-.cli-totals{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);align-items:end}
-.cli-total{background:var(--ink3);padding:12px 16px}
+.cli-totals{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid var(--line);align-items:end}
+.cli-total{background:transparent;padding:12px 16px;border-right:1px solid var(--line)}.cli-total:last-child{border-right:none}
 .cli-total label{font-size:8px;letter-spacing:2px;color:var(--fog);display:block;margin-bottom:5px}
 .cli-total p{font-size:15px;font-weight:600;white-space:nowrap}
 .cli-oc-list{padding:10px 18px 14px}
@@ -2486,7 +2486,7 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="cli-totals">
-                                <div className="cli-total"><label>MONTO TOTAL OCs</label><p style={{ color:"var(--fog)", fontWeight:600 }}>{fmtCLP(totalOC)}</p></div>
+                                <div className="cli-total"><label>MONTO TOTAL OCs</label><p style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(totalOC)}</p></div>
                                 <div className="cli-total"><label>DESPACHADO</label><p style={{ color:"var(--lime)", fontWeight:600 }}>{fmtCLP(totalDis)}</p></div>
                                 <div className="cli-total"><label>PENDIENTE DESPACHO</label><p style={{ color: pending > 0 ? "var(--rose)" : "var(--fog2)", fontWeight:600 }}>{fmtCLP(pending)}</p></div>
                                 <div className="cli-total"><label>AVANCE</label><p style={{ color:pc(pct) }}>{pct}%</p></div>
