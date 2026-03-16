@@ -2179,32 +2179,6 @@ export default function App() {
                     } catch(err) { notify("Error al leer el archivo", "err"); }
                   }} />
                 </label>
-                <button className="rail-logout" style={{ color:"var(--gold)" }} onClick={async () => {
-                  const fixed = ocs.map(o => ({ ...o, ocNumber: o.ocNumber ? o.ocNumber.replace(/\./g, "").trim() : o.ocNumber }));
-                  const changed = fixed.filter((o, i) => o.ocNumber !== ocs[i].ocNumber).length;
-                  if (changed === 0) { notify("No hay puntos que quitar"); return; }
-                  await persist(fixed);
-                  notify(changed + " OC" + (changed !== 1 ? "s" : "") + " corregida" + (changed !== 1 ? "s" : "") + " ✓");
-                }}>✦ Quitar puntos OCs</button>
-                <button className="rail-logout" style={{ color:"var(--violet)" }} onClick={async () => {
-                  const fixed = ocs.map(o => {
-                    const s = ocStatus(o.items, o.dispatches);
-                    if (s !== "closed" && s !== "toinvoice") return o;
-                    // Recopilar todas las fechas de facturas: directas e invoiceDate de GDs
-                    const disp = o.dispatches || [];
-                    const dates = disp.map(x => {
-                      if (x.docType === "factura" && x.date) return x.date;
-                      if (x.docType === "guia" && x.invoiceDate) return x.invoiceDate;
-                      return null;
-                    }).filter(Boolean).sort((a, b) => b.localeCompare(a));
-                    if (!dates.length) return o;
-                    return { ...o, deliveryDate: dates[0] };
-                  });
-                  const changed = fixed.filter((o, i) => o.deliveryDate !== ocs[i].deliveryDate).length;
-                  if (changed === 0) { notify("No hay fechas que corregir"); return; }
-                  await persist(fixed);
-                  notify(changed + " OC" + (changed !== 1 ? "s" : "") + " con fecha actualizada ✓");
-                }}>✦ Fijar fechas OCs cerradas</button>
               </div>}
             </div>
           </aside>
