@@ -1875,6 +1875,8 @@ export default function App() {
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
   const [pendExpanded, setPendExpanded] = useState({});
+  const [clientMonthFilter, setClientMonthFilter] = useState("all");
+  const [reportsMonthFilter, setReportsMonthFilter] = useState("all");
   const [onlineCount, setOnlineCount] = useState(1);
 
   // Presencia: registra al usuario activo y cuenta cuántos hay
@@ -2393,11 +2395,25 @@ export default function App() {
               )}
               {view === "clients" && (
                 <>
-                  <div className="ph"><div><div className="pt">Reporte <em>por Cliente</em></div><div className="pm">MONTOS PENDIENTES DE DESPACHO</div></div></div>
+                  <div className="ph">
+                    <div><div className="pt">Reporte <em>por Cliente</em></div><div className="pm">MONTOS PENDIENTES DE DESPACHO</div></div>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      {(() => {
+                        const months = [...new Set(enriched.map(o => (o.date||"").slice(0,7)).filter(Boolean))].sort((a,b) => b.localeCompare(a));
+                        return (
+                          <select value={clientMonthFilter} onChange={e => setClientMonthFilter(e.target.value)} className="fsel" style={{ fontSize:11 }}>
+                            <option value="all">Todos los meses</option>
+                            {months.map(m => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  </div>
                   {enriched.length === 0 && <div className="empty"><div className="empty-ico">◉</div><p>No hay ordenes aun.</p></div>}
                   {enriched.length > 0 && (() => {
+                    const filtered = clientMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(clientMonthFilter));
                     // Agrupar por cliente
-                    const byClient = enriched.reduce((acc, oc) => {
+                    const byClient = filtered.reduce((acc, oc) => {
                       const key = oc.client;
                       if (!acc[key]) acc[key] = [];
                       acc[key].push(oc);
@@ -2914,21 +2930,38 @@ export default function App() {
 
               {view === "reports" && (
                 <>
-                  <div className="ph"><div><div className="pt">Reporte <em>Por OC</em></div><div className="pm">ESTADO DE DESPACHO POR ORDEN</div></div></div>
+                  <div className="ph">
+                    <div><div className="pt">Reporte <em>Por OC</em></div><div className="pm">ESTADO DE DESPACHO POR ORDEN</div></div>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      {(() => {
+                        const months = [...new Set(enriched.map(o => (o.date||"").slice(0,7)).filter(Boolean))].sort((a,b) => b.localeCompare(a));
+                        return (
+                          <select value={reportsMonthFilter} onChange={e => setReportsMonthFilter(e.target.value)} className="fsel" style={{ fontSize:11 }}>
+                            <option value="all">Todos los meses</option>
+                            {months.map(m => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  </div>
                   <div className="kpis" style={{ marginBottom:22, gridTemplateColumns:"repeat(5,1fr)" }}>
-                    {[
-                      { n: total, lbl: "Total", c: "var(--white)" },
-                      { n: open, lbl: "Abiertas", c: "var(--sky)" },
-                      { n: enriched.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
-                      { n: enriched.filter(o => ocStatus(o.items, o.dispatches) === "toinvoice").length, lbl: "Por Facturar", c: "var(--rose)" },
-                      { n: closed, lbl: "Completadas", c: "var(--lime)" }
-                    ].map(({ n, lbl, c }) => (
-                      <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
-                    ))}
+                    {(() => {
+                      const rFiltered = reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter));
+                      return [
+                        { n: rFiltered.length, lbl: "Total", c: "var(--white)" },
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "toinvoice").length, lbl: "Por Facturar", c: "var(--rose)" },
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "closed").length, lbl: "Completadas", c: "var(--lime)" }
+                      ].map(({ n, lbl, c }) => (
+                        <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
+                      ));
+                    })()}
                   </div>
                   {enriched.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay ordenes aun.</p></div>}
                   {enriched.length > 0 && (() => {
-                    const byClient = enriched.reduce((acc, oc) => { const k = oc.client; if (!acc[k]) acc[k] = []; acc[k].push(oc); return acc; }, {});
+                    const rFiltered = reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter));
+                    const byClient = rFiltered.reduce((acc, oc) => { const k = oc.client; if (!acc[k]) acc[k] = []; acc[k].push(oc); return acc; }, {});
                     return Object.entries(byClient).map(([client, ocs]) => (
                       <div key={client} style={{ marginBottom:28 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
