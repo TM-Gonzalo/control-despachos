@@ -264,7 +264,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .srch{flex:1;background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-family:var(--fM);font-size:11px;color:var(--white);outline:none}
 .srch:focus{border-color:var(--gold)}.srch::placeholder{color:var(--fog)}
 .fsel{background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font-family:var(--fM);font-size:11px;color:var(--fog2);outline:none;cursor:pointer}
-.tbl-card{background:var(--ink2);border:1px solid var(--line);border-radius:9px;overflow:hidden;overflow-x:auto;scrollbar-width:none}.tbl-card::-webkit-scrollbar{display:none}.tbl-card table{min-width:900px}
+.tbl-card{background:var(--ink2);border:1px solid var(--line);border-radius:9px;overflow:hidden;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.tbl-card::-webkit-scrollbar{height:5px}.tbl-card::-webkit-scrollbar-track{background:transparent}.tbl-card::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}.tbl-card::-webkit-scrollbar-thumb:hover{background:var(--fog)}.tbl-card table{min-width:900px}
 table{width:100%;border-collapse:collapse}
 thead{background:var(--ink3)}
 th{padding:9px 14px;text-align:left;font-size:8px;letter-spacing:2.5px;color:var(--fog);font-weight:500}
@@ -570,6 +570,11 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
   const handleFiles = async files => {
     const pdfs = Array.from(files).filter(f => f.type === "application/pdf");
     if (!pdfs.length) return;
+    const MAX = 2;
+    if (pdfs.length > MAX) {
+      setErr("Máximo " + MAX + " PDFs a la vez. Selecciona hasta " + MAX + " archivos.");
+      return;
+    }
     // build initial queue entries
     const entries = pdfs.map(f => ({ file: f, name: f.name, status: "pending", data: null, items: [], err: null }));
     setQueue(entries);
@@ -645,7 +650,7 @@ function ImportOCModal({ onClose, onSave, apiKey }) {
               onDragLeave={() => setDrag(false)}
             >
               <div className="drop-ico">📄</div>
-              <div className="drop-lbl">Arrastra uno o varios PDFs aquí o <strong>haz clic para seleccionar</strong><small>Múltiples archivos con Ctrl/Cmd · PDF max 10 MB c/u</small></div>
+              <div className="drop-lbl">Arrastra uno o dos PDFs aquí o <strong>haz clic para seleccionar</strong><small>Máximo 2 archivos a la vez · PDF max 10 MB c/u</small></div>
               <input ref={fileRef} type="file" accept=".pdf" multiple style={{ display:"none" }} onChange={e => handleFiles(e.target.files)} />
             </div>
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginTop:9 }}>⚠ {err}</div>}
@@ -927,7 +932,7 @@ function BsaleView({ enriched, onAssign }) {
   );
 }
 
-function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
+function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -942,6 +947,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [savedCount, setSavedCount] = useState(0);
   const [lastSaved, setLastSaved] = useState(null);
   const [ocMismatch, setOcMismatch] = useState(null); // { pdfOC, thisOC }
+  const [pendingOverride, setPendingOverride] = useState(null); // datos listos para continuar si admin aprueba
   const [bsaleSearch, setBsaleSearch] = useState("");
   const [bsaleResult, setBsaleResult] = useState(null); // { doc } | null
   const [bsaleLoading, setBsaleLoading] = useState(false);
@@ -1023,11 +1029,22 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
           });
           if (!ocRef) {
             const ocRefs = refs.map(r => r.number).filter(Boolean).join(", ");
-            throw new Error("Este documento no pertenece a la OC " + oc.ocNumber + ". Referencias encontradas: " + (ocRefs || "ninguna"));
+            throw new Error("MISMATCH:" + (ocRefs || "OC PENDIENTE") + ":" + oc.ocNumber);
           }
         }
       } catch(e) {
-        if (e.message.includes("no pertenece")) throw e;
+        if (e.message.startsWith("MISMATCH:")) {
+          const parts = e.message.split(":");
+          const docOC = parts[1] || "OC PENDIENTE";
+          const d2 = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber };
+          const its2b = its.map((it, i) => ({ ...it, id: i + 1 }));
+          const am2 = {};
+          its2b.forEach((it, i) => { am2[i] = autoMatch(it.desc, oc.items) || "NONE"; });
+          setOcMismatch({ pdfOC: docOC, thisOC: oc.ocNumber, source: "Bsale" });
+          setPendingOverride({ ext: d2, num, date, docType: tipo, items: its2b, map: am2 });
+          setLoading(false);
+          return;
+        }
         // Si falla la consulta de referencias, continuar igual
       }
 
@@ -1088,7 +1105,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
         const pdfOC = norm(d.ocNumber);
         const thisOC = norm(oc.ocNumber || "");
         if (thisOC && pdfOC && !pdfOC.includes(thisOC) && !thisOC.includes(pdfOC)) {
-          setOcMismatch({ pdfOC: d.ocNumber, thisOC: oc.ocNumber });
+          setOcMismatch({ pdfOC: d.ocNumber, thisOC: oc.ocNumber, source: "PDF" });
+          // Guardar datos para que admin pueda continuar igual
+          setPendingOverride({ ext: d, num: d.docNumber || "", date: d.date || today(), docType: d.docType === "factura" ? "factura" : "guia", items: its, map: am });
           setLoading(false);
           return;
         }
@@ -1191,13 +1210,26 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
         <Steps labels={["Subir PDF", "Revisar", "Mapear items"]} current={step} />
         {ocMismatch && (
           <div style={{ background:"rgba(255,90,90,.1)", border:"1px solid var(--rose)", borderRadius:8, padding:"14px 18px", marginBottom:16 }}>
-            <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ {docType === "factura" ? "Factura" : "Guía"} rechazada — OC no coincide</div>
+            <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ Documento rechazado — OC no coincide</div>
             <div style={{ fontSize:12, color:"var(--fog2)", lineHeight:1.6 }}>
-              El PDF corresponde a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.pdfOC}</strong>, no a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.thisOC}</strong>.<br/>
-              El ingreso fue anulado. Verifica que estás subiendo el documento correcto.
+              El documento {ocMismatch.source ? "(" + ocMismatch.source + ")" : ""} referencia la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.pdfOC}</strong>, no la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.thisOC}</strong>.<br/>
+              Verifica que estás subiendo el documento correcto.
             </div>
-            <div style={{ marginTop:12 }}>
-              <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); }}>Cerrar</button>
+            <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
+              <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); setPendingOverride(null); }}>Cerrar</button>
+              {isAdmin && pendingOverride && (
+                <button className="btn btn-gold btn-sm" onClick={() => {
+                  setExt(pendingOverride.ext);
+                  setNum(pendingOverride.num);
+                  setDate(pendingOverride.date);
+                  setDocType(pendingOverride.docType);
+                  setItems(pendingOverride.items);
+                  setMap(pendingOverride.map);
+                  setOcMismatch(null);
+                  setPendingOverride(null);
+                  setStep(1);
+                }}>Ingresar igualmente →</button>
+              )}
             </div>
           </div>
         )}
@@ -1560,12 +1592,14 @@ function ConvertModal({ dispatch, ocId, onClose, onSave }) {
   );
 }
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, canDelete, onRequestDel, currentUserId, isAdmin }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin }) {
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
   const [dateVal, setDateVal] = useState(oc.deliveryDate || "");
   const [editingClient, setEditingClient] = useState(false);
   const [clientVal, setClientVal] = useState(oc.client || "");
+  const [editingOCNumber, setEditingOCNumber] = useState(false);
+  const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
   const st = ocStatus(oc.items, oc.dispatches);
   const totAmt = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
   const disAmt = oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
@@ -1581,7 +1615,26 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
       <div className="modal modal-xl">
         <div className="modal-hd">
           <div>
-            <div className="modal-title">{oc.ocNumber || oc.id}</div>
+            <div className="modal-title" style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {editingOCNumber ? (
+                <>
+                  <input
+                    value={ocNumberVal}
+                    onChange={e => setOCNumberVal(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") { onUpdateOCNumber(oc.id, ocNumberVal); setEditingOCNumber(false); } if (e.key === "Escape") setEditingOCNumber(false); }}
+                    autoFocus
+                    style={{ background:"var(--ink3)", border:"1px solid var(--gold)", borderRadius:6, color:"var(--gold)", fontFamily:"var(--fS)", fontSize:22, fontStyle:"italic", padding:"2px 10px", width:220, outline:"none" }}
+                  />
+                  <button className="btn btn-teal btn-sm" onClick={() => { onUpdateOCNumber(oc.id, ocNumberVal); setEditingOCNumber(false); }}>✓</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setEditingOCNumber(false)}>✕</button>
+                </>
+              ) : (
+                <>
+                  <span>{oc.ocNumber || oc.id}</span>
+                  <span onClick={() => { setEditingOCNumber(true); setOCNumberVal(oc.ocNumber || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", fontFamily:"var(--fM)", fontStyle:"normal" }}>✎</span>
+                </>
+              )}
+            </div>
             <div className="modal-sub" style={{ display:"flex", alignItems:"center", gap:6 }}>
               {editingClient ? (
                 <>
@@ -1786,6 +1839,8 @@ export default function App() {
   const [confirmDel, setConfirmDel] = useState(null); // { type:"oc"|"dispatch", ocId, dispId, label }
   const [dashSort, setDashSort] = useState({ col: null, dir: 1 });
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
+  const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
+  const [pendExpanded, setPendExpanded] = useState({});
   const [onlineCount, setOnlineCount] = useState(1);
 
   // Presencia: registra al usuario activo y cuenta cuántos hay
@@ -1888,12 +1943,15 @@ export default function App() {
   };
   const handleSaveKey = v => { setApiKey(v); localStorage.setItem("dc_apikey", v); };
   const handleSaveOC = async (oc, keepOpen) => {
-    if (oc.ocNumber && oc.ocNumber.trim()) {
+    // Quitar puntos del número de OC al guardar
+    const cleanOcNumber = oc.ocNumber ? oc.ocNumber.replace(/\./g, "").trim() : oc.ocNumber;
+    const cleanOc = { ...oc, ocNumber: cleanOcNumber };
+    if (cleanOc.ocNumber && cleanOc.ocNumber.trim()) {
       const norm = s => s.replace(/[\.\s]/g, "").toLowerCase();
-      const dupe = ocs.find(o => o.ocNumber && norm(o.ocNumber) === norm(oc.ocNumber));
-      if (dupe) throw new Error("La OC N° " + oc.ocNumber + " ya existe (cliente: " + dupe.client + ").");
+      const dupe = ocs.find(o => o.ocNumber && norm(o.ocNumber) === norm(cleanOc.ocNumber));
+      if (dupe) throw new Error("La OC N° " + cleanOc.ocNumber + " ya existe (cliente: " + dupe.client + ").");
     }
-    await persist([oc, ...ocs]);
+    await persist([cleanOc, ...ocs]);
     if (!keepOpen) setShowImport(false);
     notify("OC importada ✓");
   };
@@ -1979,6 +2037,21 @@ export default function App() {
     notify("Cliente actualizado ✓");
   };
 
+  const handleUpdateOCNumber = async (ocId, newNumber) => {
+    const clean = newNumber.replace(/\./g, "").trim();
+    if (clean) {
+      const norm = s => s.replace(/[\.\s]/g, "").toLowerCase();
+      const dupe = ocs.find(o => o.id !== ocId && o.ocNumber && norm(o.ocNumber) === norm(clean));
+      if (dupe) { notify("N° OC ya existe en " + dupe.client, "err"); return; }
+    }
+    const updated = ocs.map(o => o.id === ocId ? { ...o, ocNumber: clean } : o);
+    await persist(updated);
+    // Cerrar y reabrir con datos frescos para evitar estado interno desincronizado
+    setShowDetail(null);
+    setTimeout(() => setShowDetail(updated.find(o => o.id === ocId) || null), 50);
+    notify("N° OC actualizado ✓");
+  };
+
   const handleUpdateDelivery = async (ocId, newDate) => {
     const updated = ocs.map(o => o.id === ocId ? { ...o, deliveryDate: newDate } : o);
     await persist(updated);
@@ -2039,7 +2112,7 @@ export default function App() {
               <div className={"rail-item-sub" + (view === "reports" ? " on" : "")} onClick={() => setView("reports")}>Por OC</div>
               <div className={"rail-item-sub" + (view === "clients" ? " on" : "")} onClick={() => setView("clients")}>Por Cliente</div>
               {isAdmin && <div className={"rail-item-sub" + (view === "monthly" ? " on" : "")} onClick={() => setView("monthly")}>Por Facturas</div>}
-              <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>OC Pendientes</div>
+              <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>Pend. Despachar</div>
               <div className={"rail-item-sub" + (view === "toinvoice" ? " on" : "")} onClick={() => setView("toinvoice")}>Pend. Facturar</div>
             </nav>
             <div className="rail-foot">
@@ -2067,6 +2140,32 @@ export default function App() {
                     } catch(err) { notify("Error al leer el archivo", "err"); }
                   }} />
                 </label>
+                <button className="rail-logout" style={{ color:"var(--gold)" }} onClick={async () => {
+                  const fixed = ocs.map(o => ({ ...o, ocNumber: o.ocNumber ? o.ocNumber.replace(/\./g, "").trim() : o.ocNumber }));
+                  const changed = fixed.filter((o, i) => o.ocNumber !== ocs[i].ocNumber).length;
+                  if (changed === 0) { notify("No hay puntos que quitar"); return; }
+                  await persist(fixed);
+                  notify(changed + " OC" + (changed !== 1 ? "s" : "") + " corregida" + (changed !== 1 ? "s" : "") + " ✓");
+                }}>✦ Quitar puntos OCs</button>
+                <button className="rail-logout" style={{ color:"var(--violet)" }} onClick={async () => {
+                  const fixed = ocs.map(o => {
+                    const s = ocStatus(o.items, o.dispatches);
+                    if (s !== "closed" && s !== "toinvoice") return o;
+                    // Recopilar todas las fechas de facturas: directas e invoiceDate de GDs
+                    const disp = o.dispatches || [];
+                    const dates = disp.map(x => {
+                      if (x.docType === "factura" && x.date) return x.date;
+                      if (x.docType === "guia" && x.invoiceDate) return x.invoiceDate;
+                      return null;
+                    }).filter(Boolean).sort((a, b) => b.localeCompare(a));
+                    if (!dates.length) return o;
+                    return { ...o, deliveryDate: dates[0] };
+                  });
+                  const changed = fixed.filter((o, i) => o.deliveryDate !== ocs[i].deliveryDate).length;
+                  if (changed === 0) { notify("No hay fechas que corregir"); return; }
+                  await persist(fixed);
+                  notify(changed + " OC" + (changed !== 1 ? "s" : "") + " con fecha actualizada ✓");
+                }}>✦ Fijar fechas OCs cerradas</button>
               </div>}
             </div>
           </aside>
@@ -2116,7 +2215,7 @@ export default function App() {
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
                           const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
                           const d = daysLeft(oc.deliveryDate);
-                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = (oc.dispatches || []).filter(x => x.docType === "factura" && x.date).sort((a,b) => b.date.localeCompare(a.date)); return facs.length ? facs[0].date : null; })() : null;
+                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = (oc.dispatches || []).filter(x => (x.docType === "factura" && x.date) || (x.docType === "guia" && x.invoiceDate)).map(x => x.docType === "factura" ? x.date : x.invoiceDate).sort((a,b) => b.localeCompare(a)); return facs.length ? facs[0] : null; })() : null;
                           const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
                           return (
                             <tr key={oc.id}>
@@ -2217,9 +2316,9 @@ export default function App() {
                           const d = daysLeft(oc.deliveryDate);
                           const disp = oc.dispatches || [];
                           const pending = disp.filter(x => x.docType === "guia" && !x.invoiceNumber).length;
-                          const nFac = disp.filter(x => x.docType === "factura").length;
+                          const nFac = disp.filter(x => x.docType === "factura").length + disp.filter(x => x.docType === "guia" && x.invoiceNumber).length;
                           const nGuia = disp.filter(x => x.docType === "guia").length;
-                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = disp.filter(x => x.docType === "factura" && x.date).sort((a,b) => b.date.localeCompare(a.date)); return facs.length ? facs[0].date : null; })() : null;
+                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = disp.filter(x => (x.docType === "factura" && x.date) || (x.docType === "guia" && x.invoiceDate)).map(x => x.docType === "factura" ? x.date : x.invoiceDate).sort((a,b) => b.localeCompare(a)); return facs.length ? facs[0] : null; })() : null;
                           const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
                           return (
                             <tr key={oc.id}>
@@ -2228,9 +2327,10 @@ export default function App() {
                               <td style={{ color:"var(--fog)" }}>{oc.date}</td>
                               <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{entregaDisplay}</td>
                               <td>
-                                <span style={{ color:"var(--teal)", fontSize:10 }}>{nFac} fac.</span>
-                                <span style={{ color:"var(--fog)" }}> · </span>
-                                <span style={{ color: pending > 0 ? "var(--rose)" : "var(--fog2)", fontSize:10 }}>{nGuia} guia{nGuia !== 1 ? "s" : ""}{pending > 0 ? " (" + pending + "✗)" : ""}</span>
+                                {nFac > 0 && <span style={{ color:"var(--teal)", fontSize:10, fontWeight:600 }}>{nFac}F</span>}
+                                {nFac > 0 && nGuia > 0 && <span style={{ color:"var(--fog)" }}> · </span>}
+                                {nGuia > 0 && <span style={{ color: pending > 0 ? "var(--rose)" : "var(--fog2)", fontSize:10, fontWeight:600 }}>{nGuia}GD{pending > 0 ? <span style={{ color:"var(--gold)", fontWeight:400 }}> ({pending}✗)</span> : null}</span>}
+                                {nFac === 0 && nGuia === 0 && <span style={{ color:"var(--fog)", fontSize:10 }}>—</span>}
                               </td>
                               <td style={{ color:"var(--gold)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + Number(i.qty)*Number(i.unitPrice), 0))}</td>
                               <td style={{ color:"var(--rose)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0))}</td>
@@ -2462,76 +2562,77 @@ export default function App() {
               })()}
 
               {view === "pending" && (() => {
-                // Solo OCs con despacho pendiente (excluir toinvoice y closed — ya están 100% despachadas)
-                const normClient = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\./g, "").replace(/\s+/g, " ").trim().toUpperCase();
                 const pendingOCs = enriched.filter(o => { const s = ocStatus(o.items, o.dispatches); return s === "open" || s === "partial"; });
-                // Agrupar normalizando el nombre del cliente
-                const byClient = pendingOCs.reduce((acc, oc) => {
-                  const k = normClient(oc.client);
-                  if (!acc[k]) acc[k] = { label: oc.client, ocs: [] };
-                  acc[k].ocs.push(oc);
-                  return acc;
-                }, {});
                 const totalPend = pendingOCs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty) - Number(i.dispatched||0)) * Number(i.unitPrice), 0), 0);
+
+                // Sort helper para esta tabla
+                const PSortTh = ({ label, col, align }) => {
+                  const active = pendSort.col === col;
+                  return (
+                    <th className={"th-sort" + (active ? " active" : "")}
+                      style={align ? { textAlign: align } : {}}
+                      onClick={() => setPendSort(s => ({ col, dir: s.col === col ? -s.dir : 1 }))}>
+                      {label}<span className="sort-ico">{active ? (pendSort.dir === 1 ? "▲" : "▼") : "⇅"}</span>
+                    </th>
+                  );
+                };
+
+                const sorted = [...pendingOCs].sort((a, b) => {
+                  const { col, dir } = pendSort;
+                  const totA = a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0);
+                  const totB = b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0);
+                  const disA = a.items.reduce((s,i) => s+Number(i.dispatched||0)*Number(i.unitPrice),0);
+                  const disB = b.items.reduce((s,i) => s+Number(i.dispatched||0)*Number(i.unitPrice),0);
+                  const remA = totA - disA;
+                  const remB = totB - disB;
+                  const pctA = totA > 0 ? Math.round(disA/totA*100) : 0;
+                  const pctB = totB > 0 ? Math.round(disB/totB*100) : 0;
+                  const sA = ocStatus(a.items, a.dispatches);
+                  const sB = ocStatus(b.items, b.dispatches);
+                  let av, bv;
+                  if (col === "ocNumber")     { av = a.ocNumber||a.id; bv = b.ocNumber||b.id; }
+                  else if (col === "date")    { av = a.date||""; bv = b.date||""; }
+                  else if (col === "client")  { av = a.client||""; bv = b.client||""; }
+                  else if (col === "delivery"){ av = a.deliveryDate||""; bv = b.deliveryDate||""; }
+                  else if (col === "status")  { av = statusOrder[sA]??0; bv = statusOrder[sB]??0; }
+                  else if (col === "monto")   { av = totA; bv = totB; }
+                  else if (col === "despachado") { av = disA; bv = disB; }
+                  else if (col === "remanente")  { av = remA; bv = remB; }
+                  else if (col === "pct")     { av = pctA; bv = pctB; }
+                  else                        { av = 0; bv = 0; }
+                  return av < bv ? -dir : av > bv ? dir : 0;
+                });
+
                 return (
                   <>
                     <div className="ph">
-                      <div><div className="pt">Reporte <em>OC Pendientes</em></div><div className="pm">OCS SIN COMPLETAR</div></div>
+                      <div><div className="pt">Reporte <em>Pend. Despachar</em></div><div className="pm">OCS SIN COMPLETAR</div></div>
                       {pendingOCs.length > 0 && <button className="btn btn-outline" onClick={() => {
                         const rows = [];
-                        pendingOCs.forEach(oc => {
+                        sorted.forEach(oc => {
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched||0) * Number(i.unitPrice), 0);
                           const pct = tot > 0 ? Math.round(dis/tot*100) : 0;
                           const s = ocStatus(oc.items, oc.dispatches);
-                          // Fila resumen OC
                           rows.push({
-                            "Cliente": oc.client,
+                            "Estado": bLbl(s),
                             "N° OC": oc.ocNumber || oc.id,
                             "Fecha OC": oc.date || "",
+                            "Cliente": oc.client,
                             "Fecha Entrega": oc.deliveryDate || "",
-                            "Estado": bLbl(s),
-                            "Item": "",
-                            "Unidad": "",
-                            "Qty OC": "",
-                            "Despachado": "",
-                            "Pendiente Qty": "",
-                            "Precio Unit.": "",
                             "Monto OC": tot,
-                            "Monto Despachado": dis,
-                            "Monto Pendiente": tot - dis,
+                            "Despachado": dis,
+                            "Remanente": tot - dis,
                             "Avance %": pct + "%",
-                            "Notas": oc.notes || ""
-                          });
-                          // Filas por item pendiente
-                          oc.items.filter(it => Number(it.qty) - Number(it.dispatched||0) > 0).forEach(it => {
-                            const rem = Number(it.qty) - Number(it.dispatched||0);
-                            rows.push({
-                              "Cliente": "",
-                              "N° OC": "",
-                              "Fecha OC": "",
-                              "Fecha Entrega": "",
-                              "Estado": "",
-                              "Item": it.desc,
-                              "Unidad": it.unit || "",
-                              "Qty OC": Number(it.qty),
-                              "Despachado": Number(it.dispatched||0),
-                              "Pendiente Qty": rem,
-                              "Precio Unit.": Number(it.unitPrice||0),
-                              "Monto OC": Number(it.qty) * Number(it.unitPrice||0),
-                              "Monto Despachado": Number(it.dispatched||0) * Number(it.unitPrice||0),
-                              "Monto Pendiente": rem * Number(it.unitPrice||0),
-                              "Avance %": it.qty > 0 ? Math.round(Number(it.dispatched||0)/Number(it.qty)*100) + "%" : "0%",
-                              "Notas": ""
-                            });
+                            "Guias": (oc.dispatches||[]).filter(x=>x.docType==="guia").length,
+                            "Facturas": (oc.dispatches||[]).filter(x=>x.docType==="factura").length,
                           });
                         });
                         const ws = XLSX.utils.json_to_sheet(rows);
-                        // Ancho de columnas
-                        ws["!cols"] = [22,14,12,14,12,36,8,10,12,12,12,14,16,14,10,30].map(w => ({ wch: w }));
+                        ws["!cols"] = [12,14,12,28,14,14,14,14,10,8,10].map(w => ({ wch: w }));
                         const wb = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(wb, ws, "Pendientes");
-                        XLSX.writeFile(wb, "Reporte_Pendientes_" + today() + ".xlsx");
+                        XLSX.utils.book_append_sheet(wb, ws, "Pend Despachar");
+                        XLSX.writeFile(wb, "Reporte_Pend_Despachar_" + today() + ".xlsx");
                       }}>↓ Exportar Excel</button>}
                     </div>
                     <div className="kpis" style={{ marginBottom:22 }}>
@@ -2541,86 +2642,142 @@ export default function App() {
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
-                        <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
+                        <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize:38 }}>{n}</div></div>
                       ))}
                     </div>
                     {pendingOCs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay ordenes pendientes.</p></div>}
-                    {pendingOCs.length > 0 && Object.entries(byClient).sort(([, a], [, b]) => {
-                        const remA = a.ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0), 0);
-                        const remB = b.ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0), 0);
-                        return remB - remA;
-                      }).map(([, { label, ocs }]) => (
-                      <div key={label} style={{ marginBottom:28 }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-                          <div style={{ fontWeight:500, fontSize:16, color:"var(--fog2)" }}>{label}</div>
-                          <div style={{ flex:1, height:1, background:"var(--line)" }} />
-                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>{ocs.length} OC{ocs.length !== 1 ? "s" : ""}</div>
-                        </div>
-                        <div className="rep-grid">
-                          {[...ocs].sort((a, b) => {
-                            const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0);
-                            const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice||0), 0);
-                            const sA = ocStatus(a.items, a.dispatches);
-                            const sB = ocStatus(b.items, b.dispatches);
-                            // Prioridad: toinvoice (despachos pendientes de facturar) primero
-                            const prioA = sA === "toinvoice" ? 0 : 1;
-                            const prioB = sB === "toinvoice" ? 0 : 1;
-                            if (prioA !== prioB) return prioA - prioB;
-                            // Luego por mayor monto remanente
-                            return remB - remA;
-                          }).map(oc => {
-                            const s = ocStatus(oc.items, oc.dispatches);
-                            const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
-                            const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
-                            const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
-                            const d = daysLeft(oc.deliveryDate);
-                            const disp = oc.dispatches || [];
-                            const pendG = disp.filter(x => x.docType === "guia" && !x.invoiceNumber).length;
-                            return (
-                              <div className="rep-card" key={oc.id}>
-                                <div className="rep-hd">
-                                  <div style={{ display:"flex", alignItems:"baseline", gap:8 }}><div className="rep-id">{oc.ocNumber || oc.id}</div>{oc.date && <span style={{ fontSize:10, color:"var(--fog)", fontFamily:"var(--fM)" }}>{oc.date}</span>}</div>
-                                  <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap", justifyContent:"flex-end" }}>
-                                    <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : "var(--gold)"} />{bLbl(s)}</span>
-                                    {d !== null && d <= 5 && <span className="badge b-warn"><Dot c="var(--rose)" />{d < 0 ? "Vencida" : d + "d"}</span>}
-                                    {pendG > 0 && <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />{pendG} guia{pendG > 1 ? "s" : ""} sin fac.</span>}
-                                    <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
-                                  </div>
-                                </div>
-                                <div>
-                                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"var(--fog)", marginBottom:4, letterSpacing:1 }}>
-                                    <span>AVANCE ECONOMICO</span><span style={{ color:pc(pct) }}>{pct}%</span>
-                                  </div>
-                                  <div className="pbar-wrap" style={{ height:5 }}><div className="pbar" style={{ width:pct + "%", background:pc(pct) }} /></div>
-                                </div>
-                                <div className="rep-stats">
-                                  <div className="rep-stat"><label>MONTO OC</label><p style={{ color:"var(--gold)" }}>{fmtCLP(tot)}</p></div>
-                                  <div className="rep-stat"><label>DESPACHADO</label><p style={{ color:"var(--lime)" }}>{fmtCLP(dis)}</p></div>
-                                  <div className="rep-stat"><label>REMANENTE</label><p style={{ color:"var(--rose)" }}>{fmtCLP(tot - dis)}</p></div>
-                                  <div className="rep-stat"><label>ENTREGA</label><p style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</p></div>
-                                  <div className="rep-stat"><label>FACTURAS</label><p style={{ color:"var(--teal)" }}>{disp.filter(x => x.docType === "factura").length}</p></div>
-                                  <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--rose)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
-                                </div>
-                                <div className="rep-items">
-                                  {oc.items.filter(it => Number(it.qty) - Number(it.dispatched || 0) > 0).map(it => {
-                                    const rem = Number(it.qty) - Number(it.dispatched || 0);
-                                    const p = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched || 0) / Number(it.qty) * 100)) : 0;
-                                    return (
-                                      <div key={it.id} className="rep-irow">
-                                        <span style={{ flex:1, color:"var(--fog2)" }}>{it.desc}</span>
-                                        <span style={{ color:"var(--gold)", width:130, textAlign:"right" }}>{fmtNum(rem)} {it.unit} pendiente</span>
-                                        <div className="pbar-wrap" style={{ width:66 }}><div className="pbar" style={{ width:p + "%", background:pc(p) }} /></div>
-                                        <span style={{ width:26, color:"var(--fog)", fontSize:10 }}>{p}%</span>
+                    {pendingOCs.length > 0 && (
+                      <div className="tbl-card">
+                        <table>
+                          <thead>
+                            <tr>
+                              <PSortTh label="ESTADO"    col="status" />
+                              <PSortTh label="N° OC"     col="ocNumber" />
+                              <PSortTh label="FECHA OC"  col="date" />
+                              <PSortTh label="CLIENTE"   col="client" />
+                              <PSortTh label="ENTREGA"   col="delivery" />
+                              <PSortTh label="AVANCE"    col="pct" />
+                              <PSortTh label="MONTO OC"   col="monto"      align="right" />
+                              <PSortTh label="DESPACHADO" col="despachado"  align="right" />
+                              <PSortTh label="REMANENTE"  col="remanente"   align="right" />
+                              <th style={{ textAlign:"center" }}>GDS</th>
+                              <th style={{ textAlign:"center" }}>FACTS.</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sorted.map(oc => {
+                              const s = ocStatus(oc.items, oc.dispatches);
+                              const tot = oc.items.reduce((a,i) => a+Number(i.qty)*Number(i.unitPrice),0);
+                              const dis = oc.items.reduce((a,i) => a+Number(i.dispatched||0)*Number(i.unitPrice),0);
+                              const pct = tot > 0 ? Math.min(100, Math.round(dis/tot*100)) : 0;
+                              const d = daysLeft(oc.deliveryDate);
+                              const disp = oc.dispatches || [];
+                              const pendG = disp.filter(x => x.docType==="guia" && !x.invoiceNumber).length;
+                              const nFacts = disp.filter(x => x.docType==="factura").length;
+                              const nGuias = disp.filter(x => x.docType==="guia").length;
+                              const pendItems = oc.items.filter(it => Number(it.qty) - Number(it.dispatched||0) > 0);
+                              const isExpanded = !!pendExpanded[oc.id];
+                              const COLS = 12;
+                              return (
+                                <React.Fragment key={oc.id}>
+                                  <tr style={{ cursor: pendItems.length ? "pointer" : "default" }}
+                                      onClick={() => pendItems.length && setPendExpanded(e => ({ ...e, [oc.id]: !e[oc.id] }))}>
+                                    <td>
+                                      <span className={"badge " + bCls(s)}>
+                                        <Dot c={s==="open"?"var(--sky)":s==="partial"?"var(--gold)":"var(--lime)"} />
+                                        {bLbl(s)}
+                                      </span>
+                                    </td>
+                                    <td style={{ color:"var(--violet)", fontFamily:"var(--fM)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
+                                    <td style={{ color:"var(--fog2)" }}>{oc.date || "—"}</td>
+                                    <td style={{ color:"var(--white)" }}>{oc.client}</td>
+                                    <td style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>
+                                      {oc.deliveryDate || "—"}
+                                      {d !== null && d <= 5 && s !== "closed" && (
+                                        <span style={{ fontSize:9, color: d < 0 ? "var(--rose)" : "var(--gold)", marginLeft:5 }}>
+                                          {d < 0 ? "Vencida" : d + "d"}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td>
+                                      <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:100 }}>
+                                        <div className="pbar-wrap" style={{ flex:1, height:4 }}>
+                                          <div className="pbar" style={{ width:pct+"%", background:pc(pct) }} />
+                                        </div>
+                                        <span style={{ fontSize:10, color:pc(pct), width:28, textAlign:"right" }}>{pct}%</span>
                                       </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                                    </td>
+                                    <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(tot)}</td>
+                                    <td style={{ textAlign:"right", color:"var(--lime)" }}>{fmtCLP(dis)}</td>
+                                    <td style={{ textAlign:"right", color:"var(--rose)", fontWeight:600 }}>{fmtCLP(tot-dis)}</td>
+                                    <td style={{ textAlign:"center", color:"var(--rose)" }}>
+                                      {nGuias}
+                                      {pendG > 0 && <span style={{ color:"var(--gold)", fontSize:9, marginLeft:3 }}>({pendG})</span>}
+                                    </td>
+                                    <td style={{ textAlign:"center", color:"var(--teal)" }}>{nFacts}</td>
+                                    <td onClick={e => e.stopPropagation()}>
+                                      <div style={{ display:"flex", gap:6, alignItems:"center", justifyContent:"flex-end" }}>
+                                        {pendItems.length > 0 && (
+                                          <button className="btn btn-ghost btn-sm"
+                                            style={{ fontSize:11, padding:"3px 8px", color: isExpanded ? "var(--gold)" : "var(--fog2)" }}
+                                            onClick={() => setPendExpanded(e => ({ ...e, [oc.id]: !e[oc.id] }))}>
+                                            {isExpanded ? "▲" : "▼"} {pendItems.length} ítem{pendItems.length !== 1 ? "s" : ""}
+                                          </button>
+                                        )}
+                                        <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  {isExpanded && (
+                                    <tr style={{ background:"var(--ink3)" }}>
+                                      <td colSpan={COLS} style={{ padding:"0 0 0 0", borderBottom:"1px solid var(--line2)" }}>
+                                        <div style={{ padding:"10px 18px 12px 18px" }}>
+                                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)", marginBottom:8 }}>ÍTEMS PENDIENTES DE DESPACHO</div>
+                                          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                                            <thead>
+                                              <tr>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"left", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)" }}>DESCRIPCIÓN</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"right", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:80 }}>QTY OC</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"right", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:90 }}>DESPACHADO</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"right", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:90 }}>PENDIENTE</th>
+                                                <th style={{ fontSize:9, color:"var(--fog)", letterSpacing:1.5, textAlign:"center", paddingBottom:6, fontWeight:400, borderBottom:"1px solid var(--line)", width:130 }}>AVANCE</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {pendItems.map(it => {
+                                                const rem = Number(it.qty) - Number(it.dispatched||0);
+                                                const p = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched||0)/Number(it.qty)*100)) : 0;
+                                                return (
+                                                  <tr key={it.id}>
+                                                    <td style={{ fontSize:11, color:"var(--fog2)", padding:"6px 0" }}>{it.desc}</td>
+                                                    <td style={{ textAlign:"right", fontSize:11, color:"var(--fog)", padding:"6px 0" }}>{fmtNum(it.qty)} {it.unit}</td>
+                                                    <td style={{ textAlign:"right", fontSize:11, color:"var(--lime)", padding:"6px 0" }}>{fmtNum(Number(it.dispatched||0))} {it.unit}</td>
+                                                    <td style={{ textAlign:"right", fontSize:11, color:"var(--gold)", fontWeight:600, padding:"6px 0" }}>{fmtNum(rem)} {it.unit}</td>
+                                                    <td style={{ padding:"6px 0" }}>
+                                                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                                                        <div className="pbar-wrap" style={{ flex:1, height:4 }}>
+                                                          <div className="pbar" style={{ width:p+"%", background:pc(p) }} />
+                                                        </div>
+                                                        <span style={{ fontSize:10, color:pc(p), width:28, textAlign:"right" }}>{p}%</span>
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </div>
-                    ))}
+                    )}
                   </>
                 );
               })()}
@@ -2820,8 +2977,8 @@ export default function App() {
 
       {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} />}
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
-      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
+      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} />}
       {convertTarget && <ConvertModal dispatch={convertTarget.dispatch} ocId={convertTarget.ocId} onClose={() => setConvertTarget(null)} onSave={handleConvert} />}
       {confirmDel && (
         <div className="overlay" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
