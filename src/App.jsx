@@ -1666,7 +1666,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
               ) : (
                 <>
                   <span>{oc.ocNumber || oc.id}</span>
-                  <span onClick={() => { setEditingOCNumber(true); setOCNumberVal(oc.ocNumber || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", fontFamily:"var(--fM)", fontStyle:"normal" }}>✎</span>
+                  {isAdmin && <span onClick={() => { setEditingOCNumber(true); setOCNumberVal(oc.ocNumber || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", fontFamily:"var(--fM)", fontStyle:"normal" }}>✎</span>}
                 </>
               )}
             </div>
@@ -1681,7 +1681,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                 <>
                   <span>{oc.client}</span>
                   {oc.ocNumber ? <span> · Ref. {oc.id}</span> : null}
-                  <span onClick={() => { setEditingClient(true); setClientVal(oc.client || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", marginLeft:4 }}>✎</span>
+                  {isAdmin && <span onClick={() => { setEditingClient(true); setClientVal(oc.client || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", marginLeft:4 }}>✎</span>}
                 </>
               )}
             </div>
@@ -1693,7 +1693,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
         </div>
         <div className="dg">
           <div className="df"><label>FECHA OC</label><p>{oc.date || "—"}</p></div>
-          <div className="df"><label style={{ display:"flex", alignItems:"center", gap:6 }}>FECHA ENTREGA <span onClick={() => { setEditingDate(true); setDateVal(oc.deliveryDate || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px" }}>✎ editar</span></label>
+          <div className="df"><label style={{ display:"flex", alignItems:"center", gap:6 }}>FECHA ENTREGA {isAdmin && <span onClick={() => { setEditingDate(true); setDateVal(oc.deliveryDate || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px" }}>✎ editar</span>}</label>
             {editingDate ? (
               <div style={{ display:"flex", gap:6, alignItems:"center", marginTop:4 }}>
                 <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)} style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:5, color:"var(--white)", fontFamily:"var(--fM)", fontSize:12, padding:"4px 8px" }} />
@@ -1705,7 +1705,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
             )}
           </div>
           <div className="df"><label>AVANCE GLOBAL</label><p style={{ color:pc(pctGlobal) }}>{pctGlobal}%</p></div>
-          <div className="df"><label>MONTO OC</label><p style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(totAmt)}</p></div>
+          <div className="df"><label>MONTO OC</label><p style={{ color: st === "closed" ? "var(--lime)" : "var(--gold)", fontWeight:600 }}>{fmtCLP(totAmt)}</p></div>
           <div className="df"><label>DESPACHADO</label><p style={{ color:"var(--lime)", fontWeight:600 }}>{fmtCLP(disAmt)}</p></div>
           <div className="df"><label>REMANENTE</label><p style={{ color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totAmt - disAmt)}</p></div>
         </div>
@@ -2578,7 +2578,7 @@ export default function App() {
                                       <div className="mon-fac-row" key={i}>
                                         <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
                                         <span style={{ color:"var(--fog)", fontSize:10 }}>{f.date}</span>
-                                        <span style={{ color:"var(--fog2)", flex:1, fontSize:10 }}>OC {f.ocNumber}</span>
+                                        <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}</span>
                                         <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
                                       </div>
                                     ))}
@@ -2899,7 +2899,7 @@ export default function App() {
                                     <span style={{ fontSize:9, color:"var(--fog)", marginLeft:4 }}>(tol. {g.tol}d)</span>
                                   </td>
                                   <td style={{ color:"var(--white)" }}>{g.client}</td>
-                                  <td style={{ color:"var(--fog2)", fontSize:10 }}>{g.ocNumber}</td>
+                                  <td style={{ color:"var(--gold)", fontSize:10, fontWeight:600 }}>{g.ocNumber}</td>
                                   <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(g.neto)}</td>
                                 </tr>
                               ))}
@@ -2969,7 +2969,7 @@ export default function App() {
                           <div className="pbar-wrap" style={{ height:5 }}><div className="pbar" style={{ width:pct + "%", background:pc(pct) }} /></div>
                         </div>
                         <div className="rep-stats">
-                          <div className="rep-stat"><label>MONTO OC</label><p style={{ color: s === "closed" ? "var(--lime)" : s === "toinvoice" ? "var(--gold)" : "var(--gold)" }}>{fmtCLP(tot)}</p></div>
+                          <div className="rep-stat"><label>MONTO OC</label><p style={{ color: s === "closed" ? "var(--lime)" : "var(--gold)" }}>{fmtCLP(tot)}</p></div>
                           <div className="rep-stat"><label>DESPACHADO</label><p style={{ color:"var(--lime)" }}>{fmtCLP(dis)}</p></div>
                           <div className="rep-stat"><label>REMANENTE</label><p style={{ color: s === "closed" ? "var(--lime)" : s === "toinvoice" ? "var(--rose)" : "var(--rose)" }}>{fmtCLP(tot - dis)}</p></div>
                           <div className="rep-stat"><label>ENTREGA</label><p style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{oc.deliveryDate || "—"}</p></div>
