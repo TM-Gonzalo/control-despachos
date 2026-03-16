@@ -2462,7 +2462,7 @@ export default function App() {
                                   return (
                                     <div className="cli-oc-row" key={oc.id}>
                                       <span style={{ color:"var(--gold)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
-                                      <span style={{ color:"var(--fog2)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
+                                      <span style={{ color:"var(--fog)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
                                       <span style={{ color:"var(--lime)", width:100, textAlign:"right" }}>{fmtCLP(dis)}</span>
                                       <span style={{ color: rem > 0 ? "var(--rose)" : "var(--fog2)", width:100, textAlign:"right", fontWeight: rem > 0 ? 600 : 400 }}>{fmtCLP(rem)}</span>
                                       <span className={"badge " + bCls(s)} style={{ marginLeft:"auto" }}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
@@ -2742,7 +2742,7 @@ export default function App() {
                                         <span style={{ fontSize:10, color:pc(pct), width:28, textAlign:"right" }}>{pct}%</span>
                                       </div>
                                     </td>
-                                    <td style={{ textAlign:"right", color:"var(--white)", fontWeight:600 }}>{fmtCLP(tot)}</td>
+                                    <td style={{ textAlign:"right", color:"var(--fog2)" }}>{fmtCLP(tot)}</td>
                                     <td style={{ textAlign:"right", color:"var(--lime)" }}>{fmtCLP(dis)}</td>
                                     <td style={{ textAlign:"right", color:"var(--rose)", fontWeight:600 }}>{fmtCLP(tot-dis)}</td>
                                     <td style={{ textAlign:"center", color:"var(--rose)" }}>
