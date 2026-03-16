@@ -1877,6 +1877,7 @@ export default function App() {
   const [pendExpanded, setPendExpanded] = useState({});
   const [clientMonthFilter, setClientMonthFilter] = useState("all");
   const [reportsMonthFilter, setReportsMonthFilter] = useState("all");
+  const [ordersMonthFilter, setOrdersMonthFilter] = useState("all");
   const [onlineCount, setOnlineCount] = useState(1);
 
   // Presencia: registra al usuario activo y cuenta cuántos hay
@@ -2104,8 +2105,10 @@ export default function App() {
   const filtered = enriched.filter(o => {
     const norm = v => v.toLowerCase().replace(/\./g, "");
     const s = norm(search);
-    return (!s || norm(o.id).includes(s) || norm(o.client).includes(s) || norm(o.ocNumber || "").includes(s))
-      && (fst === "all" || ocStatus(o.items, o.dispatches) === fst);
+    const matchesSearch = !s || norm(o.id).includes(s) || norm(o.client).includes(s) || norm(o.ocNumber || "").includes(s);
+    const matchesStatus = fst === "all" || ocStatus(o.items, o.dispatches) === fst;
+    const matchesPeriod = ordersMonthFilter === "all" || (o.date||"").startsWith(ordersMonthFilter);
+    return matchesSearch && matchesStatus && matchesPeriod;
   });
 
   const liveDetail = showDetail ? enriched.find(o => o.id === showDetail.id) || showDetail : null;
@@ -2338,6 +2341,22 @@ export default function App() {
                       <option value="toinvoice">Por Facturar</option>
                       <option value="closed">Cerrados</option>
                     </select>
+                    {(() => {
+                      const months = [...new Set(enriched.map(o => (o.date||"").slice(0,7)).filter(Boolean))].sort((a,b) => b.localeCompare(a));
+                      const years = [...new Set(months.map(m => m.slice(0,4)))];
+                      const monthName = m => { const [y,mo] = m.split("-"); return ["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(mo)] + " " + y; };
+                      return (
+                        <select value={ordersMonthFilter} onChange={e => setOrdersMonthFilter(e.target.value)} className="fsel" style={{ fontSize:11 }}>
+                          <option value="all">Todos los períodos</option>
+                          {years.map(y => (
+                            <optgroup key={y} label={"── " + y + " ──"}>
+                              {months.filter(m => m.startsWith(y)).map(m => <option key={m} value={m}>{monthName(m)}</option>)}
+                              <option value={y}>{y} (año completo)</option>
+                            </optgroup>
+                          ))}
+                        </select>
+                      );
+                    })()}
                   </div>
                   {loading ? <div className="pgload"><div className="spin" /> Cargando...</div> :
                     filtered.length === 0 ? <div className="empty"><div className="empty-ico">◫</div><p>No hay ordenes.<br />Importa una OC desde PDF para comenzar.</p></div> :
@@ -2400,10 +2419,17 @@ export default function App() {
                     <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                       {(() => {
                         const months = [...new Set(enriched.map(o => (o.date||"").slice(0,7)).filter(Boolean))].sort((a,b) => b.localeCompare(a));
+                        const years = [...new Set(months.map(m => m.slice(0,4)))];
+                        const monthName = m => { const [y,mo] = m.split("-"); return ["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(mo)] + " " + y; };
                         return (
                           <select value={clientMonthFilter} onChange={e => setClientMonthFilter(e.target.value)} className="fsel" style={{ fontSize:11 }}>
-                            <option value="all">Todos los meses</option>
-                            {months.map(m => <option key={m} value={m}>{m}</option>)}
+                            <option value="all">Todos los períodos</option>
+                            {years.map(y => (
+                              <optgroup key={y} label={"── " + y + " ──"}>
+                                {months.filter(m => m.startsWith(y)).map(m => <option key={m} value={m}>{monthName(m)}</option>)}
+                                <option value={y}>{y} (año completo)</option>
+                              </optgroup>
+                            ))}
                           </select>
                         );
                       })()}
@@ -2935,10 +2961,17 @@ export default function App() {
                     <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                       {(() => {
                         const months = [...new Set(enriched.map(o => (o.date||"").slice(0,7)).filter(Boolean))].sort((a,b) => b.localeCompare(a));
+                        const years = [...new Set(months.map(m => m.slice(0,4)))];
+                        const monthName = m => { const [y,mo] = m.split("-"); return ["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(mo)] + " " + y; };
                         return (
                           <select value={reportsMonthFilter} onChange={e => setReportsMonthFilter(e.target.value)} className="fsel" style={{ fontSize:11 }}>
-                            <option value="all">Todos los meses</option>
-                            {months.map(m => <option key={m} value={m}>{m}</option>)}
+                            <option value="all">Todos los períodos</option>
+                            {years.map(y => (
+                              <optgroup key={y} label={"── " + y + " ──"}>
+                                {months.filter(m => m.startsWith(y)).map(m => <option key={m} value={m}>{monthName(m)}</option>)}
+                                <option value={y}>{y} (año completo)</option>
+                              </optgroup>
+                            ))}
                           </select>
                         );
                       })()}
