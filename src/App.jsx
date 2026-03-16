@@ -1810,7 +1810,7 @@ function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUs
   };
 
   return (
-    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="overlay">
       <div className="modal" style={{ maxWidth:560 }}>
         <div className="modal-hd">
           <div>
