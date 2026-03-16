@@ -2671,7 +2671,7 @@ export default function App() {
                     </div>
                     <div className="kpis" style={{ marginBottom:22 }}>
                       {[
-                        { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--white)" },
+                        { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--rose)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
                         { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
@@ -2861,11 +2861,12 @@ export default function App() {
                     {pendFacs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay guías pendientes de facturar.</p></div>}
                     {pendFacs.length > 0 && (
                       <>
-                        <div className="kpis" style={{ marginBottom:22 }}>
+                        <div className="kpis" style={{ marginBottom:22, gridTemplateColumns:"repeat(4,1fr)" }}>
                           {[
                             { n: pendFacs.length, lbl: "GDs Pendientes", c: "var(--gold)" },
                             { n: atrasadas,        lbl: "Atrasadas",      c: atrasadas > 0 ? "var(--rose)" : "var(--lime)" },
                             { n: fmtCLP(totalNeto), lbl: "Monto Neto",   c: "var(--white)" },
+                            { n: fmtCLP(Math.round(totalNeto * 1.19)), lbl: "Total c/IVA", c: "var(--sky)" },
                           ].map(({ n, lbl, c }) => (
                             <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
                           ))}
