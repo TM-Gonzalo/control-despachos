@@ -1759,7 +1759,6 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   <DocBadge doc={d} />
                   <div className="disp-meta">
                     <span style={{ fontSize:10, color:"var(--fog)" }}>{d.date}</span>
-                    {d.docType === "guia" && !d.invoiceNumber && <button className="btn btn-teal btn-sm" onClick={() => onConvert(oc.id, d)}>→ Vincular factura</button>}
                     {(isAdmin || d.createdBy === currentUserId) ? <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id)}>Eliminar</button> : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => onRequestDel({ type:"request", label: (d.docType === "factura" ? "Factura" : "Guia") + " N° " + d.number })}>Eliminar</button>}
                   </div>
                 </div>
@@ -3014,7 +3013,7 @@ export default function App() {
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
         {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} />}
-      {convertTarget && <ConvertModal dispatch={convertTarget.dispatch} ocId={convertTarget.ocId} onClose={() => setConvertTarget(null)} onSave={handleConvert} />}
+
       {confirmDel && (
         <div className="overlay" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
           <div className="modal" style={{ maxWidth:420 }}>
