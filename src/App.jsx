@@ -932,7 +932,7 @@ function BsaleView({ enriched, onAssign }) {
   );
 }
 
-function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
+function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -947,6 +947,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
   const [savedCount, setSavedCount] = useState(0);
   const [lastSaved, setLastSaved] = useState(null);
   const [ocMismatch, setOcMismatch] = useState(null); // { pdfOC, thisOC }
+  const [pendingOverride, setPendingOverride] = useState(null); // datos listos para continuar si admin aprueba
   const [bsaleSearch, setBsaleSearch] = useState("");
   const [bsaleResult, setBsaleResult] = useState(null); // { doc } | null
   const [bsaleLoading, setBsaleLoading] = useState(false);
@@ -1032,7 +1033,17 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
           }
         }
       } catch(e) {
-        if (e.message.includes("no pertenece")) throw e;
+        if (e.message.includes("no pertenece")) {
+          // Guardar datos para que admin pueda continuar igual
+          const d2 = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber };
+          const its2b = its.map((it, i) => ({ ...it, id: i + 1 }));
+          const am2 = {};
+          its2b.forEach((it, i) => { am2[i] = autoMatch(it.desc, oc.items) || "NONE"; });
+          setOcMismatch({ pdfOC: e.message.replace("Este documento no pertenece a la OC ", "").split(".")[0], thisOC: oc.ocNumber });
+          setPendingOverride({ ext: d2, num, date, docType: tipo, items: its2b, map: am2 });
+          setLoading(false);
+          return;
+        }
         // Si falla la consulta de referencias, continuar igual
       }
 
@@ -1094,6 +1105,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
         const thisOC = norm(oc.ocNumber || "");
         if (thisOC && pdfOC && !pdfOC.includes(thisOC) && !thisOC.includes(pdfOC)) {
           setOcMismatch({ pdfOC: d.ocNumber, thisOC: oc.ocNumber });
+          // Guardar datos para que admin pueda continuar igual
+          setPendingOverride({ ext: d, num: d.docNumber || "", date: d.date || today(), docType: d.docType === "factura" ? "factura" : "guia", items: its, map: am });
           setLoading(false);
           return;
         }
@@ -1201,8 +1214,21 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy }) {
               El PDF corresponde a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.pdfOC}</strong>, no a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.thisOC}</strong>.<br/>
               El ingreso fue anulado. Verifica que estás subiendo el documento correcto.
             </div>
-            <div style={{ marginTop:12 }}>
-              <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); }}>Cerrar</button>
+            <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
+              <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); setPendingOverride(null); }}>Cerrar</button>
+              {isAdmin && pendingOverride && (
+                <button className="btn btn-gold btn-sm" onClick={() => {
+                  setExt(pendingOverride.ext);
+                  setNum(pendingOverride.num);
+                  setDate(pendingOverride.date);
+                  setDocType(pendingOverride.docType);
+                  setItems(pendingOverride.items);
+                  setMap(pendingOverride.map);
+                  setOcMismatch(null);
+                  setPendingOverride(null);
+                  setStep(1);
+                }}>Ingresar igualmente →</button>
+              )}
             </div>
           </div>
         )}
@@ -2951,7 +2977,7 @@ export default function App() {
       {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} />}
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
         {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
-      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} />}
+      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} />}
       {convertTarget && <ConvertModal dispatch={convertTarget.dispatch} ocId={convertTarget.ocId} onClose={() => setConvertTarget(null)} onSave={handleConvert} />}
       {confirmDel && (
         <div className="overlay" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
