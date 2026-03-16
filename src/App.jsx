@@ -1653,7 +1653,12 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   const days = daysLeft(oc.deliveryDate);
   const dayColor = (st === "closed" || st === "toinvoice") ? "var(--fog2)" : days !== null && days <= 0 ? "var(--rose)" : days !== null && days <= 5 ? "var(--gold)" : "var(--white)";
   const dispatches = oc.dispatches || [];
-  const filteredDisp = dispatches.filter(d => docFilter === "all" ? true : d.docType === docFilter);
+  const filteredDisp = dispatches.filter(d => {
+    if (docFilter === "all") return true;
+    if (docFilter === "factura") return d.docType === "factura" || (d.docType === "guia" && d.invoiceNumber);
+    if (docFilter === "guia") return d.docType === "guia";
+    return true;
+  });
   const pendingGuias = dispatches.filter(d => d.docType === "guia" && !d.invoiceNumber).length;
   const pctGlobal = totAmt > 0 ? Math.round(disAmt / totAmt * 100) : 0;
 
@@ -1765,7 +1770,39 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
           ? <div style={{ textAlign:"center", padding:"16px", color:"var(--fog)", fontSize:11 }}>Sin documentos registrados aun</div>
           : filteredDisp.length === 0
             ? <div style={{ textAlign:"center", padding:"14px", color:"var(--fog)", fontSize:11 }}>No hay documentos de este tipo</div>
-            : <div className="disp-list">{filteredDisp.map(d => (
+            : <div className="disp-list">{filteredDisp.map(d => {
+              // GD con factura vinculada mostrada en pestaña Facturas — vista de factura
+              const isLinkedInvoice = d.docType === "guia" && d.invoiceNumber && docFilter === "factura";
+              if (isLinkedInvoice) {
+                const neto = Number(d.netTotal || 0);
+                return (
+                  <div className="disp-card" key={d.id}>
+                    <div className="disp-hd">
+                      <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {d.invoiceNumber}</span>
+                      <div className="disp-meta">
+                        <span style={{ fontSize:10, color:"var(--fog)" }}>{d.invoiceDate || d.date}</span>
+                        <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>· Ref. GD {d.number}</span>
+                      </div>
+                    </div>
+                    {(d.items || []).map((it, i) => (
+                      <div className="disp-row" key={i}>
+                        <span>{it.desc}</span>
+                        <span style={{ display:"flex", gap:10, alignItems:"center" }}>
+                          <span style={{ color:"var(--fog)", fontSize:10 }}>{fmtNum(it.qty)} {it.unit}</span>
+                          {Number(it.unitPrice) > 0 && <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(Number(it.qty) * Number(it.unitPrice))}</span>}
+                        </span>
+                      </div>
+                    ))}
+                    {neto > 0 && (
+                      <div style={{ display:"flex", justifyContent:"flex-end", borderTop:"1px solid var(--line)", marginTop:6, paddingTop:6 }}>
+                        <span style={{ fontSize:10, color:"var(--fog)", marginRight:8, letterSpacing:1 }}>NETO FACTURA</span>
+                        <span style={{ color:"var(--gold)", fontWeight:600, fontSize:13 }}>{fmtCLP(neto)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return (
               <div className="disp-card" key={d.id}>
                 <div className="disp-hd">
                   <DocBadge doc={d} />
@@ -1802,7 +1839,8 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   ) : null;
                 })()}
               </div>
-            ))}</div>
+              );
+            })}</div>
         }
       </div>
     </div>
