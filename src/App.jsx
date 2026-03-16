@@ -2574,7 +2574,7 @@ export default function App() {
                                 {Object.entries(byClient).map(([client, cfacs]) => (
                                   <div className="mon-cli" key={client}>
                                     <div className="mon-cli-name">{client.toUpperCase()} · {cfacs.length} FACTURA{cfacs.length !== 1 ? "S" : ""} · {fmtCLP(cfacs.reduce((s,f) => s+Number(f.total||0),0))}</div>
-                                    {cfacs.map((f, i) => (
+                                    {[...cfacs].sort((a,b) => Number(b.number||0) - Number(a.number||0)).map((f, i) => (
                                       <div className="mon-fac-row" key={i}>
                                         <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
                                         <span style={{ color:"var(--fog)", fontSize:10 }}>{f.date}</span>
