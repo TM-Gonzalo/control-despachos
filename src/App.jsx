@@ -2775,6 +2775,7 @@ export default function App() {
                                             {isExpanded ? "▲" : "▼"} {pendItems.length} ítem{pendItems.length !== 1 ? "s" : ""}
                                           </button>
                                         )}
+                                        <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => setShowGestion(oc)}>Gestión</button>
                                         <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
                                       </div>
                                     </td>
@@ -2999,6 +3000,7 @@ export default function App() {
                             <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
                             {d !== null && d <= 5 && s !== "closed" && s !== "toinvoice" && <span className="badge b-warn"><Dot c="var(--rose)" />{d < 0 ? "Vencida" : d + "d"}</span>}
                             {pendG > 0 && <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />{pendG} guia{pendG > 1 ? "s" : ""} sin fac.</span>}
+                            <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => setShowGestion(oc)}>Gestión</button>
                             <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
                           </div>
                         </div>
