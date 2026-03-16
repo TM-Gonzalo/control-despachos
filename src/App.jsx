@@ -2170,8 +2170,8 @@ export default function App() {
   const applySort = (arr, { col, dir }) => {
     if (!col) return arr;
     return [...arr].sort((a, b) => {
-      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches)] ?? 0) : 0;
-      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches)] ?? 0) : 0;
+      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches)] ?? 0) : col === "lastActivity" ? ((a.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
+      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches)] ?? 0) : col === "lastActivity" ? ((b.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
       return av < bv ? -dir : av > bv ? dir : 0;
     });
   };
@@ -2386,7 +2386,7 @@ export default function App() {
                     filtered.length === 0 ? <div className="empty"><div className="empty-ico">◫</div><p>No hay ordenes.<br />Importa una OC desde PDF para comenzar.</p></div> :
                     <div className="tbl-card">
                       <table>
-                        <thead><tr><SortTh label="N° OC" col="ocNumber" state={ordSort} setState={setOrdSort} /><SortTh label="CLIENTE" col="client" state={ordSort} setState={setOrdSort} /><SortTh label="FECHA OC" col="date" state={ordSort} setState={setOrdSort} /><th>ENTREGA</th><th>DOCS</th><SortTh label="TOTAL" col="monto" state={ordSort} setState={setOrdSort} /><SortTh label="PENDIENTE" col="pendiente" state={ordSort} setState={setOrdSort} /><SortTh label="AVANCE" col="pct" state={ordSort} setState={setOrdSort} /><th>ESTADO</th><th /></tr></thead>
+                        <thead><tr><SortTh label="N° OC" col="ocNumber" state={ordSort} setState={setOrdSort} /><SortTh label="CLIENTE" col="client" state={ordSort} setState={setOrdSort} /><SortTh label="FECHA OC" col="date" state={ordSort} setState={setOrdSort} /><th>ENTREGA</th><SortTh label="ÚLT. ACTIVIDAD" col="lastActivity" state={ordSort} setState={setOrdSort} /><th>DOCS</th><SortTh label="TOTAL" col="monto" state={ordSort} setState={setOrdSort} /><SortTh label="PENDIENTE" col="pendiente" state={ordSort} setState={setOrdSort} /><SortTh label="AVANCE" col="pct" state={ordSort} setState={setOrdSort} /><th>ESTADO</th><th /></tr></thead>
                         <tbody>{applySort(filtered, ordSort).map(oc => {
                           const s = ocStatus(oc.items, oc.dispatches);
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
@@ -2405,6 +2405,12 @@ export default function App() {
                               <td style={{ fontWeight:500 }}>{oc.client}</td>
                               <td style={{ color:"var(--fog)" }}>{oc.date}</td>
                               <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{entregaDisplay}</td>
+                              <td style={{ color:"var(--teal)", fontSize:10 }}>
+                                {(() => {
+                                  const dates = disp.flatMap(x => [x.date, x.invoiceDate]).filter(Boolean).sort((a,b) => b.localeCompare(a));
+                                  return dates[0] || "—";
+                                })()}
+                              </td>
                               <td>
                                 {nFac > 0 && <span style={{ color:"var(--teal)", fontSize:10, fontWeight:600 }}>{nFac}F</span>}
                                 {nFac > 0 && nGuia > 0 && <span style={{ color:"var(--fog)" }}> · </span>}
