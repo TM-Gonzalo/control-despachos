@@ -1029,17 +1029,18 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
           });
           if (!ocRef) {
             const ocRefs = refs.map(r => r.number).filter(Boolean).join(", ");
-            throw new Error("Este documento no pertenece a la OC " + oc.ocNumber + ". Referencias encontradas: " + (ocRefs || "ninguna"));
+            throw new Error("MISMATCH:" + (ocRefs || "OC PENDIENTE") + ":" + oc.ocNumber);
           }
         }
       } catch(e) {
-        if (e.message.includes("no pertenece")) {
-          // Guardar datos para que admin pueda continuar igual
+        if (e.message.startsWith("MISMATCH:")) {
+          const parts = e.message.split(":");
+          const docOC = parts[1] || "OC PENDIENTE";
           const d2 = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber };
           const its2b = its.map((it, i) => ({ ...it, id: i + 1 }));
           const am2 = {};
           its2b.forEach((it, i) => { am2[i] = autoMatch(it.desc, oc.items) || "NONE"; });
-          setOcMismatch({ pdfOC: e.message.replace("Este documento no pertenece a la OC ", "").split(".")[0], thisOC: oc.ocNumber });
+          setOcMismatch({ pdfOC: docOC, thisOC: oc.ocNumber, source: "Bsale" });
           setPendingOverride({ ext: d2, num, date, docType: tipo, items: its2b, map: am2 });
           setLoading(false);
           return;
@@ -1104,7 +1105,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
         const pdfOC = norm(d.ocNumber);
         const thisOC = norm(oc.ocNumber || "");
         if (thisOC && pdfOC && !pdfOC.includes(thisOC) && !thisOC.includes(pdfOC)) {
-          setOcMismatch({ pdfOC: d.ocNumber, thisOC: oc.ocNumber });
+          setOcMismatch({ pdfOC: d.ocNumber, thisOC: oc.ocNumber, source: "PDF" });
           // Guardar datos para que admin pueda continuar igual
           setPendingOverride({ ext: d, num: d.docNumber || "", date: d.date || today(), docType: d.docType === "factura" ? "factura" : "guia", items: its, map: am });
           setLoading(false);
@@ -1209,10 +1210,10 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
         <Steps labels={["Subir PDF", "Revisar", "Mapear items"]} current={step} />
         {ocMismatch && (
           <div style={{ background:"rgba(255,90,90,.1)", border:"1px solid var(--rose)", borderRadius:8, padding:"14px 18px", marginBottom:16 }}>
-            <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ {docType === "factura" ? "Factura" : "Guía"} rechazada — OC no coincide</div>
+            <div style={{ color:"var(--rose)", fontWeight:600, marginBottom:6 }}>⚠ Documento rechazado — OC no coincide</div>
             <div style={{ fontSize:12, color:"var(--fog2)", lineHeight:1.6 }}>
-              El PDF corresponde a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.pdfOC}</strong>, no a la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.thisOC}</strong>.<br/>
-              El ingreso fue anulado. Verifica que estás subiendo el documento correcto.
+              El documento {ocMismatch.source ? "(" + ocMismatch.source + ")" : ""} referencia la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.pdfOC}</strong>, no la OC <strong style={{ color:"var(--white)" }}>{ocMismatch.thisOC}</strong>.<br/>
+              Verifica que estás subiendo el documento correcto.
             </div>
             <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
               <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); setPendingOverride(null); }}>Cerrar</button>
