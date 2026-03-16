@@ -2420,7 +2420,7 @@ export default function App() {
                       <>
                         <div className="kpis" style={{ marginBottom:22 }}>
                           {[
-                            { n: fmtCLP(grandTotal),   lbl: "Total OCs",    c: "var(--white)" },
+                            { n: fmtCLP(grandTotal),   lbl: "Total OCs",    c: "var(--gold)" },
                             { n: fmtCLP(grandDis),     lbl: "Despachado",   c: "var(--lime)" },
                             { n: fmtCLP(grandPending), lbl: "Pendiente",    c: "var(--rose)" },
                             { n: rows.length,           lbl: "Clientes",     c: "var(--sky)"  },
@@ -2461,8 +2461,8 @@ export default function App() {
                                   const s   = ocStatus(oc.items, oc.dispatches);
                                   return (
                                     <div className="cli-oc-row" key={oc.id}>
-                                      <span style={{ color:"var(--white)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
-                                      <span style={{ color:"var(--white)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
+                                      <span style={{ color:"var(--gold)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
+                                      <span style={{ color:"var(--gold)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
                                       <span style={{ color:"var(--lime)", width:100, textAlign:"right" }}>{fmtCLP(dis)}</span>
                                       <span style={{ color: rem > 0 ? "var(--rose)" : "var(--fog2)", width:100, textAlign:"right", fontWeight: rem > 0 ? 600 : 400 }}>{fmtCLP(rem)}</span>
                                       <span className={"badge " + bCls(s)} style={{ marginLeft:"auto" }}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
