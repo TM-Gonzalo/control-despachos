@@ -161,7 +161,7 @@ const ocStatus = (items, dispatches) => {
   const pendingGuias = disp.filter(d => d.docType === "guia" && !d.invoiceNumber).length;
   return pendingGuias > 0 ? "toinvoice" : "closed";
 };
-const autoMatch = (desc, ocItems) => {
+const autoMatch = (desc, ocItems, unitPrice) => {
   // Normalizar: sin tildes, guiones entre alfanum pegados (A-325→A325), sin puntuación, minúsculas
   const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -170,10 +170,17 @@ const autoMatch = (desc, ocItems) => {
     .replace(/\s+/g, " ").trim();
   const stopwords = new Set(["de","la","el","en","y","a","x","nr","neg","nro","no","para","con"]);
   const tokens = s => norm(s).split(" ").filter(t => t.length > 1 && !stopwords.has(t));
-  const numTokens = s => tokens(s).filter(t => /\d/.test(t)); // tokens que contienen números
-  const wordTokens = s => tokens(s).filter(t => !/\d/.test(t)); // tokens solo letras
+  const numTokens = s => tokens(s).filter(t => /\d/.test(t));
+  const wordTokens = s => tokens(s).filter(t => !/\d/.test(t));
 
   const nd = norm(desc);
+
+  // 0. Match por precio unitario exacto (más confiable que texto)
+  if (unitPrice && Number(unitPrice) > 0) {
+    const priceMatch = ocItems.filter(i => Number(i.unitPrice) === Number(unitPrice));
+    if (priceMatch.length === 1) return priceMatch[0].id; // único ítem con ese precio → match seguro
+  }
+
   // 1. Exacto normalizado
   const exact = ocItems.find(i => norm(i.desc) === nd);
   if (exact) return exact.id;
@@ -208,10 +215,9 @@ const autoMatch = (desc, ocItems) => {
       const extraNums = itemNums.filter(t => !descNums.some(it => it === t)).length;
       const totalNums = new Set([...descNums, ...itemNums]).size;
       numScore = totalNums > 0 ? commonNums / totalNums : 0;
-      // Penalizar fuerte si hay números distintos (ej: 3mm vs 6mm)
       if (missingNums > 0 || extraNums > 0) numScore -= 0.4 * (missingNums + extraNums);
     } else if (descNums.length === 0 && itemNums.length === 0) {
-      numScore = 0; // sin números, no afecta
+      numScore = 0;
     }
 
     // Score combinado: palabras 50% + números 50% (si hay números en ambos)
@@ -1068,7 +1074,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
           const d2 = { docNumber: num, docType: tipo, date, items: its, netTotal, total, gdNumber };
           const its2b = its.map((it, i) => ({ ...it, id: i + 1 }));
           const am2 = {};
-          its2b.forEach((it, i) => { am2[i] = autoMatch(it.desc, oc.items) || "NONE"; });
+          its2b.forEach((it, i) => { am2[i] = autoMatch(it.desc, oc.items, it.unitPrice) || "NONE"; });
           setOcMismatch({ pdfOC: docOC, thisOC: oc.ocNumber, source: "Bsale" });
           setPendingOverride({ ext: d2, num, date, docType: tipo, items: its2b, map: am2 });
           setLoading(false);
@@ -1084,7 +1090,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       const its2 = its.map((it, i) => ({ ...it, id: i + 1 }));
       setItems(its2);
       const am = {};
-      its2.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items) || "NONE"; });
+      its2.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items, it.unitPrice) || "NONE"; });
       setMap(am);
 
       // Si es factura con GD referenciada, vincular automáticamente
@@ -1126,7 +1132,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       const its = (d.items || []).map((it, i) => ({ ...it, id: i + 1 }));
       setItems(its);
       const am = {};
-      its.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items) || "NONE"; });
+      its.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items, it.unitPrice) || "NONE"; });
       setMap(am);
       // Validar OC del PDF vs OC actual (normalizar: sin puntos ni espacios)
       if (d.ocNumber) {
