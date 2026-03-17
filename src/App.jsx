@@ -144,8 +144,8 @@ const toB64 = f => new Promise((res, rej) => {
 let _seq = 1;
 const newId = () => "OC-" + String(++_seq).padStart(4, "0");
 const today = () => new Date().toISOString().slice(0, 10);
-const fmtCLP = n => "$" + Number(n || 0).toLocaleString("es-CL");
-const fmtNum = n => Number(n || 0).toLocaleString("es-CL");
+const fmtCLP = n => "$" + Math.round(Number(n || 0)).toLocaleString("es-CL", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const fmtNum = n => Math.round(Number(n || 0)).toLocaleString("es-CL", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const daysLeft = d => {
   if (!d) return null;
   return Math.round((new Date(d) - new Date(today())) / 86400000);
