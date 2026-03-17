@@ -2801,6 +2801,7 @@ export default function App() {
                 const getEntity = key => factoringData[key]?.entity || null;
 
                 const totalConIVA = allFacs.reduce((s,f) => s + f.conIVA, 0);
+                const totalNeto = allFacs.reduce((s,f) => s + f.neto, 0);
                 const totalFactorizado = allFacs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
                 const totalNo = allFacs.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
                 const totalPendiente = totalConIVA - totalFactorizado - totalNo;
@@ -2813,6 +2814,10 @@ export default function App() {
                     <div className="ph">
                       <div><div className="pt">Reporte <em>Factoring</em></div><div className="pm">CONTROL DE FACTURAS POR FACTORIZAR</div></div>
                       <div style={{ display:"flex", gap:16, alignItems:"center" }}>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL NETO</div>
+                          <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalNeto)}</div>
+                        </div>
                         <div style={{ textAlign:"right" }}>
                           <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL c/IVA</div>
                           <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalConIVA)}</div>
@@ -2835,6 +2840,7 @@ export default function App() {
                     {months.map(month => {
                       const facs = byMonth[month];
                       const mesTotal = facs.reduce((s,f) => s + f.conIVA, 0);
+                      const mesNeto = facs.reduce((s,f) => s + f.neto, 0);
                       const mesFactorizado = facs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
                       const mesNo = facs.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
                       return (
@@ -2846,6 +2852,7 @@ export default function App() {
                             {mesFactorizado > 0 && <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>}
                             {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizado</div>}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
+                            <div style={{ fontSize:10, color:"var(--fog)" }}>{fmtCLP(mesNeto)} neto</div>
                           </div>
                           <div className="tbl-card">
                             <table style={{ tableLayout:"fixed", width:"100%", minWidth:1180 }}>
