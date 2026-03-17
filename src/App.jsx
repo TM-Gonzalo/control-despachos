@@ -2644,10 +2644,24 @@ export default function App() {
               {view === "monthly" && (() => {
                 // Recolectar todas las facturas de todos los despachos
                 const allFacs = [];
+
+                // Índice de GDs por invoiceNumber
+                const gdByInvoicePF = {};
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
+                    if (d.docType === "guia" && d.invoiceNumber) {
+                      const key = String(d.invoiceNumber).trim();
+                      if (!gdByInvoicePF[key]) gdByInvoicePF[key] = [];
+                      gdByInvoicePF[key].push(d);
+                    }
+                  });
+                });
+
+                const directFacNumsPF = new Set();
+
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "factura" && d.date) {
-                      // calcular total desde items del despacho x precio de la OC
                       let total = Number(d.total || d.amount || 0);
                       if (!total && d.items && d.items.length) {
                         total = d.items.reduce((s, it) => {
@@ -2656,11 +2670,26 @@ export default function App() {
                           return s + (Number(it.qty) || 0) * price;
                         }, 0);
                       }
+                      // Si sigue en $0, buscar GD vinculada
+                      if (!total && d.number) {
+                        const linkedGDs = gdByInvoicePF[String(d.number).trim()] || [];
+                        total = linkedGDs.reduce((s, g) => s + Number(g.total || 0), 0) ||
+                                Math.round(linkedGDs.reduce((s, g) => s + Number(g.netTotal || 0), 0) * 1.19);
+                      }
+                      if (!total) return;
+                      if (d.number) directFacNumsPF.add(String(d.number).trim());
                       allFacs.push({ ...d, total, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id });
                     }
-                    // GD con factura vinculada — incluir como factura usando invoiceDate e invoiceNumber
+                  });
+                });
+
+                // GD con factura vinculada — solo si no existe ya la factura directa
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
+                      if (directFacNumsPF.has(String(d.invoiceNumber).trim())) return;
                       const total = Number(d.total || 0) || Math.round(Number(d.netTotal || 0) * 1.19);
+                      if (!total) return;
                       allFacs.push({ ...d, number: d.invoiceNumber, date: d.invoiceDate, total, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, _fromGD: d.number });
                     }
                   });
