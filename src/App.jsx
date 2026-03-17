@@ -2769,10 +2769,7 @@ export default function App() {
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "factura" && d.date) {
-                      const neto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => {
-                        const ocItem = it.ocItemId ? oc.items.find(o => o.id === it.ocItemId) : null;
-                        return s + (Number(it.qty)||0) * Number(it.unitPrice||(ocItem?ocItem.unitPrice:0)||0);
-                      }, 0);
+                      const neto = Number(d.netTotal || 0);
                       const conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: null, neto, conIVA });
