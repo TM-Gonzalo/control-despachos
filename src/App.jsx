@@ -1925,6 +1925,7 @@ export default function App() {
   const [dashSort, setDashSort] = useState({ col: null, dir: 1 });
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
+  const [factoringSort, setFactoringSort] = useState({ col: "facNumber", dir: 1 });
   const [pendExpanded, setPendExpanded] = useState({});
   const [clientMonthFilter, setClientMonthFilter] = useState("all");
   const [reportsMonthFilter, setReportsMonthFilter] = useState("all");
@@ -2745,7 +2746,7 @@ export default function App() {
                     </div>
                     {allFacs.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay facturas registradas aún.</p></div>}
                     {months.map(month => {
-                      const facs = [...byMonth[month]].sort((a,b) => Number(b.facNumber||0) - Number(a.facNumber||0));
+                      const facs = byMonth[month];
                       const mesTotal = facs.reduce((s,f) => s + f.conIVA, 0);
                       const mesFactorizado = facs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
                       return (
@@ -2773,18 +2774,34 @@ export default function App() {
                               <thead>
                                 <tr>
                                   <th></th>
-                                  <th>FECHA</th>
-                                  <th>EMPRESA</th>
-                                  <th>ÍTEM</th>
-                                  <th>OC</th>
-                                  <th>GD</th>
-                                  <th>FACTURA</th>
-                                  <th style={{ textAlign:"right" }}>MONTO c/IVA</th>
+                                  {[
+                                    { label:"FECHA",     col:"date",      align:"left"  },
+                                    { label:"EMPRESA",   col:"client",    align:"left"  },
+                                    { label:"ÍTEM",      col:"desc",      align:"left"  },
+                                    { label:"OC",        col:"ocNumber",  align:"left"  },
+                                    { label:"GD",        col:"gdNumber",  align:"left"  },
+                                    { label:"FACTURA",   col:"facNumber", align:"left"  },
+                                    { label:"MONTO c/IVA", col:"conIVA", align:"right" },
+                                  ].map(({ label, col, align }) => {
+                                    const active = factoringSort.col === col;
+                                    return (
+                                      <th key={col} className={"th-sort" + (active ? " active" : "")}
+                                        style={{ textAlign: align, cursor:"pointer", userSelect:"none" }}
+                                        onClick={() => setFactoringSort(s => ({ col, dir: s.col === col ? -s.dir : 1 }))}>
+                                        {label}<span className="sort-ico">{active ? (factoringSort.dir === 1 ? "▲" : "▼") : "⇅"}</span>
+                                      </th>
+                                    );
+                                  })}
                                   <th>FACTORING</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {facs.map(f => {
+                                {[...facs].sort((a,b) => {
+                                  const { col, dir } = factoringSort;
+                                  let av = col === "facNumber" ? Number(a.facNumber||0) : col === "gdNumber" ? Number(a.gdNumber||0) : col === "conIVA" ? a.conIVA : String(a[col]||"");
+                                  let bv = col === "facNumber" ? Number(b.facNumber||0) : col === "gdNumber" ? Number(b.gdNumber||0) : col === "conIVA" ? b.conIVA : String(b[col]||"");
+                                  return av < bv ? -dir : av > bv ? dir : 0;
+                                }).map(f => {
                                   const fact = isFactorizado(f.key);
                                   const entity = getEntity(f.key);
                                   return (
