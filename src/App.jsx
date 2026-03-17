@@ -1910,6 +1910,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
   const [selectedYear, setSelectedYear] = useState("all");
+  const [factoringData, setFactoringData] = useState({}); // { "FAC-ID": true/false }
   const [search, setSearch] = useState("");
   const [fst, setFst] = useState("all");
   const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_ANTHROPIC_API_KEY || localStorage.getItem("dc_apikey") || "");
@@ -1980,6 +1981,8 @@ export default function App() {
       setOcs(migrateOCs(d));
       setLoading(false);
     });
+    // Cargar datos de factoring
+    storage.get("factoring-v1").then(r => { if (r) { try { setFactoringData(JSON.parse(r.value)); } catch(e) {} } });
     // Suscripción en tiempo real — actualiza cuando otro usuario guarda
     const unsub = subscribeOCs(d => {
       if (d && d.length) _seq = Math.max(_seq, ...d.map(o => parseInt(o.id.replace("OC-", "")) || 0)) + 1;
@@ -2140,6 +2143,12 @@ export default function App() {
     notify("N° OC actualizado ✓");
   };
 
+  const handleToggleFactoring = async (facKey) => {
+    const updated = { ...factoringData, [facKey]: !factoringData[facKey] };
+    setFactoringData(updated);
+    await storage.set("factoring-v1", JSON.stringify(updated));
+  };
+
   const handleUpdateDelivery = async (ocId, newDate) => {
     const updated = ocs.map(o => o.id === ocId ? { ...o, deliveryDate: newDate } : o);
     await persist(updated);
@@ -2198,10 +2207,11 @@ export default function App() {
               {[{ id:"dashboard", ico:"◈", lbl:"Dashboard" }, { id:"orders", ico:"◫", lbl:"Ordenes" }].map(n => (
                 <div key={n.id} className={"rail-item" + (view === n.id ? " on" : "")} onClick={() => setView(n.id)}><span>{n.ico}</span>{n.lbl}</div>
               ))}
-              <div className={"rail-parent" + (view === "reports" || view === "clients" || view === "monthly" || view === "pending" || view === "toinvoice" ? " on" : "")}><span>▤</span>Reportes</div>
+              <div className={"rail-parent" + (view === "reports" || view === "clients" || view === "monthly" || view === "pending" || view === "toinvoice" || view === "factoring" ? " on" : "")}><span>▤</span>Reportes</div>
               <div className={"rail-item-sub" + (view === "reports" ? " on" : "")} onClick={() => setView("reports")}>Por OC</div>
               <div className={"rail-item-sub" + (view === "clients" ? " on" : "")} onClick={() => setView("clients")}>Por Cliente</div>
               {isAdmin && <div className={"rail-item-sub" + (view === "monthly" ? " on" : "")} onClick={() => setView("monthly")}>Por Facturas</div>}
+              {isAdmin && <div className={"rail-item-sub" + (view === "factoring" ? " on" : "")} onClick={() => setView("factoring")}>Factoring</div>}
               <div className={"rail-item-sub" + (view === "pending" ? " on" : "")} onClick={() => setView("pending")}>Pend. Despachar</div>
               <div className={"rail-item-sub" + (view === "toinvoice" ? " on" : "")} onClick={() => setView("toinvoice")}>Pend. Facturar</div>
             </nav>
@@ -2664,6 +2674,125 @@ export default function App() {
                         </div>
                       </>
                     )}
+                  </>
+                );
+              })()}
+
+              {view === "factoring" && isAdmin && (() => {
+                // Recolectar todas las facturas (directas + vinculadas a GDs)
+                const allFacs = [];
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
+                    // Factura directa
+                    if (d.docType === "factura" && d.date) {
+                      const neto = Number(d.netTotal || d.total || 0) || (d.items||[]).reduce((s,it) => {
+                        const ocItem = it.ocItemId ? oc.items.find(o => o.id === it.ocItemId) : null;
+                        return s + (Number(it.qty)||0) * Number(it.unitPrice||(ocItem?ocItem.unitPrice:0)||0);
+                      }, 0);
+                      const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
+                      allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: null, neto, conIVA: Math.round(neto * 1.19) });
+                    }
+                    // GD con factura vinculada
+                    if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
+                      const neto = Number(d.netTotal || 0);
+                      const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
+                      allFacs.push({ key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: d.number, neto, conIVA: Math.round(neto * 1.19) });
+                    }
+                  });
+                });
+
+                // Ordenar por fecha desc
+                allFacs.sort((a, b) => b.date.localeCompare(a.date));
+
+                // Agrupar por mes
+                const byMonth = allFacs.reduce((acc, f) => {
+                  const key = f.date.slice(0,7);
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(f);
+                  return acc;
+                }, {});
+                const months = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
+                const fmtMonth = k => { const [y,m] = k.split("-"); return ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(m)-1] + " " + y; };
+
+                const totalConIVA = allFacs.reduce((s,f) => s + f.conIVA, 0);
+                const totalFactorizado = allFacs.filter(f => factoringData[f.key]).reduce((s,f) => s + f.conIVA, 0);
+                const totalPendiente = totalConIVA - totalFactorizado;
+
+                return (
+                  <>
+                    <div className="ph">
+                      <div><div className="pt">Reporte <em>Factoring</em></div><div className="pm">CONTROL DE FACTURAS POR FACTORIZAR</div></div>
+                      <div style={{ display:"flex", gap:16, alignItems:"center" }}>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL c/IVA</div>
+                          <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalConIVA)}</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>FACTORIZADO</div>
+                          <div style={{ fontSize:13, color:"var(--lime)", fontWeight:600 }}>{fmtCLP(totalFactorizado)}</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>PENDIENTE</div>
+                          <div style={{ fontSize:13, color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totalPendiente)}</div>
+                        </div>
+                      </div>
+                    </div>
+                    {allFacs.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay facturas registradas aún.</p></div>}
+                    {months.map(month => {
+                      const facs = byMonth[month];
+                      const mesTotal = facs.reduce((s,f) => s + f.conIVA, 0);
+                      const mesFactorizado = facs.filter(f => factoringData[f.key]).reduce((s,f) => s + f.conIVA, 0);
+                      return (
+                        <div key={month} style={{ marginBottom:28 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
+                            <div style={{ fontFamily:"var(--fS)", fontSize:18, fontStyle:"italic", color:"var(--white)" }}>{fmtMonth(month)}</div>
+                            <div style={{ flex:1, height:1, background:"var(--line)" }} />
+                            <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
+                            <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>
+                            <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
+                          </div>
+                          <div className="tbl-card">
+                            <table>
+                              <thead>
+                                <tr>
+                                  <th style={{ width:28 }}>✓</th>
+                                  <th>FECHA</th>
+                                  <th>EMPRESA</th>
+                                  <th>ÍTEM</th>
+                                  <th>OC</th>
+                                  <th>GD</th>
+                                  <th>FACTURA</th>
+                                  <th style={{ textAlign:"right" }}>MONTO c/IVA</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {facs.map(f => {
+                                  const isFactorizado = !!factoringData[f.key];
+                                  return (
+                                    <tr key={f.key} style={{ opacity: isFactorizado ? 0.55 : 1 }}>
+                                      <td>
+                                        <div
+                                          onClick={() => handleToggleFactoring(f.key)}
+                                          style={{ width:16, height:16, borderRadius:4, border: isFactorizado ? "none" : "1px solid var(--line2)", background: isFactorizado ? "var(--lime)" : "transparent", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"var(--ink)", fontWeight:700 }}>
+                                          {isFactorizado ? "✓" : ""}
+                                        </div>
+                                      </td>
+                                      <td style={{ color:"var(--fog2)" }}>{f.date}</td>
+                                      <td style={{ color:"var(--white)" }}>{f.client}</td>
+                                      <td style={{ color:"var(--fog2)", fontSize:10, maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.desc}</td>
+                                      <td style={{ color:"var(--gold)", fontSize:10, fontWeight:600 }}>{f.ocNumber}</td>
+                                      <td style={{ color:"var(--violet)", fontSize:10 }}>{f.gdNumber || "—"}</td>
+                                      <td style={{ color:"var(--teal)", fontWeight:600 }}>{f.facNumber || "—"}</td>
+                                      <td style={{ textAlign:"right", color: isFactorizado ? "var(--lime)" : "var(--white)", fontWeight:600 }}>{fmtCLP(f.conIVA)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </>
                 );
               })()}
