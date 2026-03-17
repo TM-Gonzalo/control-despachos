@@ -2766,19 +2766,39 @@ export default function App() {
 
                 // Recolectar todas las facturas (directas + vinculadas a GDs)
                 const allFacs = [];
+                // Índice de GDs por invoiceNumber para búsqueda rápida
+                const gdByInvoice = {};
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
+                    if (d.docType === "guia" && d.invoiceNumber) {
+                      const key = String(d.invoiceNumber).trim();
+                      if (!gdByInvoice[key]) gdByInvoice[key] = [];
+                      gdByInvoice[key].push({ ...d, ocClient: oc.client, ocNumber: oc.ocNumber || oc.id });
+                    }
+                  });
+                });
+
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "factura" && d.date) {
-                      const neto = Number(d.netTotal || 0);
-                      const conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
-                      if (conIVA === 0) return; // ignorar facturas sin monto
+                      let neto = Number(d.netTotal || 0);
+                      let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
+                      // Si la factura directa tiene $0, buscar GD vinculada para tomar su monto
+                      if (!conIVA && d.number) {
+                        const linkedGDs = gdByInvoice[String(d.number).trim()] || [];
+                        const gdNeto = linkedGDs.reduce((s, g) => s + Number(g.netTotal || 0), 0);
+                        const gdTotal = linkedGDs.reduce((s, g) => s + Number(g.total || 0), 0);
+                        neto = gdNeto;
+                        conIVA = gdTotal || Math.round(gdNeto * 1.19);
+                      }
+                      if (!conIVA) return;
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: null, neto, conIVA });
                     }
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
                       const neto = Number(d.netTotal || 0);
                       const conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
-                      if (conIVA === 0) return; // ignorar facturas sin monto
+                      if (!conIVA) return;
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: d.number, neto, conIVA });
                     }
