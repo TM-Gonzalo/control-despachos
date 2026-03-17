@@ -2658,6 +2658,11 @@ export default function App() {
                       }
                       allFacs.push({ ...d, total, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id });
                     }
+                    // GD con factura vinculada — incluir como factura usando invoiceDate e invoiceNumber
+                    if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
+                      const total = Number(d.total || 0) || Math.round(Number(d.netTotal || 0) * 1.19);
+                      allFacs.push({ ...d, number: d.invoiceNumber, date: d.invoiceDate, total, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, _fromGD: d.number });
+                    }
                   });
                 });
                 // Años disponibles
@@ -2738,7 +2743,7 @@ export default function App() {
                                       <div className="mon-fac-row" key={i}>
                                         <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
                                         <span style={{ color:"var(--fog)", fontSize:10 }}>{f.date}</span>
-                                        <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}</span>
+                                        <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}{f._fromGD ? <span style={{ color:"var(--violet)", marginLeft:6 }}>· GD {f._fromGD}</span> : null}</span>
                                         <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
                                       </div>
                                     ))}
