@@ -1910,7 +1910,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("dashboard");
   const [selectedYear, setSelectedYear] = useState("all");
-  const [factoringData, setFactoringData] = useState({}); // { "FAC-ID": true/false }
+  const [factoringData, setFactoringData] = useState({}); // { "FAC-ID": { entity: "Santander"|"Security"|"Otro" } | false }
   const [search, setSearch] = useState("");
   const [fst, setFst] = useState("all");
   const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_ANTHROPIC_API_KEY || localStorage.getItem("dc_apikey") || "");
@@ -2143,8 +2143,10 @@ export default function App() {
     notify("N° OC actualizado ✓");
   };
 
-  const handleToggleFactoring = async (facKey) => {
-    const updated = { ...factoringData, [facKey]: !factoringData[facKey] };
+  const handleToggleFactoring = async (facKey, entity) => {
+    const current = factoringData[facKey];
+    // Si ya está factorizado con esa entidad → desmarcar. Si no → marcar con entidad
+    const updated = { ...factoringData, [facKey]: (current && current.entity === entity) ? false : { entity } };
     setFactoringData(updated);
     await storage.set("factoring-v1", JSON.stringify(updated));
   };
@@ -2679,11 +2681,13 @@ export default function App() {
               })()}
 
               {view === "factoring" && isAdmin && (() => {
+                const ENTITIES = ["Santander", "Security", "Otro"];
+                const ENTITY_COLORS = { Santander: "var(--sky)", Security: "var(--gold)", Otro: "var(--violet)" };
+
                 // Recolectar todas las facturas (directas + vinculadas a GDs)
                 const allFacs = [];
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
-                    // Factura directa
                     if (d.docType === "factura" && d.date) {
                       const neto = Number(d.netTotal || d.total || 0) || (d.items||[]).reduce((s,it) => {
                         const ocItem = it.ocItemId ? oc.items.find(o => o.id === it.ocItemId) : null;
@@ -2692,7 +2696,6 @@ export default function App() {
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: null, neto, conIVA: Math.round(neto * 1.19) });
                     }
-                    // GD con factura vinculada
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
                       const neto = Number(d.netTotal || 0);
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
@@ -2700,9 +2703,6 @@ export default function App() {
                     }
                   });
                 });
-
-                // Ordenar por fecha desc
-                allFacs.sort((a, b) => b.date.localeCompare(a.date));
 
                 // Agrupar por mes
                 const byMonth = allFacs.reduce((acc, f) => {
@@ -2714,9 +2714,15 @@ export default function App() {
                 const months = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
                 const fmtMonth = k => { const [y,m] = k.split("-"); return ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(m)-1] + " " + y; };
 
+                const isFactorizado = key => !!(factoringData[key] && factoringData[key].entity);
+                const getEntity = key => factoringData[key]?.entity || null;
+
                 const totalConIVA = allFacs.reduce((s,f) => s + f.conIVA, 0);
-                const totalFactorizado = allFacs.filter(f => factoringData[f.key]).reduce((s,f) => s + f.conIVA, 0);
+                const totalFactorizado = allFacs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
                 const totalPendiente = totalConIVA - totalFactorizado;
+
+                // Column widths fixed
+                const colW = { check:40, fecha:100, empresa:160, item:200, oc:130, gd:70, factura:80, monto:120, entity:280 };
 
                 return (
                   <>
@@ -2739,9 +2745,9 @@ export default function App() {
                     </div>
                     {allFacs.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay facturas registradas aún.</p></div>}
                     {months.map(month => {
-                      const facs = byMonth[month];
+                      const facs = [...byMonth[month]].sort((a,b) => Number(b.facNumber||0) - Number(a.facNumber||0));
                       const mesTotal = facs.reduce((s,f) => s + f.conIVA, 0);
-                      const mesFactorizado = facs.filter(f => factoringData[f.key]).reduce((s,f) => s + f.conIVA, 0);
+                      const mesFactorizado = facs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
                       return (
                         <div key={month} style={{ marginBottom:28 }}>
                           <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
@@ -2752,10 +2758,21 @@ export default function App() {
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                           </div>
                           <div className="tbl-card">
-                            <table>
+                            <table style={{ tableLayout:"fixed", width:"100%", minWidth:1180 }}>
+                              <colgroup>
+                                <col style={{ width:colW.check }} />
+                                <col style={{ width:colW.fecha }} />
+                                <col style={{ width:colW.empresa }} />
+                                <col style={{ width:colW.item }} />
+                                <col style={{ width:colW.oc }} />
+                                <col style={{ width:colW.gd }} />
+                                <col style={{ width:colW.factura }} />
+                                <col style={{ width:colW.monto }} />
+                                <col style={{ width:colW.entity }} />
+                              </colgroup>
                               <thead>
                                 <tr>
-                                  <th style={{ width:28 }}>✓</th>
+                                  <th></th>
                                   <th>FECHA</th>
                                   <th>EMPRESA</th>
                                   <th>ÍTEM</th>
@@ -2763,27 +2780,44 @@ export default function App() {
                                   <th>GD</th>
                                   <th>FACTURA</th>
                                   <th style={{ textAlign:"right" }}>MONTO c/IVA</th>
+                                  <th>FACTORING</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {facs.map(f => {
-                                  const isFactorizado = !!factoringData[f.key];
+                                  const fact = isFactorizado(f.key);
+                                  const entity = getEntity(f.key);
                                   return (
-                                    <tr key={f.key} style={{ opacity: isFactorizado ? 0.55 : 1 }}>
+                                    <tr key={f.key} style={{ opacity: fact ? 0.6 : 1 }}>
                                       <td>
-                                        <div
-                                          onClick={() => handleToggleFactoring(f.key)}
-                                          style={{ width:16, height:16, borderRadius:4, border: isFactorizado ? "none" : "1px solid var(--line2)", background: isFactorizado ? "var(--lime)" : "transparent", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"var(--ink)", fontWeight:700 }}>
-                                          {isFactorizado ? "✓" : ""}
+                                        <div style={{ width:16, height:16, borderRadius:4, border: fact ? "none" : "1px solid var(--line2)", background: fact ? "var(--lime)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"var(--ink)", fontWeight:700 }}>
+                                          {fact ? "✓" : ""}
                                         </div>
                                       </td>
                                       <td style={{ color:"var(--fog2)" }}>{f.date}</td>
-                                      <td style={{ color:"var(--white)" }}>{f.client}</td>
-                                      <td style={{ color:"var(--fog2)", fontSize:10, maxWidth:200, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.desc}</td>
-                                      <td style={{ color:"var(--gold)", fontSize:10, fontWeight:600 }}>{f.ocNumber}</td>
+                                      <td style={{ color:"var(--white)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.client}</td>
+                                      <td style={{ color:"var(--fog2)", fontSize:10, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.desc}</td>
+                                      <td style={{ color:"var(--gold)", fontSize:10, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.ocNumber}</td>
                                       <td style={{ color:"var(--violet)", fontSize:10 }}>{f.gdNumber || "—"}</td>
                                       <td style={{ color:"var(--teal)", fontWeight:600 }}>{f.facNumber || "—"}</td>
-                                      <td style={{ textAlign:"right", color: isFactorizado ? "var(--lime)" : "var(--white)", fontWeight:600 }}>{fmtCLP(f.conIVA)}</td>
+                                      <td style={{ textAlign:"right", color: fact ? "var(--lime)" : "var(--white)", fontWeight:600 }}>{fmtCLP(f.conIVA)}</td>
+                                      <td>
+                                        <div style={{ display:"flex", gap:4 }}>
+                                          {ENTITIES.map(e => (
+                                            <button key={e}
+                                              onClick={() => handleToggleFactoring(f.key, e)}
+                                              style={{
+                                                padding:"2px 8px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:600, border:"1px solid",
+                                                background: entity === e ? ENTITY_COLORS[e] : "transparent",
+                                                color: entity === e ? "var(--ink)" : ENTITY_COLORS[e],
+                                                borderColor: ENTITY_COLORS[e],
+                                                opacity: entity && entity !== e ? 0.35 : 1
+                                              }}>
+                                              {e}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </td>
                                     </tr>
                                   );
                                 })}
