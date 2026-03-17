@@ -2799,7 +2799,7 @@ export default function App() {
                 const totalPendiente = totalConIVA - totalFactorizado - totalNo;
 
                 // Column widths fixed
-                const colW = { check:40, fecha:100, empresa:160, item:200, oc:130, gd:70, factura:80, monto:120, entity:280 };
+                const colW = { check:40, fecha:100, empresa:160, item:200, oc:130, gd:70, factura:80, monto:120, entity:370 };
 
                 return (
                   <>
@@ -2901,7 +2901,7 @@ export default function App() {
                                       <td style={{ color:"var(--teal)", fontWeight:600 }}>{f.facNumber || "—"}</td>
                                       <td style={{ textAlign:"right", color: fact ? "var(--lime)" : "var(--white)", fontWeight:600 }}>{fmtCLP(f.conIVA)}</td>
                                       <td>
-                                        <div style={{ display:"flex", gap:4 }}>
+                                        <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
                                           {ENTITIES.map(e => {
                                             const isActive = entity === e;
                                             const isOther = entity && entity !== e;
@@ -2922,19 +2922,17 @@ export default function App() {
                                               </button>
                                             );
                                           })}
+                                          {(() => {
+                                            const cnt = (factoringGestiones[f.key] || []).length;
+                                            return (
+                                              <button className="btn btn-outline btn-sm"
+                                                style={{ color:"var(--teal)", borderColor: cnt > 0 ? "var(--teal)" : undefined, marginLeft:4 }}
+                                                onClick={() => setShowFactoringGestion({ key: f.key, label: "Fac. " + (f.facNumber || "—") + " · " + f.client })}>
+                                                Gestión{cnt > 0 ? " (" + cnt + ")" : ""}
+                                              </button>
+                                            );
+                                          })()}
                                         </div>
-                                      </td>
-                                      <td>
-                                        {(() => {
-                                          const cnt = (factoringGestiones[f.key] || []).length;
-                                          return (
-                                            <button className="btn btn-outline btn-sm"
-                                              style={{ color:"var(--teal)", borderColor: cnt > 0 ? "var(--teal)" : undefined }}
-                                              onClick={() => setShowFactoringGestion({ key: f.key, label: "Fac. " + (f.facNumber || "—") + " · " + f.client })}>
-                                              Gestión{cnt > 0 ? " (" + cnt + ")" : ""}
-                                            </button>
-                                          );
-                                        })()}
                                       </td>
                                     </tr>
                                   );
