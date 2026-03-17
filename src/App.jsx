@@ -2662,19 +2662,14 @@ export default function App() {
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "factura" && d.date) {
-                      let total = Number(d.total || d.amount || 0);
-                      if (!total && d.items && d.items.length) {
-                        total = d.items.reduce((s, it) => {
-                          const ocItem = it.ocItemId ? oc.items.find(o => o.id === it.ocItemId) : null;
-                          const price = Number(it.unitPrice || (ocItem ? ocItem.unitPrice : 0) || 0);
-                          return s + (Number(it.qty) || 0) * price;
-                        }, 0);
-                      }
+                      let total = Number(d.total || 0);
+                      const neto = Number(d.netTotal || 0);
+                      if (!total) total = Math.round(neto * 1.19);
                       // Si sigue en $0, buscar GD vinculada
                       if (!total && d.number) {
                         const linkedGDs = gdByInvoicePF[String(d.number).trim()] || [];
-                        total = linkedGDs.reduce((s, g) => s + Number(g.total || 0), 0) ||
-                                Math.round(linkedGDs.reduce((s, g) => s + Number(g.netTotal || 0), 0) * 1.19);
+                        const gdNeto = linkedGDs.reduce((s, g) => s + Number(g.netTotal || 0), 0);
+                        total = linkedGDs.reduce((s, g) => s + Number(g.total || 0), 0) || Math.round(gdNeto * 1.19);
                       }
                       if (!total) return;
                       if (d.number) directFacNumsPF.add(String(d.number).trim());
