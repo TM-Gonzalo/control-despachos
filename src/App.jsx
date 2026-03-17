@@ -1904,6 +1904,63 @@ function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUs
   );
 }
 
+function FactoringGestionModal({ facKey, facLabel, gestiones, onClose, onAdd, onDel, isAdmin, currentUserId }) {
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    await onAdd(text.trim());
+    setText("");
+    setSaving(false);
+  };
+
+  return (
+    <div className="overlay">
+      <div className="modal" style={{ maxWidth:560 }}>
+        <div className="modal-hd">
+          <div>
+            <div className="modal-title">Gestión Factoring</div>
+            <div className="modal-sub" style={{ color:"var(--teal)" }}>{facLabel}</div>
+          </div>
+          <div className="xbtn" onClick={onClose}>✕</div>
+        </div>
+        <div style={{ marginBottom:16 }}>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="Agregar comentario de gestión..."
+            style={{ width:"100%", minHeight:80, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:6, padding:"10px 12px", color:"var(--white)", fontSize:13, fontFamily:"inherit", resize:"vertical", boxSizing:"border-box" }}
+          />
+          <div style={{ display:"flex", justifyContent:"flex-end", marginTop:6 }}>
+            <button className="btn btn-sky btn-sm" onClick={handleAdd} disabled={saving || !text.trim()}>
+              {saving ? "Guardando..." : "+ Agregar"}
+            </button>
+          </div>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {gestiones.length === 0 && <div style={{ color:"var(--fog)", fontSize:12, textAlign:"center", padding:"20px 0" }}>Sin comentarios aún</div>}
+          {[...gestiones].reverse().map(g => (
+            <div key={g.id} style={{ background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"10px 14px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+                <div style={{ fontSize:13, color:"var(--white)", lineHeight:1.5, flex:1 }}>{g.text}</div>
+                {isAdmin && (
+                  <button className="btn btn-rose btn-sm" style={{ fontSize:10, padding:"2px 7px" }} onClick={() => onDel(g.id)}>✕</button>
+                )}
+              </div>
+              <div style={{ display:"flex", gap:10, marginTop:6 }}>
+                <span style={{ fontSize:10, color:"var(--fog)", letterSpacing:1 }}>{g.date}</span>
+                <span style={{ fontSize:10, color:"var(--fog2)" }}>{g.author}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem("dc_user")); } catch(e) { return null; } });
   const [ocs, setOcs] = useState([]);
@@ -1911,6 +1968,8 @@ export default function App() {
   const [view, setView] = useState("dashboard");
   const [selectedYear, setSelectedYear] = useState("all");
   const [factoringData, setFactoringData] = useState({}); // { "FAC-ID": { entity: "Santander"|"Security"|"Otro" } | false }
+  const [factoringGestiones, setFactoringGestiones] = useState({}); // { "FAC-KEY": [{ id, text, date, author, authorId }] }
+  const [showFactoringGestion, setShowFactoringGestion] = useState(null); // { key, label }
   const [search, setSearch] = useState("");
   const [fst, setFst] = useState("all");
   const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_ANTHROPIC_API_KEY || localStorage.getItem("dc_apikey") || "");
@@ -1984,6 +2043,7 @@ export default function App() {
     });
     // Cargar datos de factoring
     storage.get("factoring-v1").then(r => { if (r) { try { setFactoringData(JSON.parse(r.value)); } catch(e) {} } });
+    storage.get("factoring-gestiones-v1").then(r => { if (r) { try { setFactoringGestiones(JSON.parse(r.value)); } catch(e) {} } });
     // Suscripción en tiempo real — actualiza cuando otro usuario guarda
     const unsub = subscribeOCs(d => {
       if (d && d.length) _seq = Math.max(_seq, ...d.map(o => parseInt(o.id.replace("OC-", "")) || 0)) + 1;
@@ -2150,6 +2210,20 @@ export default function App() {
     const updated = { ...factoringData, [facKey]: (current && current.entity === entity) ? false : { entity } };
     setFactoringData(updated);
     await storage.set("factoring-v1", JSON.stringify(updated));
+  };
+
+  const handleAddFactoringGestion = async (facKey, text) => {
+    const existing = factoringGestiones[facKey] || [];
+    const newG = { id: "FG-" + Date.now(), text, date: today(), author: user.name, authorId: user.id };
+    const updated = { ...factoringGestiones, [facKey]: [...existing, newG] };
+    setFactoringGestiones(updated);
+    await storage.set("factoring-gestiones-v1", JSON.stringify(updated));
+  };
+
+  const handleDelFactoringGestion = async (facKey, gId) => {
+    const updated = { ...factoringGestiones, [facKey]: (factoringGestiones[facKey] || []).filter(g => g.id !== gId) };
+    setFactoringGestiones(updated);
+    await storage.set("factoring-gestiones-v1", JSON.stringify(updated));
   };
 
   const handleUpdateDelivery = async (ocId, newDate) => {
@@ -2843,6 +2917,18 @@ export default function App() {
                                           ))}
                                         </div>
                                       </td>
+                                      <td>
+                                        {(() => {
+                                          const cnt = (factoringGestiones[f.key] || []).length;
+                                          return (
+                                            <button className="btn btn-outline btn-sm"
+                                              style={{ color:"var(--teal)", borderColor: cnt > 0 ? "var(--teal)" : undefined }}
+                                              onClick={() => setShowFactoringGestion({ key: f.key, label: "Fac. " + (f.facNumber || "—") + " · " + f.client })}>
+                                              Gestión{cnt > 0 ? " (" + cnt + ")" : ""}
+                                            </button>
+                                          );
+                                        })()}
+                                      </td>
                                     </tr>
                                   );
                                 })}
@@ -3303,6 +3389,18 @@ export default function App() {
 
       {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} existingOCs={ocs} />}
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
+      {showFactoringGestion && (
+        <FactoringGestionModal
+          facKey={showFactoringGestion.key}
+          facLabel={showFactoringGestion.label}
+          gestiones={factoringGestiones[showFactoringGestion.key] || []}
+          onClose={() => setShowFactoringGestion(null)}
+          onAdd={text => handleAddFactoringGestion(showFactoringGestion.key, text)}
+          onDel={gId => handleDelFactoringGestion(showFactoringGestion.key, gId)}
+          isAdmin={isAdmin}
+          currentUserId={user.id}
+        />
+      )}
         {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} />}
 
