@@ -1236,7 +1236,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
         return { desc: it.desc, unit: it.unit || "Unidad", qty: Number(it.qty), unitPrice, ocItemId, splitPrice: splitPrice[i] ? true : undefined };
       });
       const dispTotal = mapped.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
-      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, total: ext?.total || dispTotal || 0, netTotal: ext?.netTotal || dispTotal || 0, items: mapped, createdBy: createdBy });
+      const saveNetTotal = ext?.netTotal || dispTotal || 0;
+      const saveTotal = ext?.total || (saveNetTotal ? Math.round(saveNetTotal * 1.19) : 0);
+      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, gdNumber: ext?.gdNumber || null, total: saveTotal, netTotal: saveNetTotal, items: mapped, createdBy: createdBy });
       // resetear para agregar otro despacho sin cerrar
       setSavedCount(c => c + 1);
       setLastSaved({ num, docType });
@@ -2661,18 +2663,30 @@ export default function App() {
 
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
-                    if (d.docType === "factura" && d.date) {
+                    if (d.docType === "factura" && d.date && d.number) {
                       let total = Number(d.total || 0);
-                      const neto = Number(d.netTotal || 0);
-                      if (!total) total = Math.round(neto * 1.19);
-                      // Si sigue en $0, buscar GD vinculada
-                      if (!total && d.number) {
+                      let neto = Number(d.netTotal || 0);
+                      if (!total && neto) total = Math.round(neto * 1.19);
+                      // Si sigue en $0, buscar GD vinculada por número de factura
+                      if (!total) {
                         const linkedGDs = gdByInvoicePF[String(d.number).trim()] || [];
                         const gdNeto = linkedGDs.reduce((s, g) => s + Number(g.netTotal || 0), 0);
-                        total = linkedGDs.reduce((s, g) => s + Number(g.total || 0), 0) || Math.round(gdNeto * 1.19);
+                        const gdTotal = linkedGDs.reduce((s, g) => s + Number(g.total || 0), 0);
+                        neto = gdNeto || neto;
+                        total = gdTotal || Math.round(gdNeto * 1.19);
                       }
-                      if (!total) return;
-                      if (d.number) directFacNumsPF.add(String(d.number).trim());
+                      // Si sigue en $0, buscar GD vinculada por gdNumber (campo de la factura)
+                      if (!total && d.gdNumber) {
+                        const normGDpf = s => String(s).replace(/[\s.]/g, "");
+                        const gdRef = normGDpf(d.gdNumber);
+                        const linkedGD = enriched.flatMap(o => o.dispatches || []).find(g => g.docType === "guia" && normGDpf(g.number || "") === gdRef);
+                        if (linkedGD) {
+                          neto = Number(linkedGD.netTotal || 0);
+                          total = Number(linkedGD.total || 0) || Math.round(neto * 1.19);
+                        }
+                      }
+                      // Incluir siempre aunque total sea $0 (factura válida sin monto cargado aún)
+                      directFacNumsPF.add(String(d.number).trim());
                       allFacs.push({ ...d, total, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id });
                     }
                   });
@@ -2683,8 +2697,9 @@ export default function App() {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
                       if (directFacNumsPF.has(String(d.invoiceNumber).trim())) return;
-                      const total = Number(d.total || 0) || Math.round(Number(d.netTotal || 0) * 1.19);
-                      if (!total) return;
+                      const neto = Number(d.netTotal || 0);
+                      const total = Number(d.total || 0) || Math.round(neto * 1.19);
+                      // Incluir siempre (aunque total=$0) para no perder facturas
                       allFacs.push({ ...d, number: d.invoiceNumber, date: d.invoiceDate, total, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, _fromGD: d.number });
                     }
                   });
@@ -2807,19 +2822,29 @@ export default function App() {
 
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
-                    if (d.docType === "factura" && d.date) {
+                    if (d.docType === "factura" && d.date && d.number) {
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
-                      // Si la factura directa tiene $0, buscar GD vinculada para tomar su monto
-                      if (!conIVA && d.number) {
+                      // Si la factura directa tiene $0, buscar GD vinculada por número de factura
+                      if (!conIVA) {
                         const linkedGDs = gdByInvoice[String(d.number).trim()] || [];
                         const gdNeto = linkedGDs.reduce((s, g) => s + Number(g.netTotal || 0), 0);
                         const gdTotal = linkedGDs.reduce((s, g) => s + Number(g.total || 0), 0);
-                        neto = gdNeto;
+                        neto = gdNeto || neto;
                         conIVA = gdTotal || Math.round(gdNeto * 1.19);
                       }
-                      if (!conIVA) return;
-                      if (d.number) directFacNums.add(String(d.number).trim());
+                      // Si sigue en $0, buscar GD vinculada por gdNumber (campo de la factura)
+                      if (!conIVA && d.gdNumber) {
+                        const normGDf = s => String(s).replace(/[\s.]/g, "");
+                        const gdRef = normGDf(d.gdNumber);
+                        const linkedGD = enriched.flatMap(o => o.dispatches || []).find(g => g.docType === "guia" && normGDf(g.number || "") === gdRef);
+                        if (linkedGD) {
+                          neto = Number(linkedGD.netTotal || 0);
+                          conIVA = Number(linkedGD.total || 0) || Math.round(neto * 1.19);
+                        }
+                      }
+                      // Incluir siempre aunque conIVA sea $0 (factura válida sin monto cargado aún)
+                      directFacNums.add(String(d.number).trim());
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: null, neto, conIVA });
                     }
@@ -2833,7 +2858,7 @@ export default function App() {
                       if (directFacNums.has(String(d.invoiceNumber).trim())) return; // ya está como factura directa
                       const neto = Number(d.netTotal || 0);
                       const conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
-                      if (!conIVA) return;
+                      // Incluir siempre (aunque conIVA=$0) para no perder facturas
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: d.number, neto, conIVA });
                     }
