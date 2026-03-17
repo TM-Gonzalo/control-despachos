@@ -2815,7 +2815,7 @@ export default function App() {
                           <div style={{ fontSize:13, color:"var(--lime)", fontWeight:600 }}>{fmtCLP(totalFactorizado)}</div>
                         </div>
                         <div style={{ textAlign:"right" }}>
-                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>NO FACTORIZAR</div>
+                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>NO FACTORIZADO</div>
                           <div style={{ fontSize:13, color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totalNo)}</div>
                         </div>
                         <div style={{ textAlign:"right" }}>
@@ -2837,7 +2837,7 @@ export default function App() {
                             <div style={{ flex:1, height:1, background:"var(--line)" }} />
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
                             {mesFactorizado > 0 && <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>}
-                            {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizar</div>}
+                            {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizado</div>}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                           </div>
                           <div className="tbl-card">
@@ -2902,19 +2902,26 @@ export default function App() {
                                       <td style={{ textAlign:"right", color: fact ? "var(--lime)" : "var(--white)", fontWeight:600 }}>{fmtCLP(f.conIVA)}</td>
                                       <td>
                                         <div style={{ display:"flex", gap:4 }}>
-                                          {ENTITIES.map(e => (
-                                            <button key={e}
-                                              onClick={() => handleToggleFactoring(f.key, e)}
-                                              style={{
-                                                padding:"2px 8px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:600, border:"1px solid",
-                                                background: entity === e ? ENTITY_COLORS[e] : "transparent",
-                                                color: entity === e ? "var(--ink)" : ENTITY_COLORS[e],
-                                                borderColor: ENTITY_COLORS[e],
-                                                opacity: entity && entity !== e ? 0.35 : 1
-                                              }}>
-                                              {e}
-                                            </button>
-                                          ))}
+                                          {ENTITIES.map(e => {
+                                            const isActive = entity === e;
+                                            const isOther = entity && entity !== e;
+                                            return (
+                                              <button key={e}
+                                                onClick={() => handleToggleFactoring(f.key, e)}
+                                                style={{
+                                                  padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5,
+                                                  cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700,
+                                                  border:"1px solid " + ENTITY_COLORS[e],
+                                                  background: isActive ? ENTITY_COLORS[e] : "transparent",
+                                                  color: isActive ? "var(--ink)" : ENTITY_COLORS[e],
+                                                  opacity: isOther ? 0.3 : 1,
+                                                  transition:".12s",
+                                                  boxShadow: isActive ? "0 0 6px " + ENTITY_COLORS[e] + "66" : "none"
+                                                }}>
+                                                {e}
+                                              </button>
+                                            );
+                                          })}
                                         </div>
                                       </td>
                                       <td>
