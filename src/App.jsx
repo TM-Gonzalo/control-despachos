@@ -2771,12 +2771,14 @@ export default function App() {
                     if (d.docType === "factura" && d.date) {
                       const neto = Number(d.netTotal || 0);
                       const conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
+                      if (conIVA === 0) return; // ignorar facturas sin monto
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: null, neto, conIVA });
                     }
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
                       const neto = Number(d.netTotal || 0);
                       const conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
+                      if (conIVA === 0) return; // ignorar facturas sin monto
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: d.number, neto, conIVA });
                     }
