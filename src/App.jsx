@@ -128,7 +128,7 @@ async function extractPDF(b64, type, apiKey) {
     const up = String(u).toUpperCase().trim();
     return VALID_UNITS.has(up) ? up : "UN";
   };
-  if (parsed.items) parsed.items = parsed.items.map(it => ({ ...it, qty: fixNum(it.qty), unitPrice: fixNum(it.unitPrice), unit: fixUnit(it.unit) }));
+  if (parsed.items) parsed.items = parsed.items.map(it => { const rawUnit = String(it.unit || ""); const priceFromUnit = rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g, "")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0); const unitPrice = fixNum(it.unitPrice) || priceFromUnit || 0; const unit = fixUnit(it.unit); return { ...it, qty: fixNum(it.qty), unitPrice, unit }; });
   if (parsed.netTotal) parsed.netTotal = fixNum(parsed.netTotal);
   if (parsed.total) parsed.total = fixNum(parsed.total);
   return parsed;
@@ -2667,9 +2667,13 @@ export default function App() {
                       let total = Number(d.total || 0);
                       let neto = Number(d.netTotal || 0);
                       if (!total && neto) total = Math.round(neto * 1.19);
-                      // Fallback 1: calcular neto desde items del dispatch
+                      // Fallback 1: calcular neto desde items del dispatch (también rescata precio del campo unit)
                       if (!neto && d.items && d.items.length) {
-                        neto = (d.items || []).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
+                        neto = (d.items || []).reduce((s, it) => {
+                          const rawUnit = String(it.unit || "");
+                          const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                          return s + (Number(it.qty)||0) * p;
+                        }, 0);
                         if (neto && !total) total = Math.round(neto * 1.19);
                       }
                       // Fallback 2: buscar GD vinculada por número de factura
@@ -2830,9 +2834,13 @@ export default function App() {
                     if (d.docType === "factura" && d.date && d.number) {
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
-                      // Fallback 1: calcular neto desde items del dispatch
+                      // Fallback 1: calcular neto desde items del dispatch (también rescata precio del campo unit)
                       if (!neto && d.items && d.items.length) {
-                        neto = (d.items || []).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
+                        neto = (d.items || []).reduce((s, it) => {
+                          const rawUnit = String(it.unit || "");
+                          const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                          return s + (Number(it.qty)||0) * p;
+                        }, 0);
                         if (neto && !conIVA) conIVA = Math.round(neto * 1.19);
                       }
                       // Fallback 2: buscar GD vinculada por número de factura
@@ -2869,7 +2877,11 @@ export default function App() {
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
                       if (!neto && d.items && d.items.length) {
-                        neto = (d.items || []).reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
+                        neto = (d.items || []).reduce((s, it) => {
+                          const rawUnit = String(it.unit || "");
+                          const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                          return s + (Number(it.qty)||0) * p;
+                        }, 0);
                         if (neto && !conIVA) conIVA = Math.round(neto * 1.19);
                       }
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
