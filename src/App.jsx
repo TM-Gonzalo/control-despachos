@@ -1925,7 +1925,7 @@ export default function App() {
   const [dashSort, setDashSort] = useState({ col: null, dir: 1 });
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
-  const [factoringSort, setFactoringSort] = useState({ col: "facNumber", dir: 1 });
+  const [factoringSort, setFactoringSort] = useState({ col: "facNumber", dir: -1 });
   const [pendExpanded, setPendExpanded] = useState({});
   const [clientMonthFilter, setClientMonthFilter] = useState("all");
   const [reportsMonthFilter, setReportsMonthFilter] = useState("all");
