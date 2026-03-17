@@ -2778,6 +2778,9 @@ export default function App() {
                   });
                 });
 
+                // Set de números de facturas directas (para evitar duplicados con GDs vinculadas)
+                const directFacNums = new Set();
+
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "factura" && d.date) {
@@ -2792,10 +2795,18 @@ export default function App() {
                         conIVA = gdTotal || Math.round(gdNeto * 1.19);
                       }
                       if (!conIVA) return;
+                      if (d.number) directFacNums.add(String(d.number).trim());
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, gdNumber: null, neto, conIVA });
                     }
+                  });
+                });
+
+                // GDs con factura vinculada — solo si no existe ya la factura directa
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
+                      if (directFacNums.has(String(d.invoiceNumber).trim())) return; // ya está como factura directa
                       const neto = Number(d.netTotal || 0);
                       const conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
                       if (!conIVA) return;
