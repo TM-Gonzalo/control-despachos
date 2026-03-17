@@ -2120,7 +2120,8 @@ export default function App() {
   const handleUpdateClient = async (ocId, newClient) => {
     const updated = ocs.map(o => o.id === ocId ? { ...o, client: newClient } : o);
     await persist(updated);
-    if (showDetail && showDetail.id === ocId) setShowDetail(d => ({ ...d, client: newClient }));
+    setShowDetail(null);
+    setTimeout(() => setShowDetail(updated.find(o => o.id === ocId) || null), 50);
     notify("Cliente actualizado ✓");
   };
 
