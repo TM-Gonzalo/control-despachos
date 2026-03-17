@@ -2682,8 +2682,8 @@ export default function App() {
               })()}
 
               {view === "factoring" && isAdmin && (() => {
-                const ENTITIES = ["Santander", "Security", "Otro"];
-                const ENTITY_COLORS = { Santander: "var(--sky)", Security: "var(--gold)", Otro: "var(--violet)" };
+                const ENTITIES = ["Santander", "Security", "Otro", "No"];
+                const ENTITY_COLORS = { Santander: "var(--sky)", Security: "var(--gold)", Otro: "var(--violet)", No: "var(--rose)" };
 
                 // Recolectar todas las facturas (directas + vinculadas a GDs)
                 const allFacs = [];
@@ -2715,12 +2715,14 @@ export default function App() {
                 const months = Object.keys(byMonth).sort((a,b) => b.localeCompare(a));
                 const fmtMonth = k => { const [y,m] = k.split("-"); return ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(m)-1] + " " + y; };
 
-                const isFactorizado = key => !!(factoringData[key] && factoringData[key].entity);
+                const isFactorizado = key => !!(factoringData[key] && factoringData[key].entity && factoringData[key].entity !== "No");
+                const isNo = key => !!(factoringData[key] && factoringData[key].entity === "No");
                 const getEntity = key => factoringData[key]?.entity || null;
 
                 const totalConIVA = allFacs.reduce((s,f) => s + f.conIVA, 0);
                 const totalFactorizado = allFacs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
-                const totalPendiente = totalConIVA - totalFactorizado;
+                const totalNo = allFacs.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                const totalPendiente = totalConIVA - totalFactorizado - totalNo;
 
                 // Column widths fixed
                 const colW = { check:40, fecha:100, empresa:160, item:200, oc:130, gd:70, factura:80, monto:120, entity:280 };
@@ -2739,8 +2741,12 @@ export default function App() {
                           <div style={{ fontSize:13, color:"var(--lime)", fontWeight:600 }}>{fmtCLP(totalFactorizado)}</div>
                         </div>
                         <div style={{ textAlign:"right" }}>
+                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>NO FACTORIZAR</div>
+                          <div style={{ fontSize:13, color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totalNo)}</div>
+                        </div>
+                        <div style={{ textAlign:"right" }}>
                           <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>PENDIENTE</div>
-                          <div style={{ fontSize:13, color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totalPendiente)}</div>
+                          <div style={{ fontSize:13, color:"var(--fog2)", fontWeight:600 }}>{fmtCLP(totalPendiente)}</div>
                         </div>
                       </div>
                     </div>
@@ -2749,13 +2755,15 @@ export default function App() {
                       const facs = byMonth[month];
                       const mesTotal = facs.reduce((s,f) => s + f.conIVA, 0);
                       const mesFactorizado = facs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                      const mesNo = facs.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
                       return (
                         <div key={month} style={{ marginBottom:28 }}>
                           <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
                             <div style={{ fontFamily:"var(--fS)", fontSize:18, fontStyle:"italic", color:"var(--white)" }}>{fmtMonth(month)}</div>
                             <div style={{ flex:1, height:1, background:"var(--line)" }} />
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
-                            <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>
+                            {mesFactorizado > 0 && <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>}
+                            {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizar</div>}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                           </div>
                           <div className="tbl-card">
@@ -2805,7 +2813,7 @@ export default function App() {
                                   const fact = isFactorizado(f.key);
                                   const entity = getEntity(f.key);
                                   return (
-                                    <tr key={f.key} style={{ opacity: fact ? 0.6 : 1 }}>
+                                    <tr key={f.key} style={{ opacity: fact ? 0.6 : isNo(f.key) ? 0.45 : 1 }}>
                                       <td>
                                         <div style={{ width:16, height:16, borderRadius:4, border: fact ? "none" : "1px solid var(--line2)", background: fact ? "var(--lime)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"var(--ink)", fontWeight:700 }}>
                                           {fact ? "✓" : ""}
