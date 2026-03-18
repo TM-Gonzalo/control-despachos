@@ -1103,7 +1103,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
           const refs = refsData.items || [];
           const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
           const matchesGD = gdRefs.some(r => ocGDs.includes(normS(String(r.number || ""))));
-          const ocMismatch = gdRefs.length > 0 && !matchesGD;
+          // No marcar mismatch si ocGDs está vacío (GD puede haberse registrado en esta sesión)
+          // Solo marcar mismatch si hay GDs en la OC Y ninguna coincide
+          const ocMismatch = gdRefs.length > 0 && ocGDs.length > 0 && !matchesGD;
           const firstGDRef = gdRefs[0];
           return { ...doc, _ocMismatch: ocMismatch, _gdRefNumber: firstGDRef ? String(firstGDRef.number || "") : null };
         } catch(e) {
@@ -1172,9 +1174,11 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       }
 
       // Si hay GD ref, intentar _gdLink (vincula factura a la GD existente)
+      // Buscar en oc.dispatches Y en la versión enriquecida (por si GD se registró en esta sesión)
       if (gdNumber) {
         const normGD = s => String(s).replace(/[\s.]/g, "");
-        const matchingGD = (oc.dispatches || []).find(d =>
+        const allDispatches = (oc.dispatches || []);
+        const matchingGD = allDispatches.find(d =>
           d.docType === "guia" && normGD(d.number || "") === normGD(gdNumber)
         );
         if (matchingGD) {
@@ -2415,12 +2419,18 @@ export default function App() {
       ...it,
       dispatched: (oc.dispatches || []).reduce((s, d) => {
         const matched = d.items.filter(ii => (ii.ocItemId && ii.ocItemId === it.id) || (!ii.ocItemId && ii.desc.toLowerCase().trim() === it.desc.toLowerCase().trim()));
-        // Si hay múltiples líneas mapeadas al mismo item, ignorar las marcadas como splitPrice
-        // Si todas son splitPrice (caso raro), contar solo la primera
         const toCount = matched.filter(ii => !ii.splitPrice);
         const effective = toCount.length > 0 ? toCount : matched.slice(0, 1);
-        const qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
-        // NC resta del despachado
+        let qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
+        // Si qty excede el total OC pero los montos cuadran, limitar al máximo OC
+        // (caso diferencia de unidad: ej. 5000 tornillos x $8 = 50 paquetes x $800)
+        if (d.docType !== "nc" && qty > Number(it.qty)) {
+          const montoDespacho = effective.reduce((a, ii) => a + Number(ii.qty) * Number(ii.unitPrice || 0), 0);
+          const montoOC = Number(it.qty) * Number(it.unitPrice || 0);
+          if (montoOC > 0 && Math.abs(montoDespacho - montoOC) / montoOC < 0.02) {
+            qty = Number(it.qty); // mismos montos → contar como completo
+          }
+        }
         return d.docType === "nc" ? s - qty : s + qty;
       }, 0)
     }))
