@@ -1389,7 +1389,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
           <>
             <div className="ex-box">
               <div className="ex-ok">✓ DOCUMENTO DETECTADO</div>
-              <div className="ex-row"><span className="ex-k">Tipo</span><span className="ex-v" style={{ color: docType === "factura" ? "var(--teal)" : "var(--rose)" }}>{docType === "factura" ? "Factura" : "Guia de Despacho"}</span></div>
+              <div className="ex-row"><span className="ex-k">Tipo</span><span className="ex-v" style={{ color: docType === "factura" ? "var(--teal)" : docType === "nc" ? "#ff8c00" : "var(--rose)" }}>{docType === "factura" ? "Factura" : docType === "nc" ? "Nota de Crédito" : "Guia de Despacho"}</span></div>
               <div className="ex-row"><span className="ex-k">N° Documento</span><span className="ex-v">{ext && ext.docNumber ? ext.docNumber : "—"}</span></div>
               <div className="ex-row"><span className="ex-k">Fecha</span><span className="ex-v">{ext && ext.date ? ext.date : "—"}</span></div>
               {ext && ext.netTotal ? <div className="ex-row"><span className="ex-k">Neto</span><span className="ex-v" style={{ color:"var(--gold)" }}>{fmtCLP(ext.netTotal)}</span></div> : null}
@@ -1502,7 +1502,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                           .filter(o => {
                             const ocOriginal = oc.items.find(x => x.id === o.id);
                             const pend = Number(ocOriginal.qty) - Number(ocOriginal.dispatched || 0);
-                            if (docType !== "factura" && pend <= 0) return false;
+                            if (docType !== "factura" && docType !== "nc" && pend <= 0) return false;
                             return true;
                           })
                           .map(o => {
@@ -1578,7 +1578,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                   const pend = Number(ocItem.qty) - Number(ocItem.dispatched || 0);
                   if (!ocItemQty[val]) ocItemQty[val] = 0;
                   ocItemQty[val] += Number(items[i].qty || 0);
-                  if (ocItemQty[val] > pend) {
+                  if (docType !== "nc" && ocItemQty[val] > pend) {
                     setErr(`El item "${ocItem.desc}" tiene ${fmtNum(pend)} ${ocItem.unit} pendientes pero se están asignando ${fmtNum(ocItemQty[val])} ${ocItem.unit}.`);
                     return;
                   }
