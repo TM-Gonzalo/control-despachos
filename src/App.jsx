@@ -1053,6 +1053,10 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
   const [bsaleResult, setBsaleResult] = useState(null); // { doc } | null
   const [bsaleLoading, setBsaleLoading] = useState(false);
   const [bsaleErr, setBsaleErr] = useState(null);
+  const [bsaleFacSearch, setBsaleFacSearch] = useState("");
+  const [bsaleFacResult, setBsaleFacResult] = useState(null);
+  const [bsaleFacLoading, setBsaleFacLoading] = useState(false);
+  const [bsaleFacErr, setBsaleFacErr] = useState(null);
   const [pendingFiles, setPendingFiles] = useState([]); // cola de PDFs pendientes
 
   const searchBsale = async (num) => {
@@ -1071,6 +1075,103 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       if (!match) setBsaleErr("No se encontró ningún documento con ese número");
     } catch(e) { setBsaleErr(e.message); }
     setBsaleLoading(false);
+  };
+
+  // Buscador dedicado de FACTURAS para vincular a GD existente
+  const searchBsaleFac = async (num) => {
+    if (!num || num.length < 2) { setBsaleFacResult(null); return; }
+    setBsaleFacLoading(true); setBsaleFacErr(null); setBsaleFacResult(null);
+    try {
+      const facs = await fetchBsale("/documents.json", { documentTypeId: "1", number: num });
+      const match = (facs.items || []).find(d => String(d.number) === String(num));
+      if (!match) { setBsaleFacErr("No se encontró ninguna factura con ese número"); setBsaleFacLoading(false); return; }
+      // Validar que referencia la OC actual
+      try {
+        const refsData = await fetchBsale("/documents/" + match.id + "/references.json");
+        const refs = refsData.items || [];
+        const norm = s => String(s).replace(/[\s.]/g, "");
+        const thisOC = norm(oc.ocNumber || "");
+        if (thisOC) {
+          const ocRef = refs.find(r => {
+            const refNum = norm(String(r.number || ""));
+            return refNum === thisOC || refNum.includes(thisOC) || thisOC.includes(refNum);
+          });
+          if (!ocRef) {
+            const ocRefs = refs.map(r => r.number).filter(Boolean).join(", ");
+            setBsaleFacErr("⚠ Esta factura referencia OC " + (ocRefs || "desconocida") + ", no coincide con " + (oc.ocNumber || "esta OC"));
+            setBsaleFacResult({ ...match, _ocMismatch: true });
+            setBsaleFacLoading(false);
+            return;
+          }
+        }
+      } catch(e) { /* si falla refs, igual mostramos */ }
+      setBsaleFacResult({ ...match, _ocMismatch: false });
+    } catch(e) { setBsaleFacErr(e.message); }
+    setBsaleFacLoading(false);
+  };
+
+  const handleSelectBsaleFac = async (doc) => {
+    setErr(null); setLoading(true);
+    try {
+      const num = String(doc.number || "");
+      const date = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0, 10) : today();
+      const netTotal = doc.netAmount || 0;
+      const total = doc.totalAmount || 0;
+
+      // Verificar si ya está registrada
+      const alreadyAdded = (oc.dispatches || []).some(d =>
+        (d.docType === "factura" && String(d.number || "") === num) ||
+        String(d.invoiceNumber || "") === num
+      );
+      if (alreadyAdded) { setErr("Factura N° " + num + " ya está registrada en esta OC."); setLoading(false); return; }
+
+      // Buscar GD vinculada por referencias
+      let gdNumber = null;
+      try {
+        const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
+        const refs = refsData.items || [];
+        const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
+        if (gdRef) gdNumber = String(gdRef.number || "");
+      } catch(e) { /* continuar sin GD ref */ }
+
+      // Si encontramos GD ref que existe en esta OC, hacer _gdLink
+      if (gdNumber) {
+        const normGD = s => String(s).replace(/[\s.]/g, "");
+        const matchingGD = (oc.dispatches || []).find(d =>
+          d.docType === "guia" && normGD(d.number || "") === normGD(gdNumber)
+        );
+        if (matchingGD) {
+          await onSave(oc.id, {
+            _gdLink: true,
+            gdId: matchingGD.id,
+            invoiceNumber: num,
+            invoiceDate: date,
+            netTotal,
+            total
+          });
+          setLastSaved({ num, docType: "factura", linked: true });
+          setSavedCount(c => c + 1);
+          setBsaleFacSearch(""); setBsaleFacResult(null); setBsaleFacErr(null);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Sin GD vinculada — registrar como factura directa
+      await onSave(oc.id, {
+        docType: "factura",
+        number: num,
+        date,
+        netTotal,
+        total,
+        items: [],
+        gdNumber: gdNumber || null
+      });
+      setLastSaved({ num, docType: "factura", linked: !!gdNumber });
+      setSavedCount(c => c + 1);
+      setBsaleFacSearch(""); setBsaleFacResult(null); setBsaleFacErr(null);
+    } catch(e) { setErr(e.message); }
+    setLoading(false);
   };
 
   const handleSelectBsale = async (doc) => {
@@ -1411,6 +1512,51 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
               })()}
               <div style={{ fontSize:9, color:"var(--fog)", marginTop:10, letterSpacing:1 }}>O sube un documento PDF manualmente:</div>
             </div>
+            {/* Buscar Factura en Bsale — aparece cuando ya hay al menos una GD en esta OC */}
+            {(oc.dispatches || []).some(d => d.docType === "guia") && (
+              <div style={{ marginBottom:14 }}>
+                <div style={{ fontSize:9, letterSpacing:2, color:"var(--teal)", marginBottom:6 }}>🧾 BUSCAR FACTURA EN BSALE POR N° DE DOCUMENTO</div>
+                <div style={{ display:"flex", gap:8 }}>
+                  <input
+                    style={{ flex:1, background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"6px 10px", fontFamily:"var(--fM)", fontSize:12, color:"var(--white)", outline:"none" }}
+                    placeholder="Ej: 12345"
+                    value={bsaleFacSearch}
+                    onChange={e => { setBsaleFacSearch(e.target.value); setBsaleFacResult(null); setBsaleFacErr(null); }}
+                    onKeyDown={e => e.key === "Enter" && searchBsaleFac(bsaleFacSearch)}
+                  />
+                  <button className="btn btn-outline btn-sm" style={{ borderColor:"var(--teal)", color:"var(--teal)" }} onClick={() => searchBsaleFac(bsaleFacSearch)} disabled={bsaleFacLoading}>
+                    {bsaleFacLoading ? "..." : "Buscar"}
+                  </button>
+                </div>
+                {bsaleFacErr && <div style={{ fontSize:11, color:"var(--rose)", marginTop:6 }}>⚠ {bsaleFacErr}</div>}
+                {bsaleFacResult && (() => {
+                  const doc = bsaleFacResult;
+                  const num = String(doc.number || "");
+                  const fecha = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0,10) : "—";
+                  const monto = doc.totalAmount ? "$" + Number(doc.totalAmount).toLocaleString("es-CL") : "—";
+                  const alreadyAdded = (oc.dispatches || []).some(d =>
+                    (d.docType === "factura" && String(d.number || "") === num) ||
+                    String(d.invoiceNumber || "") === num
+                  );
+                  const mismatch = doc._ocMismatch;
+                  return (
+                    <button disabled={alreadyAdded || mismatch || loading}
+                      onClick={() => handleSelectBsaleFac(doc)}
+                      style={{ marginTop:8, width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--ink3)", border:"1px solid " + (mismatch ? "var(--rose)" : "var(--teal)") + "44", borderRadius:7, cursor: (alreadyAdded || mismatch) ? "default" : "pointer", opacity: (alreadyAdded || mismatch) ? 0.5 : 1, textAlign:"left" }}>
+                      <span className="badge bdoc-fac">FAC</span>
+                      <span style={{ color:"var(--teal)", fontFamily:"var(--fM)", fontSize:13 }}>{num}</span>
+                      <span style={{ color:"var(--fog2)", fontSize:11 }}>{fecha}</span>
+                      <span style={{ color:"var(--lime)", fontSize:12, marginLeft:"auto" }}>{monto}</span>
+                      {alreadyAdded
+                        ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ YA AGREGADO</span>
+                        : mismatch
+                          ? <span style={{ fontSize:9, color:"var(--rose)", letterSpacing:1 }}>✗ OC NO COINCIDE</span>
+                          : <span style={{ fontSize:9, color:"var(--teal)", letterSpacing:1 }}>← VINCULAR</span>}
+                    </button>
+                  );
+                })()}
+              </div>
+            )}
             <UploadZone onFile={f => handleFiles([f])} onFiles={handleFiles} loading={loading} label={lastSaved ? "Subir otro documento o" : "Arrastra la factura o guia aqui o"} />
             {pendingFiles.length > 0 && <div style={{ fontSize:11, color:"var(--gold)", marginTop:6 }}>⏳ {pendingFiles.length} PDF{pendingFiles.length !== 1 ? "s" : ""} en cola — se procesarán automáticamente</div>}
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginTop:9 }}>⚠ {err}</div>}
