@@ -3766,15 +3766,17 @@ export default function App() {
                         const price = Number(it.unitPrice || (ocItem ? ocItem.unitPrice : 0) || 0);
                         return s + (Number(it.qty) || 0) * price;
                       }, 0);
-                      pendFacs.push({ ...d, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, dias, tol, atrasada });
+                      const ocStatusVal = ocStatus(oc.items, oc.dispatches);
+                      pendFacs.push({ ...d, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, dias, tol, atrasada, ocStatusVal });
                     }
                   });
                 });
                 // Ordenar dinámico
                 const { col: tiCol, dir: tiDir } = toinvoiceSort;
+                const ocStatusOrder = { open:0, partial:1, toinvoice:2, closed:3 };
                 pendFacs.sort((a, b) => {
-                  let av = tiCol === "neto" ? a.neto : tiCol === "ocNumber" ? String(a.ocNumber || "") : tiCol === "number" ? Number(a.number || 0) : tiCol === "dias" ? (a.dias ?? 999) : String(a[tiCol] || "");
-                  let bv = tiCol === "neto" ? b.neto : tiCol === "ocNumber" ? String(b.ocNumber || "") : tiCol === "number" ? Number(b.number || 0) : tiCol === "dias" ? (b.dias ?? 999) : String(b[tiCol] || "");
+                  let av = tiCol === "neto" ? a.neto : tiCol === "ocNumber" ? String(a.ocNumber || "") : tiCol === "number" ? Number(a.number || 0) : tiCol === "dias" ? (a.dias ?? 999) : tiCol === "ocStatus" ? (ocStatusOrder[a.ocStatusVal] ?? 0) : String(a[tiCol] || "");
+                  let bv = tiCol === "neto" ? b.neto : tiCol === "ocNumber" ? String(b.ocNumber || "") : tiCol === "number" ? Number(b.number || 0) : tiCol === "dias" ? (b.dias ?? 999) : tiCol === "ocStatus" ? (ocStatusOrder[b.ocStatusVal] ?? 0) : String(b[tiCol] || "");
                   return av < bv ? -tiDir : av > bv ? tiDir : 0;
                 });
                 const totalNeto = pendFacs.reduce((s, g) => s + g.neto, 0);
@@ -3806,6 +3808,7 @@ export default function App() {
                                   { label:"DÍAS",       col:"dias",     align:"left"  },
                                   { label:"CLIENTE",    col:"client",   align:"left"  },
                                   { label:"OC",         col:"ocNumber", align:"left"  },
+                                  { label:"ESTADO OC",  col:"ocStatus", align:"left"  },
                                   { label:"MONTO NETO", col:"neto",     align:"right" },
                                 ].map(({ label, col, align }) => {
                                   const active = toinvoiceSort.col === col;
@@ -3844,6 +3847,12 @@ export default function App() {
                                         : g.ocNumber;
                                     })()}
                                   </td>
+                                  <td>{(() => {
+                                    const oc = enriched.find(o => o.id === g.ocId);
+                                    if (!oc) return null;
+                                    const s = ocStatus(oc.items, oc.dispatches);
+                                    return <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>;
+                                  })()}</td>
                                   <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(g.neto)}</td>
                                   <td>
                                     <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => { const oc = enriched.find(o => o.id === g.ocId); if (oc) setShowGestion(oc); }}>Gestión</button>
