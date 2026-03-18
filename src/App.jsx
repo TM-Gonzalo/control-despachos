@@ -1131,7 +1131,35 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       );
       if (alreadyAdded) { setErr("Factura N° " + num + " ya está registrada en esta OC."); setLoading(false); return; }
 
-      // Buscar GD vinculada — usar el _gdRefNumber ya resuelto en searchBsaleFac
+      // Obtener ítems desde Bsale para mostrar detalle
+      let facItems = [];
+      try {
+        const detailsData = await fetchBsale("/documents/" + doc.id + "/details.json");
+        const detailItems = detailsData.items || [];
+        const variantNames = await Promise.all(detailItems.map(async (it) => {
+          if (!it.variant?.id) return it.variant?.description || "";
+          try {
+            const v = await fetchBsale("/variants/" + it.variant.id + ".json");
+            const productId = v.product?.id;
+            if (productId) {
+              const p = await fetchBsale("/products/" + productId + ".json");
+              const prodName = p.name || "";
+              const varDesc = v.description || "";
+              return [prodName, varDesc].filter(Boolean).join(" ");
+            }
+            return v.description || it.variant?.description || "";
+          } catch { return it.variant?.description || ""; }
+        }));
+        facItems = detailItems.map((it, i) => ({
+          id: i + 1,
+          desc: variantNames[i] || it.comment || "",
+          unit: it.unitAbbreviation || "UN",
+          qty: Number(it.quantity || 1),
+          unitPrice: Number(it.netUnitValue || it.unitValue || 0)
+        }));
+      } catch(e) { /* continuar sin items */ }
+
+      // Buscar GD vinculada — usar _gdRefNumber ya resuelto en searchBsaleFac
       let gdNumber = doc._gdRefNumber || null;
       if (!gdNumber) {
         try {
@@ -1142,7 +1170,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
         } catch(e) { /* continuar sin GD ref */ }
       }
 
-      // Si encontramos GD ref que existe en esta OC, hacer _gdLink
+      // Si hay GD ref, intentar _gdLink (vincula factura a la GD existente)
       if (gdNumber) {
         const normGD = s => String(s).replace(/[\s.]/g, "");
         const matchingGD = (oc.dispatches || []).find(d =>
@@ -1155,7 +1183,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
             invoiceNumber: num,
             invoiceDate: date,
             netTotal,
-            total
+            total,
+            items: facItems
           });
           setLastSaved({ num, docType: "factura", linked: true });
           setSavedCount(c => c + 1);
@@ -1165,14 +1194,14 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
         }
       }
 
-      // Sin GD vinculada — registrar como factura directa
+      // Sin GD vinculada — registrar como factura directa con ítems
       await onSave(oc.id, {
         docType: "factura",
         number: num,
         date,
         netTotal,
         total,
-        items: [],
+        items: facItems,
         gdNumber: gdNumber || null
       });
       setLastSaved({ num, docType: "factura", linked: !!gdNumber });
@@ -1898,7 +1927,11 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
     return true;
   });
   const hasNC = dispatches.some(d => d.docType === "nc");
-  const pendingGuias = dispatches.filter(d => d.docType === "guia" && !d.invoiceNumber).length;
+  const pendingGuias = dispatches.filter(d => {
+    if (d.docType !== "guia" || d.invoiceNumber) return false;
+    const normN = s => String(s).replace(/[\s.]/g, "");
+    return !dispatches.some(f => f.docType === "factura" && f.gdNumber && normN(f.gdNumber) === normN(d.number || ""));
+  }).length;
   const pctGlobal = totAmt > 0 ? Math.round(disAmt / totAmt * 100) : 0;
 
   return (
@@ -2050,6 +2083,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
               const isLinkedInvoice = d.docType === "guia" && d.invoiceNumber && docFilter === "factura";
               if (isLinkedInvoice) {
                 const neto = Number(d.netTotal || 0);
+                const displayItems = (d.invoiceItems && d.invoiceItems.length > 0) ? d.invoiceItems : (d.items || []);
                 return (
                   <div className="disp-card" key={d.id}>
                     <div className="disp-hd">
@@ -2057,9 +2091,10 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                       <div className="disp-meta">
                         <span style={{ fontSize:10, color:"var(--fog)" }}>{d.invoiceDate || d.date}</span>
                         <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>· Ref. GD {d.number}</span>
+                        {isAdmin && <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id, true)}>Desvincular</button>}
                       </div>
                     </div>
-                    {(d.items || []).map((it, i) => (
+                    {displayItems.map((it, i) => (
                       <div className="disp-row" key={i}>
                         <span>{it.desc}</span>
                         <span style={{ display:"flex", gap:10, alignItems:"center" }}>
@@ -2403,11 +2438,11 @@ export default function App() {
 
     // Caso especial: vincular factura a GD existente sin crear despacho nuevo
     if (dispatch._gdLink) {
-      const { gdId, invoiceNumber, invoiceDate, netTotal, total } = dispatch;
+      const { gdId, invoiceNumber, invoiceDate, netTotal, total, items: facItems } = dispatch;
       const updated = ocs.map(o => o.id === ocId ? {
         ...o,
         dispatches: (o.dispatches || []).map(d => d.id === gdId
-          ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total }
+          ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: facItems || d.invoiceItems || [] }
           : d
         )
       } : o);
@@ -2526,7 +2561,13 @@ export default function App() {
   const open = enriched.filter(o => ocStatus(o.items, o.dispatches) === "open").length;
   const closed = enriched.filter(o => ocStatus(o.items, o.dispatches) === "closed").length;
   const alerts = enriched.filter(o => { const d = daysLeft(o.deliveryDate); return d !== null && d <= 5 && ocStatus(o.items, o.dispatches) !== "closed"; });
-  const pendingGuias = enriched.reduce((s, o) => s + (o.dispatches || []).filter(d => d.docType === "guia" && !d.invoiceNumber).length, 0);
+  const pendingGuias = enriched.reduce((s, o) => {
+    const normN = n => String(n).replace(/[\s.]/g, "");
+    return s + (o.dispatches || []).filter(d => {
+      if (d.docType !== "guia" || d.invoiceNumber) return false;
+      return !(o.dispatches || []).some(f => f.docType === "factura" && f.gdNumber && normN(f.gdNumber) === normN(d.number || ""));
+    }).length;
+  }, 0);
 
   const filtered = enriched.filter(o => {
     const norm = v => v.toLowerCase().replace(/\./g, "");
