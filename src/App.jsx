@@ -1034,7 +1034,7 @@ function BsaleView({ enriched, onAssign }) {
   );
 }
 
-function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
+function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1095,7 +1095,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       });
       if (!matches.length) { setBsaleFacErr("No se encontró ninguna factura con ese número"); setBsaleFacLoading(false); return; }
       const normS = s => String(s).replace(/[\s.]/g, "");
-      const ocGDs = (oc.dispatches || []).filter(d => d.docType === "guia").map(d => normS(d.number || ""));
+      // Usar ocs fresco para capturar GDs registradas en esta sesión
+      const freshOCSearch = (ocs || []).find(o => o.id === oc.id);
+      const ocGDs = (freshOCSearch?.dispatches || oc.dispatches || []).filter(d => d.docType === "guia").map(d => normS(d.number || ""));
       // Enriquecer cada match con sus referencias
       const enriched = await Promise.all(matches.map(async doc => {
         try {
@@ -1103,9 +1105,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
           const refs = refsData.items || [];
           const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
           const matchesGD = gdRefs.some(r => ocGDs.includes(normS(String(r.number || ""))));
-          // No marcar mismatch si ocGDs está vacío (GD puede haberse registrado en esta sesión)
-          // Solo marcar mismatch si hay GDs en la OC Y ninguna coincide
-          const ocMismatch = gdRefs.length > 0 && ocGDs.length > 0 && !matchesGD;
+          const ocMismatch = gdRefs.length > 0 && !matchesGD;
           const firstGDRef = gdRefs[0];
           return { ...doc, _ocMismatch: ocMismatch, _gdRefNumber: firstGDRef ? String(firstGDRef.number || "") : null };
         } catch(e) {
@@ -1173,12 +1173,12 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
         } catch(e) { /* continuar sin GD ref */ }
       }
 
-      // Si hay GD ref, intentar _gdLink (vincula factura a la GD existente)
-      // Buscar en oc.dispatches Y en la versión enriquecida (por si GD se registró en esta sesión)
+      // Si hay GD ref, intentar _gdLink — usar ocs (estado fresco) para capturar GDs de esta sesión
       if (gdNumber) {
         const normGD = s => String(s).replace(/[\s.]/g, "");
-        const allDispatches = (oc.dispatches || []);
-        const matchingGD = allDispatches.find(d =>
+        const freshOC = (ocs || []).find(o => o.id === oc.id);
+        const freshDispatches = (freshOC?.dispatches || oc.dispatches || []);
+        const matchingGD = freshDispatches.find(d =>
           d.docType === "guia" && normGD(d.number || "") === normGD(gdNumber)
         );
         if (matchingGD) {
@@ -2419,18 +2419,12 @@ export default function App() {
       ...it,
       dispatched: (oc.dispatches || []).reduce((s, d) => {
         const matched = d.items.filter(ii => (ii.ocItemId && ii.ocItemId === it.id) || (!ii.ocItemId && ii.desc.toLowerCase().trim() === it.desc.toLowerCase().trim()));
+        // Si hay múltiples líneas mapeadas al mismo item, ignorar las marcadas como splitPrice
+        // Si todas son splitPrice (caso raro), contar solo la primera
         const toCount = matched.filter(ii => !ii.splitPrice);
         const effective = toCount.length > 0 ? toCount : matched.slice(0, 1);
-        let qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
-        // Si qty excede el total OC pero los montos cuadran, limitar al máximo OC
-        // (caso diferencia de unidad: ej. 5000 tornillos x $8 = 50 paquetes x $800)
-        if (d.docType !== "nc" && qty > Number(it.qty)) {
-          const montoDespacho = effective.reduce((a, ii) => a + Number(ii.qty) * Number(ii.unitPrice || 0), 0);
-          const montoOC = Number(it.qty) * Number(it.unitPrice || 0);
-          if (montoOC > 0 && Math.abs(montoDespacho - montoOC) / montoOC < 0.02) {
-            qty = Number(it.qty); // mismos montos → contar como completo
-          }
-        }
+        const qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
+        // NC resta del despachado
         return d.docType === "nc" ? s - qty : s + qty;
       }, 0)
     }))
@@ -4059,7 +4053,7 @@ export default function App() {
         />
       )}
         {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} />}
-      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} />}
+      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} />}
 
       {confirmDel && (
         <div className="overlay" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
