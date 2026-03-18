@@ -1808,7 +1808,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
         <div className="slbl">Remanente por item</div>
         <div className="tbl-card" style={{ marginBottom:18 }}>
           <table>
-            <thead><tr><th>DESCRIPCION</th><th>UNIDAD</th><th>OC</th><th>DESPACHADO</th><th>REMANENTE</th><th>AVANCE</th></tr></thead>
+            <thead><tr><th>DESCRIPCION</th><th>UNIDAD</th><th style={{ textAlign:"right" }}>PRECIO UNIT</th><th>OC</th><th>DESPACHADO</th><th>REMANENTE</th><th>AVANCE</th></tr></thead>
             <tbody>{oc.items.map(it => {
               const rem = Number(it.qty) - Number(it.dispatched || 0);
               const pct = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched || 0) / Number(it.qty) * 100)) : 0;
@@ -1816,6 +1816,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                 <tr key={it.id}>
                   <td style={{ fontWeight:500 }}>{it.desc}</td>
                   <td style={{ color:"var(--fog)" }}>{it.unit}</td>
+                  <td style={{ textAlign:"right", color:"var(--fog2)", fontFamily:"var(--fM)", fontSize:11 }}>{it.unitPrice ? fmtCLP(Number(it.unitPrice)) : <span style={{ color:"var(--fog)" }}>—</span>}</td>
                   <td>{fmtNum(it.qty)}</td>
                   <td style={{ color:"var(--lime)" }}>{fmtNum(it.dispatched || 0)}</td>
                   <td>{rem > 0 ? <span style={{ color:"var(--gold)", fontWeight:500 }}>{fmtNum(rem)} pend.</span> : rem === 0 ? <span style={{ color:"var(--lime)" }}>✓ Completo</span> : <span style={{ color:"var(--rose)", fontWeight:500 }}>{fmtNum(Math.abs(rem))} excedido</span>}</td>
@@ -2098,6 +2099,8 @@ export default function App() {
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
   const [factoringSort, setFactoringSort] = useState({ col: "facNumber", dir: -1 });
+  const [facFilterFrom, setFacFilterFrom] = useState("");
+  const [facFilterTo, setFacFilterTo] = useState("");
   const [pendExpanded, setPendExpanded] = useState({});
   const [clientMonthFilter, setClientMonthFilter] = useState("all");
   const [reportsMonthFilter, setReportsMonthFilter] = useState("all");
@@ -3064,8 +3067,42 @@ export default function App() {
                   return { ...f, conIVA: Math.max(0, f.conIVA - nc.conIVA), neto: Math.max(0, f.neto - nc.neto), _ncDesc: nc.conIVA };
                 });
 
-                // Agrupar por mes
-                const byMonth = allFacsAdj.reduce((acc, f) => {
+                // Filtrar por rango de fechas
+                const allFacsFiltered = allFacsAdj.filter(f => {
+                  if (facFilterFrom && f.date < facFilterFrom) return false;
+                  if (facFilterTo && f.date > facFilterTo) return false;
+                  return true;
+                });
+
+                // Función descarga Excel
+                const handleDownloadFactoringXlsx = () => {
+                  const rows = allFacsFiltered.map(f => ({
+                    "Fecha": f.date,
+                    "Empresa": f.client,
+                    "Ítem": f.desc,
+                    "OC": f.ocNumber || "",
+                    "GD": f.gdNumber || "",
+                    "Factura": f.facNumber || "",
+                    "Neto": f.neto,
+                    "Monto c/IVA": f.conIVA,
+                    "NC Descuento": f._ncDesc || 0,
+                    "Factoring": getEntity(f.key) || "Pendiente",
+                  }));
+                  const ws = XLSX.utils.json_to_sheet(rows);
+                  ws["!cols"] = [
+                    { wch: 12 }, { wch: 28 }, { wch: 36 }, { wch: 16 },
+                    { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }
+                  ];
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "Factoring");
+                  const suffix = (facFilterFrom || facFilterTo)
+                    ? "_" + (facFilterFrom || "") + (facFilterTo ? "_al_" + facFilterTo : "")
+                    : "_" + today();
+                  XLSX.writeFile(wb, "Reporte_Factoring" + suffix + ".xlsx");
+                };
+
+                // Agrupar por mes (sobre datos filtrados)
+                const byMonth = allFacsFiltered.reduce((acc, f) => {
                   const key = f.date.slice(0,7);
                   if (!acc[key]) acc[key] = [];
                   acc[key].push(f);
@@ -3078,10 +3115,10 @@ export default function App() {
                 const isNo = key => !!(factoringData[key] && factoringData[key].entity === "No");
                 const getEntity = key => factoringData[key]?.entity || null;
 
-                const totalConIVA = allFacsAdj.reduce((s,f) => s + f.conIVA, 0);
-                const totalNeto = allFacsAdj.reduce((s,f) => s + f.neto, 0);
-                const totalFactorizado = allFacsAdj.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
-                const totalNo = allFacsAdj.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                const totalConIVA = allFacsFiltered.reduce((s,f) => s + f.conIVA, 0);
+                const totalNeto = allFacsFiltered.reduce((s,f) => s + f.neto, 0);
+                const totalFactorizado = allFacsFiltered.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                const totalNo = allFacsFiltered.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
                 const totalPendiente = totalConIVA - totalFactorizado - totalNo;
 
                 // Column widths fixed
@@ -3091,7 +3128,24 @@ export default function App() {
                   <>
                     <div className="ph">
                       <div><div className="pt">Reporte <em>Factoring</em></div><div className="pm">CONTROL DE FACTURAS POR FACTORIZAR</div></div>
-                      <div style={{ display:"flex", gap:16, alignItems:"center" }}>
+                      <div style={{ display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+                        <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                          <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>DESDE</span>
+                          <input type="date" value={facFilterFrom} onChange={e => setFacFilterFrom(e.target.value)}
+                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                          <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>HASTA</span>
+                          <input type="date" value={facFilterTo} onChange={e => setFacFilterTo(e.target.value)}
+                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                          {(facFilterFrom || facFilterTo) && (
+                            <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 8px" }}
+                              onClick={() => { setFacFilterFrom(""); setFacFilterTo(""); }}>✕ Limpiar</button>
+                          )}
+                        </div>
+                        <button className="btn btn-outline btn-sm" style={{ color:"var(--lime)", borderColor:"var(--lime)", fontSize:10, padding:"4px 12px" }}
+                          onClick={handleDownloadFactoringXlsx}>
+                          ↓ Excel{(facFilterFrom || facFilterTo) ? " (filtrado)" : ""}
+                        </button>
+                        <div style={{ width:1, height:28, background:"var(--line)" }} />
                         <div style={{ textAlign:"right" }}>
                           <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL NETO</div>
                           <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalNeto)}</div>
@@ -3114,7 +3168,7 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    {allFacsAdj.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay facturas registradas aún.</p></div>}
+                    {allFacsFiltered.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>{allFacsAdj.length > 0 ? "Sin resultados para el período seleccionado." : "No hay facturas registradas aún."}</p></div>}
                     {months.map(month => {
                       const facs = byMonth[month];
                       const mesTotal = facs.reduce((s,f) => s + f.conIVA, 0);
