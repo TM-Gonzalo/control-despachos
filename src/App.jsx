@@ -2505,7 +2505,7 @@ export default function App() {
           .map(d => d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: items || [] } : d)
       } : o);
       await persist(updated);
-      if (showDetail && showDetail.id === ocId) setShowDetail(enriched.find(o => o.id === ocId));
+      if (showDetail && showDetail.id === ocId) setShowDetail(updated.find(o => o.id === ocId));
       notify("Factura N° " + invoiceNumber + " vinculada a GD ✓");
       return;
     }
