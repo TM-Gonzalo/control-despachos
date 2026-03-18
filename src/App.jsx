@@ -1085,25 +1085,26 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       const facs = await fetchBsale("/documents.json", { documentTypeId: "1", number: num });
       const match = (facs.items || []).find(d => String(d.number) === String(num));
       if (!match) { setBsaleFacErr("No se encontró ninguna factura con ese número"); setBsaleFacLoading(false); return; }
-      // Validar que referencia la OC actual
+      // Validar referencias — Bsale guarda OC con ID interno (no folio SAP), así que
+      // solo validamos contra GDs registradas en esta OC.
       try {
         const refsData = await fetchBsale("/documents/" + match.id + "/references.json");
         const refs = refsData.items || [];
-        const norm = s => String(s).replace(/[\s.]/g, "");
-        const thisOC = norm(oc.ocNumber || "");
-        if (thisOC) {
-          const ocRef = refs.find(r => {
-            const refNum = norm(String(r.number || ""));
-            return refNum === thisOC || refNum.includes(thisOC) || thisOC.includes(refNum);
-          });
-          if (!ocRef) {
-            const ocRefs = refs.map(r => r.number).filter(Boolean).join(", ");
-            setBsaleFacErr("⚠ Esta factura referencia OC " + (ocRefs || "desconocida") + ", no coincide con " + (oc.ocNumber || "esta OC"));
+        const normS = s => String(s).replace(/[\s.]/g, "");
+        const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
+        if (gdRefs.length > 0) {
+          const ocGDs = (oc.dispatches || []).filter(d => d.docType === "guia").map(d => normS(d.number || ""));
+          const matchesGD = gdRefs.some(r => ocGDs.includes(normS(String(r.number || ""))));
+          if (!matchesGD) {
+            const gdNums = gdRefs.map(r => r.number).filter(Boolean).join(", ");
+            setBsaleFacErr("⚠ Esta factura referencia GD " + gdNums + ", que no pertenece a esta OC");
             setBsaleFacResult({ ...match, _ocMismatch: true });
             setBsaleFacLoading(false);
             return;
           }
         }
+        const firstGDRef = gdRefs[0];
+        match._gdRefNumber = firstGDRef ? String(firstGDRef.number || "") : null;
       } catch(e) { /* si falla refs, igual mostramos */ }
       setBsaleFacResult({ ...match, _ocMismatch: false });
     } catch(e) { setBsaleFacErr(e.message); }
@@ -1125,14 +1126,16 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       );
       if (alreadyAdded) { setErr("Factura N° " + num + " ya está registrada en esta OC."); setLoading(false); return; }
 
-      // Buscar GD vinculada por referencias
-      let gdNumber = null;
-      try {
-        const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
-        const refs = refsData.items || [];
-        const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
-        if (gdRef) gdNumber = String(gdRef.number || "");
-      } catch(e) { /* continuar sin GD ref */ }
+      // Buscar GD vinculada — usar el _gdRefNumber ya resuelto en searchBsaleFac
+      let gdNumber = doc._gdRefNumber || null;
+      if (!gdNumber) {
+        try {
+          const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
+          const refs = refsData.items || [];
+          const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
+          if (gdRef) gdNumber = String(gdRef.number || "");
+        } catch(e) { /* continuar sin GD ref */ }
+      }
 
       // Si encontramos GD ref que existe en esta OC, hacer _gdLink
       if (gdNumber) {
