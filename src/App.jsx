@@ -2302,6 +2302,7 @@ export default function App() {
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
   const [factoringSort, setFactoringSort] = useState({ col: "facNumber", dir: -1 });
+  const [toinvoiceSort, setToinvoiceSort] = useState({ col: "date", dir: 1 });
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [facFilterTo, setFacFilterTo] = useState("");
   const [pendExpanded, setPendExpanded] = useState({});
@@ -3769,8 +3770,13 @@ export default function App() {
                     }
                   });
                 });
-                // Ordenar de más antigua a más nueva
-                pendFacs.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+                // Ordenar dinámico
+                const { col: tiCol, dir: tiDir } = toinvoiceSort;
+                pendFacs.sort((a, b) => {
+                  let av = tiCol === "neto" ? a.neto : tiCol === "ocNumber" ? String(a.ocNumber || "") : tiCol === "number" ? Number(a.number || 0) : tiCol === "dias" ? (a.dias ?? 999) : String(a[tiCol] || "");
+                  let bv = tiCol === "neto" ? b.neto : tiCol === "ocNumber" ? String(b.ocNumber || "") : tiCol === "number" ? Number(b.number || 0) : tiCol === "dias" ? (b.dias ?? 999) : String(b[tiCol] || "");
+                  return av < bv ? -tiDir : av > bv ? tiDir : 0;
+                });
                 const totalNeto = pendFacs.reduce((s, g) => s + g.neto, 0);
                 const atrasadas = pendFacs.filter(g => g.atrasada).length;
                 return (
@@ -3794,12 +3800,23 @@ export default function App() {
                             <thead>
                               <tr>
                                 <th>ESTADO</th>
-                                <th>N° GD</th>
-                                <th>FECHA GD</th>
-                                <th>DÍAS</th>
-                                <th>CLIENTE</th>
-                                <th>OC</th>
-                                <th style={{ textAlign:"right" }}>MONTO NETO</th>
+                                {[
+                                  { label:"N° GD",      col:"number",   align:"left"  },
+                                  { label:"FECHA GD",   col:"date",     align:"left"  },
+                                  { label:"DÍAS",       col:"dias",     align:"left"  },
+                                  { label:"CLIENTE",    col:"client",   align:"left"  },
+                                  { label:"OC",         col:"ocNumber", align:"left"  },
+                                  { label:"MONTO NETO", col:"neto",     align:"right" },
+                                ].map(({ label, col, align }) => {
+                                  const active = toinvoiceSort.col === col;
+                                  return (
+                                    <th key={col} className={"th-sort" + (active ? " active" : "")}
+                                      style={{ textAlign:align, cursor:"pointer", userSelect:"none" }}
+                                      onClick={() => setToinvoiceSort(s => ({ col, dir: s.col === col ? -s.dir : (col === "neto" || col === "dias" ? -1 : 1) }))}>
+                                      {label}<span className="sort-ico">{active ? (toinvoiceSort.dir === 1 ? "▲" : "▼") : "⇅"}</span>
+                                    </th>
+                                  );
+                                })}
                                 <th></th>
                               </tr>
                             </thead>
@@ -3818,7 +3835,15 @@ export default function App() {
                                     <span style={{ fontSize:9, color:"var(--fog)", marginLeft:4 }}>(tol. {g.tol}d)</span>
                                   </td>
                                   <td style={{ color:"var(--white)" }}>{g.client}</td>
-                                  <td style={{ color:"var(--gold)", fontSize:10, fontWeight:600 }}>{g.ocNumber}</td>
+                                  <td style={{ color:"var(--gold)", fontSize:10, fontWeight:600 }}>
+                                    {(() => {
+                                      const oc = enriched.find(o => o.id === g.ocId);
+                                      return oc
+                                        ? <span style={{ cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:2 }}
+                                            onClick={() => { setView("orders"); setTimeout(() => setShowDetail(oc), 80); }}>{g.ocNumber}</span>
+                                        : g.ocNumber;
+                                    })()}
+                                  </td>
                                   <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(g.neto)}</td>
                                   <td>
                                     <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => { const oc = enriched.find(o => o.id === g.ocId); if (oc) setShowGestion(oc); }}>Gestión</button>
