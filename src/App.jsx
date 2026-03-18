@@ -2841,7 +2841,7 @@ export default function App() {
                               <td>
                                 {nFac > 0 && <span style={{ color:"var(--teal)", fontSize:10, fontWeight:600 }}>{nFac}F</span>}
                                 {nFac > 0 && nGuia > 0 && <span style={{ color:"var(--fog)" }}> · </span>}
-                                {nGuia > 0 && <span style={{ color: pending > 0 ? "var(--rose)" : "var(--fog2)", fontSize:10, fontWeight:600 }}>{nGuia}GD{pending > 0 ? <span style={{ color:"var(--gold)", fontWeight:400 }}> ({pending}✗)</span> : null}</span>}
+                                {nGuia > 0 && <span style={{ color: pending > 0 && s !== "closed" ? "var(--rose)" : "var(--fog2)", fontSize:10, fontWeight:600 }}>{nGuia}GD{pending > 0 && s !== "closed" ? <span style={{ color:"var(--gold)", fontWeight:400 }}> ({pending}✗)</span> : null}</span>}
                                 {nFac === 0 && nGuia === 0 && <span style={{ color:"var(--fog)", fontSize:10 }}>—</span>}
                               </td>
                               <td style={{ color:"var(--gold)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + Number(i.qty)*Number(i.unitPrice), 0))}</td>
