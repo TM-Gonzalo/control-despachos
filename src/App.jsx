@@ -1039,6 +1039,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
+  const [warn, setWarn] = useState(null);
   const [ext, setExt] = useState(null);
   const [items, setItems] = useState([]);
   const [map, setMap] = useState({});
@@ -1782,6 +1783,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
               })}</tbody>
             </table>
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginBottom:11 }}>⚠ {err}</div>}
+            {warn && <div style={{ color:"var(--gold)", fontSize:11, marginBottom:11, background:"rgba(232,184,75,.08)", border:"1px solid rgba(232,184,75,.2)", borderRadius:5, padding:"6px 10px" }}>⚠ {warn}</div>}
             <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
               <button className="btn btn-ghost" onClick={() => setStep(1)}>← Volver</button>
               <button className="btn btn-gold" onClick={() => {
@@ -1789,8 +1791,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                   const sinMapear = items.filter((_, i) => !map[i] || map[i] === "NONE").length;
                   if (sinMapear > 0) { setErr("Una factura debe tener todos sus items vinculados. Faltan " + sinMapear + " por vincular."); return; }
                 }
-                // Validar que ningún merge exceda el pendiente
+                // Validar que ningún merge exceda el pendiente — warning no bloqueante
                 const ocItemQty = {};
+                const warns = [];
                 for (let i = 0; i < items.length; i++) {
                   const val = map[i];
                   if (!val || val === "NONE" || splitPrice[i]) continue;
@@ -1800,11 +1803,12 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                   if (!ocItemQty[val]) ocItemQty[val] = 0;
                   ocItemQty[val] += Number(items[i].qty || 0);
                   if (docType !== "nc" && ocItemQty[val] > pend) {
-                    setErr(`El item "${ocItem.desc}" tiene ${fmtNum(pend)} ${ocItem.unit} pendientes pero se están asignando ${fmtNum(ocItemQty[val])} ${ocItem.unit}.`);
-                    return;
+                    warns.push(`"${ocItem.desc}": ${fmtNum(pend)} pendientes, asignando ${fmtNum(ocItemQty[val])} (posible diferencia de unidad).`);
                   }
                 }
-                setErr(null); setStep(3);
+                setErr(null);
+                setWarn(warns.length > 0 ? warns.join(" / ") : null);
+                setStep(3);
               }}>Revisar →</button>
             </div>
           </>
