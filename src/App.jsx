@@ -157,22 +157,10 @@ const ocStatus = (items, dispatches) => {
   const dis = items.reduce((s, i) => s + Number(i.dispatched || 0), 0);
   if (dis === 0) return "open";
   if (dis < tot) return "partial";
-  // 100% despachado — revisar guías sin factura y monto facturado vs monto OC
+  // 100% despachado — verificar monto facturado vs monto OC (monto tiene prioridad)
   const disp = dispatches || [];
-  const pendingGuias = disp.filter(d => {
-    if (d.docType !== "guia" || d.invoiceNumber) return false;
-    // Verificar si hay una factura directa que declare esta GD como gdNumber
-    const normN = s => String(s).replace(/[\s.]/g, "");
-    const coveredByDirectFac = disp.some(f =>
-      f.docType === "factura" && f.gdNumber && normN(f.gdNumber) === normN(d.number || "")
-    );
-    return !coveredByDirectFac;
-  }).length;
-  if (pendingGuias > 0) return "toinvoice";
-  // Calcular monto OC
   const montoOC = items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice || 0), 0);
-  if (montoOC === 0) return "closed"; // sin precio, solo verificar cantidad
-  // Helper: neto de un dispatch con fallback a unitPrice de OC
+  if (montoOC === 0) return "closed";
   const calcNeto = d => {
     if (Number(d.netTotal || 0) > 0) return Number(d.netTotal);
     const netoItems = (d.items||[]).reduce((s,it) => {
@@ -182,13 +170,11 @@ const ocStatus = (items, dispatches) => {
       return s + (Number(it.qty)||0) * p;
     }, 0);
     if (netoItems > 0) return netoItems;
-    // Fallback: usar unitPrice de la OC via ocItemId
     return (d.items||[]).reduce((s,it) => {
       const ocIt = it.ocItemId ? items.find(o => o.id === it.ocItemId) : null;
       return s + (Number(it.qty)||0) * Number(ocIt?.unitPrice || 0);
     }, 0);
   };
-  // Calcular monto facturado (facturas directas + GDs vinculadas - NCs)
   let montoFac = 0;
   const facNums = new Set();
   disp.forEach(d => {
@@ -198,8 +184,15 @@ const ocStatus = (items, dispatches) => {
     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate && !facNums.has(String(d.invoiceNumber).trim())) montoFac += calcNeto(d);
   });
   disp.forEach(d => { if (d.docType === "nc") montoFac -= calcNeto(d); });
-  // Cerrada si monto facturado >= 99% del monto OC
-  return (montoOC > 0 ? montoFac / montoOC : 1) >= 0.99 ? "closed" : "toinvoice";
+  // Si monto facturado >= 99% del monto OC → cerrada (independiente de GDs sin vincular)
+  if ((montoFac / montoOC) >= 0.99) return "closed";
+  // Monto insuficiente — hay GDs sin factura pendientes
+  const normN = s => String(s).replace(/[\s.]/g, "");
+  const pendingGuias = disp.filter(d => {
+    if (d.docType !== "guia" || d.invoiceNumber) return false;
+    return !disp.some(f => f.docType === "factura" && f.gdNumber && normN(f.gdNumber) === normN(d.number || ""));
+  }).length;
+  return pendingGuias > 0 ? "toinvoice" : "toinvoice";
 };
 const autoMatch = (desc, ocItems, unitPrice) => {
   // Normalizar: sin tildes, guiones entre alfanum pegados (A-325→A325), sin puntuación, minúsculas
@@ -2126,7 +2119,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   const price = Number(it.unitPrice || (mapped ? mapped.unitPrice : 0) || 0);
                   return (
                     <div className="disp-row" key={i}>
-                      <span>{it.desc}{mapped ? <span style={{ fontSize:9, color:"var(--lime)", marginLeft:6 }}>→ {mapped.desc}</span> : <span style={{ fontSize:9, color:"var(--fog)", marginLeft:6 }}>sin vincular</span>}</span>
+                      <span>{it.desc}{d.docType === "guia" ? (mapped ? <span style={{ fontSize:9, color:"var(--lime)", marginLeft:6 }}>→ {mapped.desc}</span> : <span style={{ fontSize:9, color:"var(--fog)", marginLeft:6 }}>sin vincular</span>) : null}</span>
                       <span style={{ display:"flex", gap:10, alignItems:"center" }}>
                         <span style={{ color:"var(--fog)", fontSize:10 }}>{fmtNum(it.qty)} {it.unit}</span>
                         {price > 0 && <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(it.qty * price)}</span>}
