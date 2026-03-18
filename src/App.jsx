@@ -1898,7 +1898,8 @@ function ConvertModal({ dispatch, ocId, onClose, onSave }) {
   );
 }
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail }) {
+  const canDelGD = isAdmin || (userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl");
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
   const [dateVal, setDateVal] = useState(oc.deliveryDate || "");
@@ -2111,7 +2112,13 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   <DocBadge doc={d} />
                   <div className="disp-meta">
                     <span style={{ fontSize:10, color:"var(--fog)" }}>{d.date}</span>
-                    {(isAdmin || d.createdBy === currentUserId) ? <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id)}>Eliminar</button> : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => onRequestDel({ type:"request", label: (d.docType === "factura" ? "Factura" : "Guia") + " N° " + d.number })}>Eliminar</button>}
+                    {(() => {
+                      const canDelThis = isAdmin || d.createdBy === currentUserId ||
+                        (userEmail === "jhaeger@totalmetal.cl" && d.docType === "guia" && !d.invoiceNumber);
+                      return canDelThis
+                        ? <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id)}>Eliminar</button>
+                        : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => onRequestDel({ type:"request", label: (d.docType === "factura" ? "Factura" : "Guia") + " N° " + d.number })}>Eliminar</button>;
+                    })()}
                   </div>
                 </div>
                 {(d.items || []).map((it, i) => {
@@ -3957,7 +3964,7 @@ export default function App() {
           currentUserId={user.id}
         />
       )}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} />}
 
       {confirmDel && (
