@@ -1084,7 +1084,21 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
     setBsaleFacLoading(true); setBsaleFacErr(null); setBsaleFacResult(null);
     try {
       const facs = await fetchBsale("/documents.json", { documentTypeId: "1", number: num });
-      const matches = (facs.items || []).filter(d => String(d.number) === String(num));
+      // Filtrar solo facturas reales — excluir GDs (TD=52), boletas (TD=39/41) y otros
+      // Las facturas electrónicas son TD=33 (afecta) o TD=34 (exenta)
+      const isRealFac = d => {
+        if (d.ted) {
+          const tdMatch = d.ted.match(/<TD>(\d+)<\/TD>/);
+          if (tdMatch) {
+            const td = Number(tdMatch[1]);
+            return td === 33 || td === 34; // solo facturas electrónicas
+          }
+        }
+        // Sin TED: confiar en document_type — excluir tipo 7 (boleta) y tipos de GD
+        const dtId = Number(d.document_type?.id || 0);
+        return dtId !== 7 && dtId !== 8;
+      };
+      const matches = (facs.items || []).filter(d => String(d.number) === String(num) && isRealFac(d));
       if (!matches.length) { setBsaleFacErr("No se encontró ninguna factura con ese número"); setBsaleFacLoading(false); return; }
       const normS = s => String(s).replace(/[\s.]/g, "");
       const ocGDs = (oc.dispatches || []).filter(d => d.docType === "guia").map(d => normS(d.number || ""));
