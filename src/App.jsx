@@ -1105,7 +1105,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
           const refs = refsData.items || [];
           const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
           const matchesGD = gdRefs.some(r => ocGDs.includes(normS(String(r.number || ""))));
-          const ocMismatch = gdRefs.length > 0 && !matchesGD;
+          const ocMismatch = gdRefs.length > 0 && ocGDs.length > 0 && !matchesGD;
           const firstGDRef = gdRefs[0];
           return { ...doc, _ocMismatch: ocMismatch, _gdRefNumber: firstGDRef ? String(firstGDRef.number || "") : null };
         } catch(e) {
@@ -2423,7 +2423,15 @@ export default function App() {
         // Si todas son splitPrice (caso raro), contar solo la primera
         const toCount = matched.filter(ii => !ii.splitPrice);
         const effective = toCount.length > 0 ? toCount : matched.slice(0, 1);
-        const qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
+        let qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
+        // Si qty excede el total OC pero los montos cuadran (diferencia de unidad), limitar al máximo OC
+        if (d.docType !== "nc" && qty > Number(it.qty)) {
+          const montoDespacho = effective.reduce((a, ii) => a + Number(ii.qty) * Number(ii.unitPrice || 0), 0);
+          const montoOC = Number(it.qty) * Number(it.unitPrice || 0);
+          if (montoOC > 0 && Math.abs(montoDespacho - montoOC) / montoOC < 0.02) {
+            qty = Number(it.qty);
+          }
+        }
         // NC resta del despachado
         return d.docType === "nc" ? s - qty : s + qty;
       }, 0)
