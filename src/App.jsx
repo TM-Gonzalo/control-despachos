@@ -73,7 +73,8 @@ async function fetchBsale(path, params = {}) {
 async function extractPDF(b64, type, apiKey) {
   const prompts = {
     oc: `Extrae los datos de esta Orden de Compra. CONTEXTO IMPORTANTE: el receptor de esta OC es siempre "Total Metal" o "Industrial y Comercial Total Metal" (el proveedor). El campo "client" debe ser la empresa DIFERENTE a Total Metal que aparece como emisora o compradora. Busca el nombre del cliente en el encabezado como "Empresa:", "Razon Social:", "De:", "Cliente:", o en el bloque de datos del comprador/emisor. NUNCA uses "Total Metal", "Industrial y Comercial Total Metal" ni variantes como valor de "client". Para el campo "notes": extrae SOLO informacion operativa relevante como nombre de obra, OT, numero de proyecto, forma de pago, lugar de entrega o referencias internas. NO incluyas texto legal, instrucciones de facturacion electronica, terminos y condiciones ni notas de cumplimiento legal. Si no hay notas operativas relevantes, usa null. Responde SOLO JSON sin texto extra ni backticks: {"ocNumber":"string o null","client":"string","date":"YYYY-MM-DD o null","deliveryDate":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"notes":"string o null"}`,
-    dispatch: `Extrae los datos de este documento (factura o guia de despacho). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA. IMPORTANTE: todos los valores numericos (qty, unitPrice, netTotal, total) deben ser numeros enteros o decimales SIN puntos de miles ni separadores — por ejemplo 2463 NO 2.463, y 6090000 NO 6.090.000. Extrae el campo "ocNumber" con el numero de OC (busca "OC", "Orden de Compra", "N° OC", "PO", "Purchase Order"). Si el documento es una FACTURA, extrae tambien el campo "gdNumber" con el numero de Guia de Despacho referenciada (busca en la seccion "Referencias a otros Documentos" o "Referencias" el folio de tipo "Guia de Despacho Electronica", "Guia de Despacho" o "GD"). Si no hay GD referenciada, "gdNumber" debe ser null. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia","date":"YYYY-MM-DD o null","gdNumber":"string o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
+    nc: `Extrae los datos de esta Nota de Credito. El campo "refInvoice" es el numero de la FACTURA a la que se aplica la NC (busca "DOC. REFERENCIA", "Referencia", "Factura N°" o similar). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA, ambos como numeros POSITIVOS. IMPORTANTE: todos los valores numericos sin puntos de miles. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"nc","date":"YYYY-MM-DD o null","refInvoice":"string o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`,
+    dispatch: `Extrae los datos de este documento (factura, guia de despacho o nota de credito). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". Para facturas y NC, "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA, siempre como valores POSITIVOS. IMPORTANTE: todos los valores numericos (qty, unitPrice, netTotal, total) deben ser numeros enteros o decimales SIN puntos de miles ni separadores — por ejemplo 2463 NO 2.463, y 6090000 NO 6.090.000. Si el documento dice "NOTA DE CREDITO" o "NOTA DE CRÉDITO", el campo "docType" debe ser "nc" y el campo "refInvoice" debe contener el numero de la factura referenciada (busca "DOC. REFERENCIA", "Referencia" o similar); en ese caso "gdNumber" es null. Si es factura, extrae "gdNumber" con el numero de GD referenciada. Si es guia, "gdNumber" es null. Extrae el campo "ocNumber" con el numero de OC. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"factura o guia o nc","date":"YYYY-MM-DD o null","gdNumber":"string o null","refInvoice":"string o null","ocNumber":"string o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`
   };
 
   // Intenta primero el proxy seguro (API key server-side).
@@ -335,6 +336,7 @@ tr:hover td{background:rgba(255,255,255,.012)}
 .bdoc-factura{background:rgba(61,255,196,.08);color:var(--teal);border:1px solid rgba(61,255,196,.2)}
 .bdoc-guia{background:rgba(167,139,255,.1);color:var(--violet);border:1px solid rgba(167,139,255,.22)}
 .bdoc-guia-pend{background:rgba(232,184,75,.08);color:var(--gold);border:1px solid rgba(232,184,75,.2)}
+.bdoc-nc{background:rgba(255,140,0,.1);color:#ff8c00;border:1px solid rgba(255,140,0,.3)}
 .pbar-wrap{background:var(--ink);border-radius:99px;height:4px;overflow:hidden}
 .pbar{height:100%;border-radius:99px;transition:width .5s}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
@@ -471,6 +473,9 @@ function Dot({ c }) {
 }
 
 function DocBadge({ doc }) {
+  if (doc.docType === "nc") {
+    return <span className="badge bdoc-nc"><Dot c="#ff8c00" />NC {doc.number}{doc.refInvoice ? <span style={{ color:"var(--fog)", marginLeft:4, fontSize:8 }}>Fac. {doc.refInvoice}</span> : null}</span>;
+  }
   if (doc.docType === "factura") {
     return <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {doc.number}</span>;
   }
@@ -1156,7 +1161,24 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
     setErr(null); setLoading(true);
     try {
       const b64 = await toB64(f);
+      // Intentar detectar NC primero (si el PDF la menciona) extrayendo con prompt NC
+      // Usamos dispatch por defecto; si el resultado tiene docType "nc", usamos ese
       const d = await extractPDF(b64, "dispatch", apiKey);
+      // Si la IA detectó NC en el campo docType o es una NC (no factura ni guia)
+      const isNC = d.docType === "nc";
+      if (isNC) {
+        setExt(d); setNum(d.docNumber || ""); setDate(d.date || today());
+        setDocType("nc");
+        const its = (d.items || []).map((it, i) => ({ ...it, id: i + 1 }));
+        setItems(its);
+        const am = {};
+        its.forEach((it, i) => { am[i] = autoMatch(it.desc, oc.items, it.unitPrice) || "NONE"; });
+        setMap(am);
+        setOcMismatch(null);
+        setStep(1);
+        setLoading(false);
+        return;
+      }
       setExt(d); setNum(d.docNumber || ""); setDate(d.date || today());
       setDocType(d.docType === "factura" ? "factura" : "guia");
       const its = (d.items || []).map((it, i) => ({ ...it, id: i + 1 }));
@@ -1256,7 +1278,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
       const dispTotal = mapped.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
       const saveNetTotal = ext?.netTotal || dispTotal || 0;
       const saveTotal = ext?.total || (saveNetTotal ? Math.round(saveNetTotal * 1.19) : 0);
-      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, gdNumber: ext?.gdNumber || null, total: saveTotal, netTotal: saveNetTotal, items: mapped, createdBy: createdBy });
+      const ncRefInvoice = docType === "nc" ? (ext?.refInvoice || null) : null;
+      await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, gdNumber: ext?.gdNumber || null, refInvoice: ncRefInvoice, total: saveTotal, netTotal: saveNetTotal, items: mapped, createdBy: createdBy });
       // resetear para agregar otro despacho sin cerrar
       setSavedCount(c => c + 1);
       setLastSaved({ num, docType });
@@ -1305,7 +1328,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
             {lastSaved && (
               <div style={{ background:"rgba(127,255,90,.08)", border:"1px solid rgba(127,255,90,.2)", borderRadius:7, padding:"10px 14px", marginBottom:14, display:"flex", alignItems:"center", gap:10 }}>
                 <span style={{ color:"var(--lime)", fontSize:14 }}>✓</span>
-                <span style={{ fontSize:12, color:"var(--lime)" }}>{lastSaved.linked ? "Factura N° " + lastSaved.num + " vinculada a GD existente." : (lastSaved.docType === "factura" ? "Factura" : "Guia") + " N° " + lastSaved.num + " registrada."}</span>
+                <span style={{ fontSize:12, color:"var(--lime)" }}>{lastSaved.linked ? "Factura N° " + lastSaved.num + " vinculada a GD existente." : (lastSaved.docType === "factura" ? "Factura" : lastSaved.docType === "nc" ? "NC" : "Guia") + " N° " + lastSaved.num + " registrada."}</span>
                 <span style={{ fontSize:11, color:"var(--fog2)", marginLeft:"auto" }}>{savedCount} guardado{savedCount !== 1 ? "s" : ""} en esta sesión</span>
               </div>
             )}
@@ -1378,11 +1401,13 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                 <select value={docType} onChange={e => setDocType(e.target.value)}>
                   <option value="guia">Guia de Despacho</option>
                   <option value="factura">Factura</option>
+                  <option value="nc">Nota de Crédito</option>
                 </select>
               </div>
-              <div className="fg"><label>N° DOCUMENTO *</label><input value={num} onChange={e => setNum(e.target.value)} placeholder={docType === "factura" ? "Ej: 12345" : "Ej: 8821"} /></div>
+              <div className="fg"><label>N° DOCUMENTO *</label><input value={num} onChange={e => setNum(e.target.value)} placeholder={docType === "factura" ? "Ej: 12345" : docType === "nc" ? "Ej: 158" : "Ej: 8821"} /></div>
               <div className="fg"><label>FECHA</label><input type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
-              {docType === "factura" && <div className="fg"><label>MONTO NETO FACTURA *</label><input type="number" value={ext?.netTotal || 0} onChange={e => setExt(p => ({ ...p, netTotal: Number(e.target.value) }))} placeholder="Monto neto sin IVA" /></div>}
+              {docType === "nc" && <div className="fg"><label>N° FACTURA REFERENCIADA *</label><input value={ext?.refInvoice || ""} onChange={e => setExt(p => ({ ...p, refInvoice: e.target.value }))} placeholder="Ej: 1795" /></div>}
+              {(docType === "factura" || docType === "nc") && <div className="fg"><label>{docType === "nc" ? "MONTO NETO NC *" : "MONTO NETO FACTURA *"}</label><input type="number" value={ext?.netTotal || 0} onChange={e => setExt(p => ({ ...p, netTotal: Number(e.target.value) }))} placeholder="Monto neto sin IVA" /></div>}
             </div>
             <div className="slbl">ITEMS DEL DOCUMENTO</div>
             <div className="itbl">
@@ -1609,7 +1634,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginBottom:11, marginTop:8 }}>⚠ {err}</div>}
             <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:14 }}>
               <button className="btn btn-ghost" onClick={() => setStep(2)}>← Corregir mapeo</button>
-              <button className="btn btn-gold" onClick={save} disabled={saving}>{saving ? <><div className="spin" />Guardando...</> : "Confirmar y Registrar " + (docType === "factura" ? "Factura" : "Guia") + " ✓"}</button>
+              <button className="btn btn-gold" onClick={save} disabled={saving}>{saving ? <><div className="spin" />Guardando...</> : "Confirmar y Registrar " + (docType === "factura" ? "Factura" : docType === "nc" ? "NC" : "Guia") + " ✓"}</button>
             </div>
           </>
         )}
@@ -1677,8 +1702,10 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
     if (docFilter === "all") return true;
     if (docFilter === "factura") return d.docType === "factura" || (d.docType === "guia" && d.invoiceNumber);
     if (docFilter === "guia") return d.docType === "guia";
+    if (docFilter === "nc") return d.docType === "nc";
     return true;
   });
+  const hasNC = dispatches.some(d => d.docType === "nc");
   const pendingGuias = dispatches.filter(d => d.docType === "guia" && !d.invoiceNumber).length;
   const pctGlobal = totAmt > 0 ? Math.round(disAmt / totAmt * 100) : 0;
 
@@ -1781,7 +1808,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
         </div>
         {dispatches.length > 0 && (
           <div className="doc-tabs">
-            {[["all","Todos"],["factura","Facturas"],["guia","Guias"]].map(([v, l]) => (
+            {([["all","Todos"],["factura","Facturas"],["guia","Guias"]].concat(hasNC ? [["nc","NC"]] : [])).map(([v, l]) => (
               <div key={v} className={"doc-tab" + (docFilter === v ? " on" : "")} onClick={() => setDocFilter(v)}>{l}</div>
             ))}
           </div>
@@ -1791,6 +1818,41 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
           : filteredDisp.length === 0
             ? <div style={{ textAlign:"center", padding:"14px", color:"var(--fog)", fontSize:11 }}>No hay documentos de este tipo</div>
             : <div className="disp-list">{filteredDisp.map(d => {
+              // NC — tarjeta especial en naranja
+              if (d.docType === "nc") {
+                const total = Number(d.total || 0);
+                const neto = Number(d.netTotal || 0);
+                return (
+                  <div className="disp-card" key={d.id} style={{ borderLeft:"2px solid #ff8c00", background:"rgba(255,140,0,.04)" }}>
+                    <div className="disp-hd">
+                      <DocBadge doc={d} />
+                      <div className="disp-meta">
+                        <span style={{ fontSize:10, color:"var(--fog)" }}>{d.date}</span>
+                        {(isAdmin || d.createdBy === currentUserId) ? <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id)}>Eliminar</button> : null}
+                      </div>
+                    </div>
+                    {(d.items || []).map((it, i) => {
+                      const mapped = oc.items.find(o => o.id === it.ocItemId);
+                      const price = Number(it.unitPrice || (mapped ? mapped.unitPrice : 0) || 0);
+                      return (
+                        <div className="disp-row" key={i}>
+                          <span style={{ color:"var(--fog2)" }}>↩ {it.desc}{mapped ? <span style={{ fontSize:9, color:"var(--lime)", marginLeft:6 }}>→ {mapped.desc}</span> : null}</span>
+                          <span style={{ display:"flex", gap:10, alignItems:"center" }}>
+                            <span style={{ color:"#ff8c00", fontSize:10 }}>-{fmtNum(it.qty)} {it.unit}</span>
+                            {price > 0 && <span style={{ color:"#ff8c00", fontWeight:600 }}>-{fmtCLP(it.qty * price)}</span>}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {(neto > 0 || total > 0) && (
+                      <div style={{ display:"flex", justifyContent:"flex-end", gap:16, borderTop:"1px solid var(--line)", marginTop:6, paddingTop:6 }}>
+                        {neto > 0 && <span style={{ fontSize:10, color:"var(--fog)" }}>Neto: <span style={{ color:"#ff8c00", fontWeight:600 }}>-{fmtCLP(neto)}</span></span>}
+                        {total > 0 && <span style={{ fontSize:10, color:"var(--fog)" }}>Total c/IVA: <span style={{ color:"#ff8c00", fontWeight:600 }}>-{fmtCLP(total)}</span></span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
               // GD con factura vinculada mostrada en pestaña Facturas — vista de factura
               const isLinkedInvoice = d.docType === "guia" && d.invoiceNumber && docFilter === "factura";
               if (isLinkedInvoice) {
@@ -2097,7 +2159,9 @@ export default function App() {
         // Si todas son splitPrice (caso raro), contar solo la primera
         const toCount = matched.filter(ii => !ii.splitPrice);
         const effective = toCount.length > 0 ? toCount : matched.slice(0, 1);
-        return s + effective.reduce((a, ii) => a + Number(ii.qty), 0);
+        const qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
+        // NC resta del despachado
+        return d.docType === "nc" ? s - qty : s + qty;
       }, 0)
     }))
   }));
@@ -2164,7 +2228,7 @@ export default function App() {
     if (dispatch.number && dispatch.number.trim()) {
       const norm = dispatch.number.trim().toLowerCase();
       const dupe = existing.find(d => d.number && d.number.trim().toLowerCase() === norm && d.docType === dispatch.docType);
-      if (dupe) throw new Error((dispatch.docType === "factura" ? "Factura" : "Guia") + " N° " + dispatch.number + " ya está registrada en esta OC.");
+      if (dupe) throw new Error((dispatch.docType === "factura" ? "Factura" : dispatch.docType === "nc" ? "NC" : "Guia") + " N° " + dispatch.number + " ya está registrada en esta OC.");
     }
     const updated = ocs.map(o => o.id === ocId ? { ...o, dispatches: [...(o.dispatches || []), dispatch] } : o);
     await persist(updated);
@@ -2173,7 +2237,7 @@ export default function App() {
       setShowDetail({ ...live, dispatches: [...(live.dispatches || []), dispatch] });
     }
     // no cerrar el modal — se resetea internamente para agregar otro
-    notify((dispatch.docType === "factura" ? "Factura" : "Guia") + " registrada ✓");
+    notify((dispatch.docType === "factura" ? "Factura" : dispatch.docType === "nc" ? "NC" : "Guia") + " registrada ✓");
   };
 
   const handleDelDispatch = (ocId, dispId) => {
@@ -2749,10 +2813,30 @@ export default function App() {
                     }
                   });
                 });
+                // Aplicar NCs: restar de la factura referenciada si existe
+                const ncMap = {}; // facNumber -> monto NC acumulado
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
+                    if (d.docType === "nc" && d.refInvoice && d.date) {
+                      const key = String(d.refInvoice).trim();
+                      const ncNeto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0),0);
+                      const ncTotal = Number(d.total || 0) || Math.round(ncNeto * 1.19);
+                      if (!ncMap[key]) ncMap[key] = { neto: 0, total: 0 };
+                      ncMap[key].neto += ncNeto;
+                      ncMap[key].total += ncTotal;
+                    }
+                  });
+                });
+                // Descontar NCs de las facturas
+                const allFacsAdj = allFacs.map(f => {
+                  const nc = ncMap[String(f.number || "").trim()];
+                  if (!nc) return f;
+                  return { ...f, total: Math.max(0, f.total - nc.total), neto: Math.max(0, (f.neto||0) - nc.neto), _ncDesc: nc.total };
+                });
                 // Años disponibles
-                const availableYears = [...new Set(allFacs.map(f => f.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
+                const availableYears = [...new Set(allFacsAdj.map(f => f.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
                 // Filtrar por año seleccionado
-                const filteredFacs = selectedYear === "all" ? allFacs : allFacs.filter(f => f.date.startsWith(selectedYear));
+                const filteredFacs = selectedYear === "all" ? allFacsAdj : allFacsAdj.filter(f => f.date.startsWith(selectedYear));
                 // Agrupar por año-mes
                 const byMonth = filteredFacs.reduce((acc, fac) => {
                   const key = fac.date.slice(0, 7); // "YYYY-MM"
@@ -2828,7 +2912,10 @@ export default function App() {
                                         <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
                                         <span style={{ color:"var(--fog)", fontSize:10 }}>{f.date}</span>
                                         <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}{f._fromGD ? <span style={{ color:"var(--violet)", marginLeft:6 }}>· GD {f._fromGD}</span> : null}</span>
-                                        <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
+                                        <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
+                                          <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
+                                          {f._ncDesc > 0 && <span style={{ fontSize:9, color:"#ff8c00" }}>NC -{fmtCLP(f._ncDesc)}</span>}
+                                        </span>
                                       </div>
                                     ))}
                                   </div>
@@ -2926,8 +3013,28 @@ export default function App() {
                   });
                 });
 
+                // Aplicar NCs al reporte Factoring
+                const ncMapFact = {};
+                enriched.forEach(oc => {
+                  (oc.dispatches || []).forEach(d => {
+                    if (d.docType === "nc" && d.refInvoice && d.date) {
+                      const key = String(d.refInvoice).trim();
+                      const ncNeto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0),0);
+                      const ncTotal = Number(d.total || 0) || Math.round(ncNeto * 1.19);
+                      if (!ncMapFact[key]) ncMapFact[key] = { neto: 0, conIVA: 0 };
+                      ncMapFact[key].neto += ncNeto;
+                      ncMapFact[key].conIVA += ncTotal;
+                    }
+                  });
+                });
+                const allFacsAdj = allFacs.map(f => {
+                  const nc = ncMapFact[String(f.facNumber || "").trim()];
+                  if (!nc) return f;
+                  return { ...f, conIVA: Math.max(0, f.conIVA - nc.conIVA), neto: Math.max(0, f.neto - nc.neto), _ncDesc: nc.conIVA };
+                });
+
                 // Agrupar por mes
-                const byMonth = allFacs.reduce((acc, f) => {
+                const byMonth = allFacsAdj.reduce((acc, f) => {
                   const key = f.date.slice(0,7);
                   if (!acc[key]) acc[key] = [];
                   acc[key].push(f);
@@ -2940,10 +3047,10 @@ export default function App() {
                 const isNo = key => !!(factoringData[key] && factoringData[key].entity === "No");
                 const getEntity = key => factoringData[key]?.entity || null;
 
-                const totalConIVA = allFacs.reduce((s,f) => s + f.conIVA, 0);
-                const totalNeto = allFacs.reduce((s,f) => s + f.neto, 0);
-                const totalFactorizado = allFacs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
-                const totalNo = allFacs.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                const totalConIVA = allFacsAdj.reduce((s,f) => s + f.conIVA, 0);
+                const totalNeto = allFacsAdj.reduce((s,f) => s + f.neto, 0);
+                const totalFactorizado = allFacsAdj.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                const totalNo = allFacsAdj.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
                 const totalPendiente = totalConIVA - totalFactorizado - totalNo;
 
                 // Column widths fixed
@@ -2976,7 +3083,7 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    {allFacs.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay facturas registradas aún.</p></div>}
+                    {allFacsAdj.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay facturas registradas aún.</p></div>}
                     {months.map(month => {
                       const facs = byMonth[month];
                       const mesTotal = facs.reduce((s,f) => s + f.conIVA, 0);
@@ -3060,7 +3167,10 @@ export default function App() {
                                       </td>
                                       <td style={{ color:"var(--violet)", fontSize:10 }}>{f.gdNumber || "—"}</td>
                                       <td style={{ color:"var(--teal)", fontWeight:600 }}>{f.facNumber || "—"}</td>
-                                      <td style={{ textAlign:"right", color: fact ? "var(--lime)" : "var(--white)", fontWeight:600 }}>{fmtCLP(f.conIVA)}</td>
+                                      <td style={{ textAlign:"right" }}>
+                                        <div style={{ fontWeight:600, color: fact ? "var(--lime)" : "var(--white)" }}>{fmtCLP(f.conIVA)}</div>
+                                        {f._ncDesc > 0 && <div style={{ fontSize:9, color:"#ff8c00" }}>NC -{fmtCLP(f._ncDesc)}</div>}
+                                      </td>
                                       <td>
                                         <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
                                           {ENTITIES.map(e => {
