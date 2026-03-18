@@ -1857,6 +1857,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
               </div>
             </div>
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginBottom:11, marginTop:8 }}>⚠ {err}</div>}
+            {warn && <div style={{ color:"var(--gold)", fontSize:11, marginBottom:11, marginTop:8, background:"rgba(232,184,75,.08)", border:"1px solid rgba(232,184,75,.2)", borderRadius:5, padding:"6px 10px" }}>⚠ {warn}</div>}
             <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:14 }}>
               <button className="btn btn-ghost" onClick={() => setStep(2)}>← Corregir mapeo</button>
               <button className="btn btn-gold" onClick={save} disabled={saving}>{saving ? <><div className="spin" />Guardando...</> : "Confirmar y Registrar " + (docType === "factura" ? "Factura" : docType === "nc" ? "NC" : "Guia") + " ✓"}</button>
