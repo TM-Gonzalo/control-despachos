@@ -157,10 +157,42 @@ const ocStatus = (items, dispatches) => {
   const dis = items.reduce((s, i) => s + Number(i.dispatched || 0), 0);
   if (dis === 0) return "open";
   if (dis < tot) return "partial";
-  // 100% despachado — revisar si hay guías sin factura
+  // 100% despachado — revisar guías sin factura y monto facturado vs monto OC
   const disp = dispatches || [];
   const pendingGuias = disp.filter(d => d.docType === "guia" && !d.invoiceNumber).length;
-  return pendingGuias > 0 ? "toinvoice" : "closed";
+  if (pendingGuias > 0) return "toinvoice";
+  // Calcular monto OC
+  const montoOC = items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice || 0), 0);
+  if (montoOC === 0) return "closed"; // sin precio, solo verificar cantidad
+  // Calcular monto facturado neto (facturas directas + GDs vinculadas - NCs)
+  let montoFac = 0;
+  const gdFacNums = new Set();
+  // Sumar facturas directas
+  disp.forEach(d => {
+    if (d.docType === "factura") {
+      const neto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0), 0);
+      montoFac += neto;
+      if (d.number) gdFacNums.add(String(d.number).trim());
+    }
+  });
+  // Sumar GDs vinculadas (solo si no existe ya la factura directa)
+  disp.forEach(d => {
+    if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
+      if (gdFacNums.has(String(d.invoiceNumber).trim())) return;
+      const neto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0), 0);
+      montoFac += neto;
+    }
+  });
+  // Restar NCs
+  disp.forEach(d => {
+    if (d.docType === "nc") {
+      const neto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0), 0);
+      montoFac -= neto;
+    }
+  });
+  // Comparar con tolerancia del 1%
+  const pctFac = montoOC > 0 ? montoFac / montoOC : 1;
+  return pctFac >= 0.99 ? "closed" : "toinvoice";
 };
 const autoMatch = (desc, ocItems, unitPrice) => {
   // Normalizar: sin tildes, guiones entre alfanum pegados (A-325→A325), sin puntuación, minúsculas
