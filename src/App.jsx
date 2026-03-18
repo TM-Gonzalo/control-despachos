@@ -3756,8 +3756,17 @@ export default function App() {
                 // Recolectar todas las GDs sin factura
                 const pendFacs = [];
                 enriched.forEach(oc => {
+                  const ocStatusVal = ocStatus(oc.items, oc.dispatches);
+                  // Solo OCs que realmente están pendientes de facturar
+                  if (ocStatusVal === "closed") return;
+                  const normN = s => String(s).replace(/[\s.]/g, "");
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "guia" && !d.invoiceNumber) {
+                      // Verificar que no esté cubierta por factura directa con gdNumber
+                      const coveredByDirectFac = (oc.dispatches || []).some(f =>
+                        f.docType === "factura" && f.gdNumber && normN(f.gdNumber) === normN(d.number || "")
+                      );
+                      if (coveredByDirectFac) return;
                       const dias = diffDays(d.date);
                       const tol = tolerancia(oc.client, oc.rut);
                       const atrasada = dias !== null && dias > tol;
@@ -3766,7 +3775,6 @@ export default function App() {
                         const price = Number(it.unitPrice || (ocItem ? ocItem.unitPrice : 0) || 0);
                         return s + (Number(it.qty) || 0) * price;
                       }, 0);
-                      const ocStatusVal = ocStatus(oc.items, oc.dispatches);
                       pendFacs.push({ ...d, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, dias, tol, atrasada, ocStatusVal });
                     }
                   });
