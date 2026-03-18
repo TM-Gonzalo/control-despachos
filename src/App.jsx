@@ -159,7 +159,15 @@ const ocStatus = (items, dispatches) => {
   if (dis < tot) return "partial";
   // 100% despachado — revisar guías sin factura y monto facturado vs monto OC
   const disp = dispatches || [];
-  const pendingGuias = disp.filter(d => d.docType === "guia" && !d.invoiceNumber).length;
+  const pendingGuias = disp.filter(d => {
+    if (d.docType !== "guia" || d.invoiceNumber) return false;
+    // Verificar si hay una factura directa que declare esta GD como gdNumber
+    const normN = s => String(s).replace(/[\s.]/g, "");
+    const coveredByDirectFac = disp.some(f =>
+      f.docType === "factura" && f.gdNumber && normN(f.gdNumber) === normN(d.number || "")
+    );
+    return !coveredByDirectFac;
+  }).length;
   if (pendingGuias > 0) return "toinvoice";
   // Calcular monto OC
   const montoOC = items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice || 0), 0);
@@ -1115,9 +1123,10 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
     setErr(null); setLoading(true);
     try {
       const num = String(doc.number || "");
-      const date = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0, 10) : today();
-      const netTotal = doc.netAmount || 0;
+      const rawDate = doc.documentDate || doc.generationDate;
+      const date = rawDate ? new Date(rawDate * 1000).toISOString().slice(0, 10) : today();
       const total = doc.totalAmount || 0;
+      const netTotal = doc.netAmount || (total ? Math.round(total / 1.19) : 0);
 
       // Verificar si ya está registrada
       const alreadyAdded = (oc.dispatches || []).some(d =>
@@ -1535,7 +1544,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                 {bsaleFacResult && (() => {
                   const doc = bsaleFacResult;
                   const num = String(doc.number || "");
-                  const fecha = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0,10) : "—";
+                  const rawDateFac = doc.documentDate || doc.generationDate;
+                  const fecha = rawDateFac ? new Date(rawDateFac * 1000).toISOString().slice(0,10) : "—";
                   const monto = doc.totalAmount ? "$" + Number(doc.totalAmount).toLocaleString("es-CL") : "—";
                   const alreadyAdded = (oc.dispatches || []).some(d =>
                     (d.docType === "factura" && String(d.number || "") === num) ||
