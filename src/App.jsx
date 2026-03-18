@@ -1977,7 +1977,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
             </div>
           </div>
           <div style={{ display:"flex", gap:7, alignItems:"center" }}>
-            <span className={"badge " + bCls(st)}><Dot c={st === "open" ? "var(--sky)" : st === "partial" ? "var(--gold)" : "var(--lime)"} />{bLbl(st)}</span>
+            <span className={"badge " + bCls(st)}><Dot c={st === "open" ? "var(--sky)" : st === "partial" ? "var(--gold)" : st === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(st)}</span>
             <div className="xbtn" onClick={onClose}>✕</div>
           </div>
         </div>
@@ -2119,6 +2119,23 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   <DocBadge doc={d} />
                   <div className="disp-meta">
                     <span style={{ fontSize:10, color:"var(--fog)" }}>{d.date}</span>
+                    {d.docType === "factura" && !d.gdNumber && (() => {
+                      const unlinkedGDs = (oc.dispatches || []).filter(g => g.docType === "guia" && !g.invoiceNumber);
+                      if (unlinkedGDs.length === 0) return null;
+                      return (
+                        <select
+                          style={{ background:"var(--ink3)", border:"1px solid var(--teal)", borderRadius:4, color:"var(--teal)", fontSize:9, padding:"2px 6px", fontFamily:"var(--fM)", cursor:"pointer" }}
+                          defaultValue=""
+                          onChange={e => {
+                            if (!e.target.value) return;
+                            const gd = unlinkedGDs.find(g => g.id === e.target.value);
+                            if (gd) onDelDispatch(oc.id, d.id, "relink", { gdId: gd.id, invoiceNumber: d.number, invoiceDate: d.date, netTotal: d.netTotal, total: d.total, items: d.items });
+                          }}>
+                          <option value="">↔ Vincular a GD...</option>
+                          {unlinkedGDs.map(g => <option key={g.id} value={g.id}>GD {g.number} · {g.date}</option>)}
+                        </select>
+                      );
+                    })()}
                     {(() => {
                       const canDelThis = isAdmin || d.createdBy === currentUserId ||
                         (userEmail === "jhaeger@totalmetal.cl" && d.docType === "guia" && !d.invoiceNumber);
@@ -2478,7 +2495,20 @@ export default function App() {
     notify((dispatch.docType === "factura" ? "Factura" : dispatch.docType === "nc" ? "NC" : "Guia") + " registrada ✓");
   };
 
-  const handleDelDispatch = (ocId, dispId) => {
+  const handleDelDispatch = async (ocId, dispId, action, relinkData) => {
+    if (action === "relink" && relinkData) {
+      const { gdId, invoiceNumber, invoiceDate, netTotal, total, items } = relinkData;
+      const updated = ocs.map(o => o.id === ocId ? {
+        ...o,
+        dispatches: (o.dispatches || [])
+          .filter(d => d.id !== dispId)
+          .map(d => d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: items || [] } : d)
+      } : o);
+      await persist(updated);
+      if (showDetail && showDetail.id === ocId) setShowDetail(enriched.find(o => o.id === ocId));
+      notify("Factura N° " + invoiceNumber + " vinculada a GD ✓");
+      return;
+    }
     const oc = ocs.find(o => o.id === ocId);
     const disp = (oc?.dispatches || []).find(d => d.id === dispId);
     setConfirmDel({ type:"dispatch", ocId, dispId, label: disp ? (disp.docType === "factura" ? "Factura" : "Guia") + " N° " + disp.number : "documento" });
