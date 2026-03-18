@@ -1103,9 +1103,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
         try {
           const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
           const refs = refsData.items || [];
-          const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
+          const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia") || String(r.dte_code?.id || "") === "16" || String(r.dte_code?.id || "") === "52");
           const matchesGD = gdRefs.some(r => ocGDs.includes(normS(String(r.number || ""))));
-          const ocMismatch = gdRefs.length > 0 && ocGDs.length > 0 && !matchesGD;
+          const ocMismatch = gdRefs.length > 0 && !matchesGD;
           const firstGDRef = gdRefs[0];
           return { ...doc, _ocMismatch: ocMismatch, _gdRefNumber: firstGDRef ? String(firstGDRef.number || "") : null };
         } catch(e) {
@@ -1168,7 +1168,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
         try {
           const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
           const refs = refsData.items || [];
-          const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
+          const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia") || String(r.dte_code?.id || "") === "16" || String(r.dte_code?.id || "") === "52");
           if (gdRef) gdNumber = String(gdRef.number || "");
         } catch(e) { /* continuar sin GD ref */ }
       }
@@ -1261,7 +1261,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
         const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
         const refs = refsData.items || [];
         // Buscar referencia a GD
-        const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
+        const gdRef = refs.find(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia") || String(r.dte_code?.id || "") === "16" || String(r.dte_code?.id || "") === "52");
         if (gdRef) gdNumber = String(gdRef.number || "");
         // Validar que el documento referencia la OC actual
         const norm = s => String(s).replace(/[\s.]/g, "");
@@ -2423,15 +2423,7 @@ export default function App() {
         // Si todas son splitPrice (caso raro), contar solo la primera
         const toCount = matched.filter(ii => !ii.splitPrice);
         const effective = toCount.length > 0 ? toCount : matched.slice(0, 1);
-        let qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
-        // Si qty excede el total OC pero los montos cuadran (diferencia de unidad), limitar al máximo OC
-        if (d.docType !== "nc" && qty > Number(it.qty)) {
-          const montoDespacho = effective.reduce((a, ii) => a + Number(ii.qty) * Number(ii.unitPrice || 0), 0);
-          const montoOC = Number(it.qty) * Number(it.unitPrice || 0);
-          if (montoOC > 0 && Math.abs(montoDespacho - montoOC) / montoOC < 0.02) {
-            qty = Number(it.qty);
-          }
-        }
+        const qty = effective.reduce((a, ii) => a + Number(ii.qty), 0);
         // NC resta del despachado
         return d.docType === "nc" ? s - qty : s + qty;
       }, 0)
