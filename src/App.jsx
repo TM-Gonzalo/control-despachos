@@ -1085,7 +1085,13 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
     setBsaleFacLoading(true); setBsaleFacErr(null); setBsaleFacResult(null);
     try {
       const facs = await fetchBsale("/documents.json", { documentTypeId: "1", number: num });
-      const matches = (facs.items || []).filter(d => String(d.number) === String(num));
+      const getTDFac = d => { const m = (d.ted || "").match(/<TD>(\d+)<\/TD>/); return m ? Number(m[1]) : null; };
+      const matches = (facs.items || []).filter(d => {
+        if (String(d.number) !== String(num)) return false;
+        const td = getTDFac(d);
+        if (td !== null) return td === 33 || td === 34; // solo facturas electrónicas
+        return Number(d.document_type?.id || 0) !== 7 && Number(d.document_type?.id || 0) !== 8;
+      });
       if (!matches.length) { setBsaleFacErr("No se encontró ninguna factura con ese número"); setBsaleFacLoading(false); return; }
       const normS = s => String(s).replace(/[\s.]/g, "");
       const ocGDs = (oc.dispatches || []).filter(d => d.docType === "guia").map(d => normS(d.number || ""));
