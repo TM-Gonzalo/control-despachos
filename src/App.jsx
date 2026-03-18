@@ -1085,36 +1085,33 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
     setBsaleLoading(false);
   };
 
-  // Buscador dedicado de FACTURAS para vincular a GD existente
+  // Buscador dedicado de FACTURAS — bsaleFacResult es array de candidatos
   const searchBsaleFac = async (num) => {
     if (!num || num.length < 2) { setBsaleFacResult(null); return; }
     setBsaleFacLoading(true); setBsaleFacErr(null); setBsaleFacResult(null);
     try {
       const facs = await fetchBsale("/documents.json", { documentTypeId: "1", number: num });
-      const match = (facs.items || []).find(d => String(d.number) === String(num));
-      if (!match) { setBsaleFacErr("No se encontró ninguna factura con ese número"); setBsaleFacLoading(false); return; }
-      // Validar referencias — Bsale guarda OC con ID interno (no folio SAP), así que
-      // solo validamos contra GDs registradas en esta OC.
-      try {
-        const refsData = await fetchBsale("/documents/" + match.id + "/references.json");
-        const refs = refsData.items || [];
-        const normS = s => String(s).replace(/[\s.]/g, "");
-        const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
-        if (gdRefs.length > 0) {
-          const ocGDs = (oc.dispatches || []).filter(d => d.docType === "guia").map(d => normS(d.number || ""));
+      const matches = (facs.items || []).filter(d => String(d.number) === String(num));
+      if (!matches.length) { setBsaleFacErr("No se encontró ninguna factura con ese número"); setBsaleFacLoading(false); return; }
+      const normS = s => String(s).replace(/[\s.]/g, "");
+      const ocGDs = (oc.dispatches || []).filter(d => d.docType === "guia").map(d => normS(d.number || ""));
+      // Enriquecer cada match con sus referencias
+      const enriched = await Promise.all(matches.map(async doc => {
+        try {
+          const refsData = await fetchBsale("/documents/" + doc.id + "/references.json");
+          const refs = refsData.items || [];
+          const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia"));
           const matchesGD = gdRefs.some(r => ocGDs.includes(normS(String(r.number || ""))));
-          if (!matchesGD) {
-            const gdNums = gdRefs.map(r => r.number).filter(Boolean).join(", ");
-            setBsaleFacErr("⚠ Esta factura referencia GD " + gdNums + ", que no pertenece a esta OC");
-            setBsaleFacResult({ ...match, _ocMismatch: true });
-            setBsaleFacLoading(false);
-            return;
-          }
+          const ocMismatch = gdRefs.length > 0 && !matchesGD;
+          const firstGDRef = gdRefs[0];
+          return { ...doc, _ocMismatch: ocMismatch, _gdRefNumber: firstGDRef ? String(firstGDRef.number || "") : null };
+        } catch(e) {
+          return { ...doc, _ocMismatch: false, _gdRefNumber: null };
         }
-        const firstGDRef = gdRefs[0];
-        match._gdRefNumber = firstGDRef ? String(firstGDRef.number || "") : null;
-      } catch(e) { /* si falla refs, igual mostramos */ }
-      setBsaleFacResult({ ...match, _ocMismatch: false });
+      }));
+      // Ordenar: coincidentes con GD de esta OC primero
+      enriched.sort((a, b) => (a._ocMismatch ? 1 : 0) - (b._ocMismatch ? 1 : 0));
+      setBsaleFacResult(enriched);
     } catch(e) { setBsaleFacErr(e.message); }
     setBsaleFacLoading(false);
   };
@@ -1123,8 +1120,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
     setErr(null); setLoading(true);
     try {
       const num = String(doc.number || "");
-      const rawDate = doc.documentDate || doc.generationDate;
-      const date = rawDate ? new Date(rawDate * 1000).toISOString().slice(0, 10) : today();
+      const date = doc.emissionDate ? new Date(doc.emissionDate * 1000).toISOString().slice(0, 10) : today();
       const total = doc.totalAmount || 0;
       const netTotal = doc.netAmount || (total ? Math.round(total / 1.19) : 0);
 
@@ -1191,9 +1187,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
     try {
       const tipo = doc._tipo === "factura" ? "factura" : "guia";
       const num = String(doc.number || "");
-      const date = doc.generationDate ? new Date(doc.generationDate * 1000).toISOString().slice(0, 10) : today();
-      const netTotal = doc.netAmount || 0;
+      const date = (doc.emissionDate || doc.generationDate) ? new Date((doc.emissionDate || doc.generationDate) * 1000).toISOString().slice(0, 10) : today();
       const total = doc.totalAmount || 0;
+      const netTotal = doc.netAmount || (total ? Math.round(total / 1.19) : 0);
 
       // Obtener detalles (items) del documento desde Bsale
       let its = [];
@@ -1541,33 +1537,39 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin }) {
                   </button>
                 </div>
                 {bsaleFacErr && <div style={{ fontSize:11, color:"var(--rose)", marginTop:6 }}>⚠ {bsaleFacErr}</div>}
-                {bsaleFacResult && (() => {
-                  const doc = bsaleFacResult;
+                {bsaleFacResult && bsaleFacResult.length > 1 && (
+                  <div style={{ fontSize:10, color:"var(--gold)", marginTop:8, marginBottom:2 }}>
+                    ⚠ Se encontraron {bsaleFacResult.length} facturas con ese número — elige la correcta:
+                  </div>
+                )}
+                {bsaleFacResult && bsaleFacResult.map((doc, idx) => {
                   const num = String(doc.number || "");
-                  const rawDateFac = doc.documentDate || doc.generationDate;
-                  const fecha = rawDateFac ? new Date(rawDateFac * 1000).toISOString().slice(0,10) : "—";
-                  const monto = doc.totalAmount ? "$" + Number(doc.totalAmount).toLocaleString("es-CL") : "—";
+                  const fecha = doc.emissionDate ? new Date(doc.emissionDate * 1000).toISOString().slice(0,10) : "—";
+                  const neto = doc.netAmount || 0;
+                  const total = doc.totalAmount || 0;
+                  const monto = neto ? "$" + Number(neto).toLocaleString("es-CL") + " neto" : (total ? "$" + Number(total).toLocaleString("es-CL") : "—");
                   const alreadyAdded = (oc.dispatches || []).some(d =>
                     (d.docType === "factura" && String(d.number || "") === num) ||
                     String(d.invoiceNumber || "") === num
                   );
                   const mismatch = doc._ocMismatch;
                   return (
-                    <button disabled={alreadyAdded || mismatch || loading}
+                    <button key={doc.id || idx} disabled={alreadyAdded || mismatch || loading}
                       onClick={() => handleSelectBsaleFac(doc)}
-                      style={{ marginTop:8, width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--ink3)", border:"1px solid " + (mismatch ? "var(--rose)" : "var(--teal)") + "44", borderRadius:7, cursor: (alreadyAdded || mismatch) ? "default" : "pointer", opacity: (alreadyAdded || mismatch) ? 0.5 : 1, textAlign:"left" }}>
+                      style={{ marginTop:6, width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--ink3)", border:"1px solid " + (mismatch ? "var(--rose)" : alreadyAdded ? "var(--lime)" : "var(--teal)") + "44", borderRadius:7, cursor: (alreadyAdded || mismatch) ? "default" : "pointer", opacity: mismatch ? 0.45 : 1, textAlign:"left" }}>
                       <span className="badge bdoc-fac">FAC</span>
                       <span style={{ color:"var(--teal)", fontFamily:"var(--fM)", fontSize:13 }}>{num}</span>
                       <span style={{ color:"var(--fog2)", fontSize:11 }}>{fecha}</span>
+                      {doc.municipality && <span style={{ fontSize:10, color:"var(--fog)", fontStyle:"italic" }}>{doc.municipality}</span>}
                       <span style={{ color:"var(--lime)", fontSize:12, marginLeft:"auto" }}>{monto}</span>
                       {alreadyAdded
                         ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ YA AGREGADO</span>
                         : mismatch
-                          ? <span style={{ fontSize:9, color:"var(--rose)", letterSpacing:1 }}>✗ OC NO COINCIDE</span>
+                          ? <span style={{ fontSize:9, color:"var(--rose)", letterSpacing:1 }}>✗ GD NO COINCIDE</span>
                           : <span style={{ fontSize:9, color:"var(--teal)", letterSpacing:1 }}>← VINCULAR</span>}
                     </button>
                   );
-                })()}
+                })}
               </div>
             )}
             <UploadZone onFile={f => handleFiles([f])} onFiles={handleFiles} loading={loading} label={lastSaved ? "Subir otro documento o" : "Arrastra la factura o guia aqui o"} />
