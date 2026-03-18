@@ -164,35 +164,34 @@ const ocStatus = (items, dispatches) => {
   // Calcular monto OC
   const montoOC = items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice || 0), 0);
   if (montoOC === 0) return "closed"; // sin precio, solo verificar cantidad
-  // Calcular monto facturado neto (facturas directas + GDs vinculadas - NCs)
+  // Helper: neto de un dispatch con fallback a unitPrice de OC
+  const calcNeto = d => {
+    if (Number(d.netTotal || 0) > 0) return Number(d.netTotal);
+    const netoItems = (d.items||[]).reduce((s,it) => {
+      const rawUnit = String(it.unit || "");
+      const priceFromUnit = rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0);
+      const p = Number(it.unitPrice || 0) || priceFromUnit || 0;
+      return s + (Number(it.qty)||0) * p;
+    }, 0);
+    if (netoItems > 0) return netoItems;
+    // Fallback: usar unitPrice de la OC via ocItemId
+    return (d.items||[]).reduce((s,it) => {
+      const ocIt = it.ocItemId ? items.find(o => o.id === it.ocItemId) : null;
+      return s + (Number(it.qty)||0) * Number(ocIt?.unitPrice || 0);
+    }, 0);
+  };
+  // Calcular monto facturado (facturas directas + GDs vinculadas - NCs)
   let montoFac = 0;
-  const gdFacNums = new Set();
-  // Sumar facturas directas
+  const facNums = new Set();
   disp.forEach(d => {
-    if (d.docType === "factura") {
-      const neto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0), 0);
-      montoFac += neto;
-      if (d.number) gdFacNums.add(String(d.number).trim());
-    }
+    if (d.docType === "factura") { montoFac += calcNeto(d); if (d.number) facNums.add(String(d.number).trim()); }
   });
-  // Sumar GDs vinculadas (solo si no existe ya la factura directa)
   disp.forEach(d => {
-    if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
-      if (gdFacNums.has(String(d.invoiceNumber).trim())) return;
-      const neto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0), 0);
-      montoFac += neto;
-    }
+    if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate && !facNums.has(String(d.invoiceNumber).trim())) montoFac += calcNeto(d);
   });
-  // Restar NCs
-  disp.forEach(d => {
-    if (d.docType === "nc") {
-      const neto = Number(d.netTotal || 0) || (d.items||[]).reduce((s,it) => s+(Number(it.qty)||0)*(Number(it.unitPrice)||0), 0);
-      montoFac -= neto;
-    }
-  });
-  // Comparar con tolerancia del 1%
-  const pctFac = montoOC > 0 ? montoFac / montoOC : 1;
-  return pctFac >= 0.99 ? "closed" : "toinvoice";
+  disp.forEach(d => { if (d.docType === "nc") montoFac -= calcNeto(d); });
+  // Cerrada si monto facturado >= 99% del monto OC
+  return (montoOC > 0 ? montoFac / montoOC : 1) >= 0.99 ? "closed" : "toinvoice";
 };
 const autoMatch = (desc, ocItems, unitPrice) => {
   // Normalizar: sin tildes, guiones entre alfanum pegados (A-325→A325), sin puntuación, minúsculas
