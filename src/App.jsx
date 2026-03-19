@@ -3204,17 +3204,33 @@ export default function App() {
                   });
                 });
 
-                // GD con factura vinculada — solo si no existe ya la factura directa
+                // GD con factura vinculada — agrupar por invoiceNumber para evitar duplicados
+                // cuando múltiples GDs comparten la misma factura
+                const gdFacMap = {}; // invoiceNumber -> { entry, gdNumbers[] }
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
                       if (directFacNumsPF.has(String(d.invoiceNumber).trim())) return;
-                      const neto = Number(d.netTotal || 0);
-                      const total = Number(d.total || 0) || Math.round(neto * 1.19);
-                      // Incluir siempre (aunque total=$0) para no perder facturas
-                      allFacs.push({ ...d, number: d.invoiceNumber, date: d.invoiceDate, total, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, _fromGD: d.number });
+                      const key = String(d.invoiceNumber).trim();
+                      if (!gdFacMap[key]) {
+                        const neto = Number(d.netTotal || 0);
+                        const total = Number(d.total || 0) || Math.round(neto * 1.19);
+                        gdFacMap[key] = { ...d, number: d.invoiceNumber, date: d.invoiceDate, total, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, _fromGDs: [d.number] };
+                      } else {
+                        // Acumular GDs adicionales — sumar montos si la primera GD no tenía monto
+                        gdFacMap[key]._fromGDs.push(d.number);
+                        if (!gdFacMap[key].total) {
+                          const neto = Number(d.netTotal || 0);
+                          const total = Number(d.total || 0) || Math.round(neto * 1.19);
+                          gdFacMap[key].total = total;
+                          gdFacMap[key].neto = neto;
+                        }
+                      }
                     }
                   });
+                });
+                Object.values(gdFacMap).forEach(entry => {
+                  allFacs.push({ ...entry, _fromGD: entry._fromGDs.join(", ") });
                 });
                 // Aplicar NCs: restar de la factura referenciada si existe
                 const ncMap = {}; // facNumber -> monto NC acumulado
@@ -3395,11 +3411,13 @@ export default function App() {
                   });
                 });
 
-                // GDs con factura vinculada — solo si no existe ya la factura directa
+                // GDs con factura vinculada — agrupar por invoiceNumber para evitar duplicados
+                const gdFacMapF = {};
                 enriched.forEach(oc => {
                   (oc.dispatches || []).forEach(d => {
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
                       if (directFacNums.has(String(d.invoiceNumber).trim())) return;
+                      const key = String(d.invoiceNumber).trim();
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
                       if (!neto && d.items && d.items.length) {
@@ -3411,10 +3429,17 @@ export default function App() {
                         if (neto && !conIVA) conIVA = Math.round(neto * 1.19);
                       }
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
-                      allFacs.push({ key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: d.number, neto, conIVA });
+                      if (!gdFacMapF[key]) {
+                        gdFacMapF[key] = { key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: d.number, neto, conIVA };
+                      } else {
+                        // Misma factura en múltiples GDs — acumular GD numbers en gdNumber
+                        gdFacMapF[key].gdNumber = gdFacMapF[key].gdNumber + ", " + d.number;
+                        if (!gdFacMapF[key].neto && neto) { gdFacMapF[key].neto = neto; gdFacMapF[key].conIVA = conIVA; }
+                      }
                     }
                   });
                 });
+                Object.values(gdFacMapF).forEach(entry => allFacs.push(entry));
 
                 // Aplicar NCs al reporte Factoring
                 const ncMapFact = {};
