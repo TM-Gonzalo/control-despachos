@@ -1754,9 +1754,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
                                 setMap(p => ({ ...p, [i]: e.target.value }));
                                 setSplitPrice(p => ({ ...p, [i]: false }));
                                 setMapSearch(p => ({ ...p, [i]: "" }));
-                              }}
-                              size={Math.min(8, ocFiltered.length + 1)}
-                              style={{ width:"100%", height:"auto" }}>
+                              }}>
                               <option value="NONE">— Sin vincular —</option>
                               {ocFiltered.map(o => {
                                 const pend = Number(o.qty) - Number(o.dispatched || 0);
