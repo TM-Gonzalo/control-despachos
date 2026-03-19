@@ -1045,6 +1045,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
   const [ext, setExt] = useState(null);
   const [items, setItems] = useState([]);
   const [map, setMap] = useState({});
+  const [mapSearch, setMapSearch] = useState({});
   const [splitPrice, setSplitPrice] = useState({}); // {idx: true} = subdivisión de precio, no suma qty
   const [num, setNum] = useState("");
   const [date, setDate] = useState(today());
@@ -1728,32 +1729,51 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
                     </td>
                     <td className="map-arrow">→</td>
                     <td>
-                      <select className={"map-sel" + (matched ? (excede ? " warn" : " ok") : " warn")} value={val || "NONE"} onChange={e => {
-                        const newVal = e.target.value;
-                        setMap(p => ({ ...p, [i]: newVal }));
-                        setSplitPrice(p => ({ ...p, [i]: false }));
-                      }}>
-                        <option value="NONE">— Sin vincular —</option>
-                        {oc.items
-                          .filter(o => {
-                            const ocOriginal = oc.items.find(x => x.id === o.id);
-                            const pend = Number(ocOriginal.qty) - Number(ocOriginal.dispatched || 0);
-                            if (docType !== "factura" && docType !== "nc" && pend <= 0) return false;
-                            return true;
-                          })
-                          .map(o => {
-                            const pend = Number(o.qty) - Number(o.dispatched || 0);
-                            const qtyEnMapeo = items.reduce((s, it2, j) => {
-                              if (String(map[j]) === String(o.id) && !splitPrice[j]) return s + Number(it2.qty || 0);
-                              return s;
-                            }, 0);
-                            const disponible = pend - qtyEnMapeo;
-                            const enUso = Object.entries(map).some(([k, v]) => String(v) === String(o.id) && v !== "NONE");
-                            const label = enUso ? "⊕ " : "";
-                            const dispLabel = disponible > 0 ? fmtNum(disponible) + " " + o.unit + " dispon." : disponible === 0 && qtyEnMapeo > 0 ? "✓ cubierto" : "✓ despachado";
-                            return <option key={o.id} value={o.id}>{label}{o.desc} · {dispLabel}</option>;
-                          })}
-                      </select>
+                      {(() => {
+                        const srch = (mapSearch[i] || "").toLowerCase();
+                        const ocFiltered = oc.items.filter(o => {
+                          const pend = Number(o.qty) - Number(o.dispatched || 0);
+                          if (docType !== "factura" && docType !== "nc" && pend <= 0) return false;
+                          if (srch && !o.desc.toLowerCase().includes(srch)) return false;
+                          return true;
+                        });
+                        return (
+                          <div>
+                            <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:3 }}>
+                              <input
+                                placeholder="Buscar ítem OC..."
+                                value={mapSearch[i] || ""}
+                                onChange={e => setMapSearch(p => ({ ...p, [i]: e.target.value }))}
+                                onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); setMapSearch(p => ({ ...p, [i]: "" })); } }}
+                                style={{ flex:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontFamily:"var(--fM)", fontSize:10, padding:"3px 7px", outline:"none" }}
+                              />
+                              {mapSearch[i] && <button onClick={() => setMapSearch(p => ({ ...p, [i]: "" }))} style={{ background:"none", border:"none", color:"var(--fog)", cursor:"pointer", fontSize:11, padding:0 }}>✕</button>}
+                            </div>
+                            <select className={"map-sel" + (matched ? (excede ? " warn" : " ok") : " warn")} value={val || "NONE"}
+                              onChange={e => {
+                                setMap(p => ({ ...p, [i]: e.target.value }));
+                                setSplitPrice(p => ({ ...p, [i]: false }));
+                                setMapSearch(p => ({ ...p, [i]: "" }));
+                              }}
+                              size={Math.min(8, ocFiltered.length + 1)}
+                              style={{ width:"100%", height:"auto" }}>
+                              <option value="NONE">— Sin vincular —</option>
+                              {ocFiltered.map(o => {
+                                const pend = Number(o.qty) - Number(o.dispatched || 0);
+                                const qtyEnMapeo = items.reduce((s, it2, j) => {
+                                  if (String(map[j]) === String(o.id) && !splitPrice[j]) return s + Number(it2.qty || 0);
+                                  return s;
+                                }, 0);
+                                const disponible = pend - qtyEnMapeo;
+                                const enUso = Object.entries(map).some(([k, v]) => String(v) === String(o.id) && v !== "NONE");
+                                const label = enUso ? "⊕ " : "";
+                                const dispLabel = disponible > 0 ? fmtNum(disponible) + " " + o.unit + " dispon." : disponible === 0 && qtyEnMapeo > 0 ? "✓ cubierto" : "✓ despachado";
+                                return <option key={o.id} value={o.id}>{label}{o.desc} · {dispLabel}</option>;
+                              })}
+                            </select>
+                          </div>
+                        );
+                      })()}
                       {!matched && <div className="map-note">⚠ No descontara del remanente</div>}
                     </td>
                     <td><input type="number" className="map-qty" value={it.qty} min={1} onChange={e => updItem(i, "qty", e.target.value)} style={{ opacity: isSplit ? 0.4 : 1 }} /></td>
@@ -2703,6 +2723,19 @@ export default function App() {
   }));
 
   const persist = async updated => { setOcs(updated); await saveOCs(updated); };
+
+  // Esc global para cerrar ventanas emergentes
+  useEffect(() => {
+    const handler = e => {
+      if (e.key !== "Escape") return;
+      if (showDispatch) { setShowDispatch(null); return; }
+      if (showDetail) { setShowDetail(null); return; }
+      if (showImport) { setShowImport(false); return; }
+      if (showFactoringGestion) { setShowFactoringGestion(null); return; }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showDispatch, showDetail, showImport, showFactoringGestion]);
 
   const handleAddGestion = async (ocId, comment) => {
     const updated = ocs.map(o => {
