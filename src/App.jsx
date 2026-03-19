@@ -2150,6 +2150,26 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   <DocBadge doc={d} />
                   <div className="disp-meta">
                     <span style={{ fontSize:10, color:"var(--fog)" }}>{d.date}</span>
+                    {d.docType === "guia" && !d.invoiceNumber && (() => {
+                      // GD sin factura: ofrecer copiar factura de otra GD ya vinculada
+                      const linkedGDs = (oc.dispatches || []).filter(g => g.docType === "guia" && g.invoiceNumber);
+                      if (linkedGDs.length === 0) return null;
+                      if (!isAdmin) return null;
+                      return (
+                        <select
+                          style={{ background:"var(--ink3)", border:"1px solid var(--violet)", borderRadius:4, color:"var(--violet)", fontSize:9, padding:"2px 6px", fontFamily:"var(--fM)", cursor:"pointer" }}
+                          defaultValue=""
+                          onChange={e => {
+                            if (!e.target.value) return;
+                            const srcGD = linkedGDs.find(g => g.id === e.target.value);
+                            if (!srcGD) return;
+                            onDelDispatch(oc.id, d.id, "copyInvoice", { gdId: d.id, invoiceNumber: srcGD.invoiceNumber, invoiceDate: srcGD.invoiceDate, netTotal: srcGD.netTotal, total: srcGD.total, invoiceItems: srcGD.invoiceItems || [] });
+                          }}>
+                          <option value="">↔ Copiar factura de GD...</option>
+                          {linkedGDs.map(g => <option key={g.id} value={g.id}>GD {g.number} → Fac. {g.invoiceNumber}</option>)}
+                        </select>
+                      );
+                    })()}
                     {d.docType === "factura" && (() => {
                       const unlinkedGDs = (oc.dispatches || []).filter(g => g.docType === "guia" && !g.invoiceNumber);
                       if (unlinkedGDs.length === 0) return null;
@@ -2574,6 +2594,20 @@ export default function App() {
       await persist(updated);
       if (showDetail && showDetail.id === ocId) setShowDetail(updated.find(o => o.id === ocId));
       notify("GD vinculada a Factura N° " + invoiceNumber + " ✓");
+      return;
+    }
+    if (action === "copyInvoice" && relinkData) {
+      // Copiar factura de otra GD a esta GD sin factura
+      const { gdId, invoiceNumber, invoiceDate, netTotal, total, invoiceItems } = relinkData;
+      const updated = ocs.map(o => o.id === ocId ? {
+        ...o,
+        dispatches: (o.dispatches || []).map(d =>
+          d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: invoiceItems || [] } : d
+        )
+      } : o);
+      await persist(updated);
+      if (showDetail && showDetail.id === ocId) setShowDetail(updated.find(o => o.id === ocId));
+      notify("Factura N° " + invoiceNumber + " copiada a GD ✓");
       return;
     }
     if (action === "relink" && relinkData) {
