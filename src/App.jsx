@@ -4181,7 +4181,32 @@ export default function App() {
                 const atrasadas = pendFacs.filter(g => g.atrasada).length;
                 return (
                   <>
-                    <div className="ph"><div><div className="pt">Reporte <em>Pend. Facturar</em></div><div className="pm">GUÍAS SIN FACTURA VINCULADA</div></div></div>
+                    <div className="ph">
+                      <div><div className="pt">Reporte <em>Pend. Facturar</em></div><div className="pm">GUÍAS SIN FACTURA VINCULADA</div></div>
+                      {pendFacs.length > 0 && (
+                        <button className="btn btn-outline btn-sm" style={{ color:"var(--lime)", borderColor:"var(--lime)", fontSize:10, padding:"4px 12px" }}
+                          onClick={() => {
+                            const rows = pendFacs.map(g => ({
+                              "Estado": g.atrasada ? "Atrasada" : "Ok",
+                              "N° GD": g.number || "",
+                              "Fecha GD": g.date || "",
+                              "Días": g.dias !== null ? g.dias : "",
+                              "Tolerancia": g.tol + "d",
+                              "Cliente": g.client || "",
+                              "OC": g.ocNumber || "",
+                              "Estado OC": { open:"Abierta", partial:"Parcial", toinvoice:"Por Facturar", closed:"Cerrada" }[g.ocStatusVal] || "",
+                              "Monto Neto": g.neto || 0,
+                            }));
+                            const ws = XLSX.utils.json_to_sheet(rows);
+                            ws["!cols"] = [{ wch:10 },{ wch:10 },{ wch:12 },{ wch:8 },{ wch:12 },{ wch:32 },{ wch:18 },{ wch:14 },{ wch:16 }];
+                            const wb = XLSX.utils.book_new();
+                            XLSX.utils.book_append_sheet(wb, ws, "Pend. Facturar");
+                            XLSX.writeFile(wb, "Pend_Facturar_" + today() + ".xlsx");
+                          }}>
+                          ↓ Excel
+                        </button>
+                      )}
+                    </div>
                     {pendFacs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay guías pendientes de facturar.</p></div>}
                     {pendFacs.length > 0 && (
                       <>
