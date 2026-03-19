@@ -3741,7 +3741,7 @@ export default function App() {
                               onClick={() => { setFacFilterFrom(""); setFacFilterTo(""); }}>✕ Limpiar</button>
                           )}
                         </div>
-                        <button className="btn btn-outline btn-sm" style={{ color:"var(--lime)", borderColor:"var(--lime)", fontSize:10, padding:"4px 12px" }}
+                        <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
                           onClick={handleDownloadFactoringXlsx}>
                           ↓ Excel{(facFilterFrom || facFilterTo) ? " (filtrado)" : ""}
                         </button>
@@ -4184,7 +4184,7 @@ export default function App() {
                     <div className="ph">
                       <div><div className="pt">Reporte <em>Pend. Facturar</em></div><div className="pm">GUÍAS SIN FACTURA VINCULADA</div></div>
                       {pendFacs.length > 0 && (
-                        <button className="btn btn-outline btn-sm" style={{ color:"var(--lime)", borderColor:"var(--lime)", fontSize:10, padding:"4px 12px" }}
+                        <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
                           onClick={() => {
                             const rows = pendFacs.map(g => ({
                               "Estado": g.atrasada ? "Atrasada" : "Ok",
