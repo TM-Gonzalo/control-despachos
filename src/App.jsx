@@ -1106,8 +1106,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
           const gdRefs = refs.filter(r => r.documentTypeId === 8 || String(r.documentTypeName || "").toLowerCase().includes("guia") || String(r.dte_code?.id || "") === "16" || String(r.dte_code?.id || "") === "52");
           const matchesGD = gdRefs.some(r => ocGDs.includes(normS(String(r.number || ""))));
           const ocMismatch = gdRefs.length > 0 && !matchesGD;
-          const firstGDRef = gdRefs[0];
-          return { ...doc, _ocMismatch: ocMismatch, _gdRefNumber: firstGDRef ? String(firstGDRef.number || "") : null };
+          const gdRefNumbers = gdRefs.map(r => String(r.number || "")).filter(Boolean);
+          return { ...doc, _ocMismatch: ocMismatch, _gdRefNumber: gdRefNumbers[0] || null, _gdRefNumbers: gdRefNumbers };
         } catch(e) {
           return { ...doc, _ocMismatch: false, _gdRefNumber: null };
         }
@@ -1173,18 +1173,19 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
         } catch(e) { /* continuar sin GD ref */ }
       }
 
-      // Si hay GD ref, intentar _gdLink — usar ocs (estado fresco) para capturar GDs de esta sesión
-      if (gdNumber) {
+      // Si hay GD refs, intentar _gdLink — usar ocs (estado fresco) para capturar GDs de esta sesión
+      const gdNumbers = doc._gdRefNumbers || (doc._gdRefNumber ? [doc._gdRefNumber] : []);
+      if (gdNumbers.length > 0) {
         const normGD = s => String(s).replace(/[\s.]/g, "");
         const freshOC = (ocs || []).find(o => o.id === oc.id);
         const freshDispatches = (freshOC?.dispatches || oc.dispatches || []);
-        const matchingGD = freshDispatches.find(d =>
-          d.docType === "guia" && normGD(d.number || "") === normGD(gdNumber)
-        );
-        if (matchingGD) {
+        const matchingGDs = gdNumbers.map(gn =>
+          freshDispatches.find(d => d.docType === "guia" && normGD(d.number || "") === normGD(gn))
+        ).filter(Boolean);
+        if (matchingGDs.length > 0) {
           await onSave(oc.id, {
-            _gdLink: true,
-            gdId: matchingGD.id,
+            _gdLinks: true,
+            gdIds: matchingGDs.map(g => g.id),
             invoiceNumber: num,
             invoiceDate: date,
             netTotal,
@@ -2479,6 +2480,24 @@ export default function App() {
     const existing = (oc?.dispatches || []);
 
     // Caso especial: vincular factura a GD existente sin crear despacho nuevo
+    if (dispatch._gdLinks) {
+      // Vincular factura a múltiples GDs
+      const { gdIds, invoiceNumber, invoiceDate, netTotal, total, items: facItems } = dispatch;
+      const updated = ocs.map(o => o.id === ocId ? {
+        ...o,
+        dispatches: (o.dispatches || []).map(d => gdIds.includes(d.id)
+          ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: facItems || d.invoiceItems || [] }
+          : d
+        )
+      } : o);
+      await persist(updated);
+      if (showDetail && showDetail.id === ocId) {
+        const live = enriched.find(o => o.id === ocId);
+        setShowDetail(live);
+      }
+      notify("Factura N° " + invoiceNumber + " vinculada a " + gdIds.length + " GD" + (gdIds.length > 1 ? "s" : "") + " ✓");
+      return;
+    }
     if (dispatch._gdLink) {
       const { gdId, invoiceNumber, invoiceDate, netTotal, total, items: facItems } = dispatch;
       const updated = ocs.map(o => o.id === ocId ? {
