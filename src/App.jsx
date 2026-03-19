@@ -2102,6 +2102,27 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                       <div className="disp-meta">
                         <span style={{ fontSize:10, color:"var(--fog)" }}>{d.invoiceDate || d.date}</span>
                         <span style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>· Ref. GD {d.number}</span>
+                        {(() => {
+                          // Mostrar selector para vincular a GD adicional (caso especial: factura cubre múltiples GDs)
+                          const extraGDs = (oc.dispatches || []).filter(g =>
+                            g.docType === "guia" && !g.invoiceNumber &&
+                            String(g.invoiceNumber || "") !== String(d.invoiceNumber || "")
+                          );
+                          if (extraGDs.length === 0) return null;
+                          return (
+                            <select
+                              style={{ background:"var(--ink3)", border:"1px solid var(--teal)", borderRadius:4, color:"var(--teal)", fontSize:9, padding:"2px 6px", fontFamily:"var(--fM)", cursor:"pointer" }}
+                              defaultValue=""
+                              onChange={e => {
+                                if (!e.target.value) return;
+                                const gd = extraGDs.find(g => g.id === e.target.value);
+                                if (gd) onDelDispatch(oc.id, gd.id, "addInvoice", { invoiceNumber: d.invoiceNumber, invoiceDate: d.invoiceDate || d.date, netTotal: d.netTotal, total: d.total, items: d.invoiceItems || d.items || [] });
+                              }}>
+                              <option value="">↔ Vincular también a...</option>
+                              {extraGDs.map(g => <option key={g.id} value={g.id}>GD {g.number} · {g.date}</option>)}
+                            </select>
+                          );
+                        })()}
                         {isAdmin && <button className="btn btn-rose btn-sm" onClick={() => onDelDispatch(oc.id, d.id, true)}>Desvincular</button>}
                       </div>
                     </div>
@@ -2129,9 +2150,12 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                   <DocBadge doc={d} />
                   <div className="disp-meta">
                     <span style={{ fontSize:10, color:"var(--fog)" }}>{d.date}</span>
-                    {d.docType === "factura" && !d.gdNumber && (() => {
+                    {d.docType === "factura" && (() => {
                       const unlinkedGDs = (oc.dispatches || []).filter(g => g.docType === "guia" && !g.invoiceNumber);
                       if (unlinkedGDs.length === 0) return null;
+                      // Factura directa sin GD: relink (elimina factura directa y vincula a GD)
+                      // Factura ya vinculada a una GD pero quedan GDs sin factura: vincular adicional
+                      const isLinkedFac = !!d.gdNumber;
                       return (
                         <select
                           style={{ background:"var(--ink3)", border:"1px solid var(--teal)", borderRadius:4, color:"var(--teal)", fontSize:9, padding:"2px 6px", fontFamily:"var(--fM)", cursor:"pointer" }}
@@ -2139,9 +2163,15 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                           onChange={e => {
                             if (!e.target.value) return;
                             const gd = unlinkedGDs.find(g => g.id === e.target.value);
-                            if (gd) onDelDispatch(oc.id, d.id, "relink", { gdId: gd.id, invoiceNumber: d.number, invoiceDate: d.date, netTotal: d.netTotal, total: d.total, items: d.items });
+                            if (!gd) return;
+                            if (isLinkedFac) {
+                              // Solo vincular la GD adicional sin eliminar la factura directa
+                              onDelDispatch(oc.id, d.id, "linkExtra", { gdId: gd.id, invoiceNumber: d.number, invoiceDate: d.date, netTotal: d.netTotal, total: d.total });
+                            } else {
+                              onDelDispatch(oc.id, d.id, "relink", { gdId: gd.id, invoiceNumber: d.number, invoiceDate: d.date, netTotal: d.netTotal, total: d.total, items: d.items });
+                            }
                           }}>
-                          <option value="">↔ Vincular a GD...</option>
+                          <option value="">{isLinkedFac ? "↔ Vincular GD adicional..." : "↔ Vincular a GD..."}</option>
                           {unlinkedGDs.map(g => <option key={g.id} value={g.id}>GD {g.number} · {g.date}</option>)}
                         </select>
                       );
@@ -2532,6 +2562,20 @@ export default function App() {
   };
 
   const handleDelDispatch = async (ocId, dispId, action, relinkData) => {
+    if (action === "linkExtra" && relinkData) {
+      // Vincular GD adicional sin eliminar la factura directa
+      const { gdId, invoiceNumber, invoiceDate, netTotal, total } = relinkData;
+      const updated = ocs.map(o => o.id === ocId ? {
+        ...o,
+        dispatches: (o.dispatches || []).map(d =>
+          d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total } : d
+        )
+      } : o);
+      await persist(updated);
+      if (showDetail && showDetail.id === ocId) setShowDetail(updated.find(o => o.id === ocId));
+      notify("GD vinculada a Factura N° " + invoiceNumber + " ✓");
+      return;
+    }
     if (action === "relink" && relinkData) {
       const { gdId, invoiceNumber, invoiceDate, netTotal, total, items } = relinkData;
       const updated = ocs.map(o => o.id === ocId ? {
@@ -2543,6 +2587,21 @@ export default function App() {
       await persist(updated);
       if (showDetail && showDetail.id === ocId) setShowDetail(updated.find(o => o.id === ocId));
       notify("Factura N° " + invoiceNumber + " vinculada a GD ✓");
+      return;
+    }
+    // addInvoice: vincular factura a una GD adicional sin eliminar la vinculación original
+    if (action === "addInvoice" && relinkData) {
+      const { invoiceNumber, invoiceDate, netTotal, total, items } = relinkData;
+      const updated = ocs.map(o => o.id === ocId ? {
+        ...o,
+        dispatches: (o.dispatches || []).map(d => d.id === dispId
+          ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: items || [] }
+          : d
+        )
+      } : o);
+      await persist(updated);
+      if (showDetail && showDetail.id === ocId) setShowDetail(updated.find(o => o.id === ocId));
+      notify("Factura N° " + invoiceNumber + " vinculada también a GD ✓");
       return;
     }
     const oc = ocs.find(o => o.id === ocId);
