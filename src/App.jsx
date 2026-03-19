@@ -1919,7 +1919,6 @@ function ConvertModal({ dispatch, ocId, onClose, onSave }) {
 
 
 async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
-  // Cargar jsPDF dinámicamente
   if (!window.jspdf) {
     await new Promise((res, rej) => {
       const s = document.createElement("script");
@@ -1939,16 +1938,10 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   const stLabel = { open:"Abierta", partial:"Parcial", closed:"Cerrada", toinvoice:"Por Facturar" }[st] || st;
   const stColor = { open:[77,184,255], partial:[232,184,75], closed:[127,255,90], toinvoice:[255,90,90] }[st] || [200,200,200];
 
-  // Logo esquina superior derecha
-  try { doc.addImage(TM_LOGO_B64, "PNG", mr - 36, y - 2, 32, 22); } catch(e) {}
-
-  // Título OC
+  // Header: título OC a la izquierda, logo a la derecha
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  doc.setFillColor(30, 32, 40);
-  doc.rect(0, 0, W, 10, "F");
-  doc.setTextColor(60, 60, 60);
+  doc.setTextColor(40, 40, 40);
   doc.text(oc.ocNumber || oc.id, ml, y + 5);
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
@@ -1956,53 +1949,48 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   doc.text(oc.client || "", ml, y + 12);
   if (oc.ocNumber) doc.text("Ref. " + oc.id, ml, y + 18);
 
-  // Badge estado
+  // Badge estado — debajo del texto, no sobre el logo
   doc.setFillColor(...stColor);
   doc.setDrawColor(...stColor);
-  doc.roundedRect(mr - 50, y + 2, 36, 7, 2, 2, "F");
+  doc.roundedRect(ml, y + 22, 32, 6, 1.5, 1.5, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setTextColor(30, 30, 30);
-  doc.text(stLabel, mr - 32, y + 7, { align: "center" });
+  doc.text(stLabel, ml + 16, y + 26.5, { align: "center" });
 
-  y += 28;
+  // Logo esquina superior derecha
+  try { doc.addImage(TM_LOGO_B64, "PNG", mr - 34, y - 2, 30, 20); } catch(e) {}
+
+  y += 34;
 
   // Línea separadora
   doc.setDrawColor(220, 220, 220);
   doc.line(ml, y, mr, y);
   y += 6;
 
-  // Datos generales
+  // Datos generales — 4 columnas
+  const c1 = ml, c2 = 65, c3 = 115, c4 = 160;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(120, 120, 120);
-  const col2 = W / 2 + 5;
-  doc.text("FECHA OC", ml, y);
-  doc.text("MONTO OC", col2, y);
+  doc.text("FECHA OC", c1, y);
+  doc.text("MONTO OC", c2, y);
+  doc.text("DESPACHADO", c3, y);
+  doc.text("REMANENTE", c4, y);
   y += 4;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(40, 40, 40);
-  doc.text(oc.date || "—", ml, y);
-  doc.text(fmtM(totAmt), col2, y);
-  y += 6;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(120, 120, 120);
-  doc.text("DESPACHADO", ml, y);
-  doc.text("REMANENTE", col2, y);
-  y += 4;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.text(oc.date || "—", c1, y);
+  doc.text(fmtM(totAmt), c2, y);
   doc.setTextColor(40, 160, 80);
-  doc.text(fmtM(disAmt), ml, y);
-  const rem = totAmt - disAmt;
-  doc.setTextColor(rem > 0 ? 220 : 40, rem > 0 ? 80 : 160, 80);
-  doc.text(fmtM(rem), col2, y);
-  y += 6;
+  doc.text(fmtM(disAmt), c3, y);
+  const rem0 = totAmt - disAmt;
+  doc.setTextColor(rem0 > 0 ? 200 : 40, rem0 > 0 ? 80 : 160, 80);
+  doc.text(fmtM(rem0), c4, y);
+  y += 7;
 
-  // Notas si existen
+  // Notas
   if (oc.notes) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
@@ -2020,17 +2008,18 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   doc.line(ml, y, mr, y);
   y += 6;
 
-  // Tabla ítems
+  // Tabla ítems — columnas ajustadas, sin barra de progreso
+  // Posiciones: DESCRIPCIÓN(14-105) | UN(107) | P.UNIT(130 right) | OC(148 right) | DESP.(163 right) | REMANENTE(196 right)
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(80, 80, 80);
-  doc.setFillColor(240, 240, 240);
+  doc.setFillColor(235, 235, 235);
   doc.rect(ml, y - 4, mr - ml, 6, "F");
   doc.text("DESCRIPCIÓN", ml + 2, y);
-  doc.text("UN", 118, y);
-  doc.text("P.UNIT", 132, y, { align: "right" });
-  doc.text("OC", 150, y, { align: "right" });
-  doc.text("DESP.", 166, y, { align: "right" });
+  doc.text("UN", 107, y);
+  doc.text("P.UNIT", 130, y, { align: "right" });
+  doc.text("OC", 148, y, { align: "right" });
+  doc.text("DESP.", 163, y, { align: "right" });
   doc.text("REMANENTE", mr - 2, y, { align: "right" });
   y += 5;
 
@@ -2040,26 +2029,19 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
     if (y > H - 30) { doc.addPage(); y = 20; }
     if (i % 2 === 0) { doc.setFillColor(250, 250, 250); doc.rect(ml, y - 3.5, mr - ml, 6, "F"); }
     const rem = Number(it.qty) - Number(it.dispatched || 0);
-    const pct = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched || 0) / Number(it.qty) * 100)) : 0;
     doc.setTextColor(40, 40, 40);
-    const descLines = doc.splitTextToSize(it.desc || "", 90);
+    const descLines = doc.splitTextToSize(it.desc || "", 88);
     doc.text(descLines[0], ml + 2, y);
-    doc.text(it.unit || "UN", 118, y);
     doc.setTextColor(100, 100, 100);
-    doc.text(fmtM(it.unitPrice || 0), 132, y, { align: "right" });
+    doc.text(it.unit || "UN", 107, y);
+    doc.text(fmtM(it.unitPrice || 0), 130, y, { align: "right" });
     doc.setTextColor(40, 40, 40);
-    doc.text(fmtN(it.qty), 150, y, { align: "right" });
+    doc.text(fmtN(it.qty), 148, y, { align: "right" });
     doc.setTextColor(40, 160, 80);
-    doc.text(fmtN(it.dispatched || 0), 166, y, { align: "right" });
-    if (rem > 0) { doc.setTextColor(220, 140, 40); doc.text(fmtN(rem) + " pend.", mr - 2, y, { align: "right" }); }
-    else if (rem === 0) { doc.setTextColor(40, 160, 80); doc.text("✓ Completo", mr - 2, y, { align: "right" }); }
-    else { doc.setTextColor(220, 60, 60); doc.text(fmtN(Math.abs(rem)) + " exc.", mr - 2, y, { align: "right" }); }
-    // Barra de progreso
-    doc.setFillColor(220, 220, 220);
-    doc.rect(mr - 42, y - 3, 38, 2, "F");
-    const barColor = pct >= 100 ? [127, 255, 90] : pct > 0 ? [232, 184, 75] : [200, 200, 200];
-    doc.setFillColor(...barColor);
-    doc.rect(mr - 42, y - 3, 38 * pct / 100, 2, "F");
+    doc.text(fmtN(it.dispatched || 0), 163, y, { align: "right" });
+    if (rem > 0) { doc.setTextColor(200, 120, 40); doc.text(fmtN(rem) + " pend.", mr - 2, y, { align: "right" }); }
+    else if (rem === 0) { doc.setTextColor(40, 160, 80); doc.text("Completo", mr - 2, y, { align: "right" }); }
+    else { doc.setTextColor(200, 60, 60); doc.text(fmtN(Math.abs(rem)) + " exc.", mr - 2, y, { align: "right" }); }
     y += 6;
   });
 
@@ -2082,8 +2064,9 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
     const isNC = d.docType === "nc";
     const badgeColor = isGD ? (d.invoiceNumber ? [100, 80, 200] : [200, 140, 40]) : isFac ? [40, 160, 140] : [200, 100, 0];
     const label = isGD ? ("GD " + d.number + (d.invoiceNumber ? " · Fac. " + d.invoiceNumber : " (sin factura)")) : isFac ? "Factura " + d.number : "NC " + d.number;
-    doc.setFillColor(...badgeColor.map(c => Math.min(255, c + 160)));
-    doc.setDrawColor(...badgeColor);
+    const bgColor = badgeColor.map(c => Math.min(255, c + 155));
+    doc.setFillColor(...bgColor);
+    doc.setDrawColor(...bgColor);
     doc.roundedRect(ml, y - 3.5, mr - ml, 6, 1, 1, "FD");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
@@ -2094,29 +2077,29 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
     doc.text(d.date || d.invoiceDate || "", mr - 3, y, { align: "right" });
     y += 7;
 
-    (d.items || []).forEach(it => {
+    const displayItems = (d.invoiceItems && d.invoiceItems.length > 0) ? d.invoiceItems : (d.items || []);
+    displayItems.forEach(it => {
       if (y > H - 20) { doc.addPage(); y = 20; }
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7.5);
       doc.setTextColor(80, 80, 80);
-      const desc = doc.splitTextToSize((it.desc || "") + (it.ocItemId ? "" : ""), 130);
+      const desc = doc.splitTextToSize(it.desc || "", 130);
       doc.text("  " + desc[0], ml + 2, y);
-      doc.setTextColor(160, 140, 40);
-      doc.text(fmtN(it.qty) + " " + (it.unit || "UN"), 162, y, { align: "right" });
-      if (it.unitPrice) { doc.setTextColor(100, 100, 100); doc.text(fmtM(Number(it.qty) * Number(it.unitPrice)), mr - 2, y, { align: "right" }); }
+      doc.setTextColor(100, 100, 100);
+      doc.text(fmtN(it.qty) + " " + (it.unit || "UN"), 163, y, { align: "right" });
+      if (it.unitPrice) { doc.setTextColor(80, 80, 80); doc.text(fmtM(Number(it.qty) * Number(it.unitPrice)), mr - 2, y, { align: "right" }); }
       y += 4.5;
     });
 
-    // Total doc
     const neto = Number(d.netTotal || 0);
     const total = Number(d.total || 0);
     if (neto || total) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
-      doc.setTextColor(isNC ? 200 : 40, isNC ? 80 : 160, 80);
-      const label2 = isGD ? "TOTAL GD" : isNC ? "NC" : "NETO FACTURA";
+      doc.setTextColor(...badgeColor);
+      const lbl2 = isGD ? "TOTAL GD" : isNC ? "NC" : "NETO FACTURA";
       const val = isGD ? fmtM(neto || total) : fmtM(neto);
-      doc.text(label2 + ": " + val, mr - 2, y, { align: "right" });
+      doc.text(lbl2 + ": " + val, mr - 2, y, { align: "right" });
       y += 5;
     }
     y += 1;
@@ -2133,6 +2116,7 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   const filename = "OC_" + (oc.ocNumber || oc.id) + "_" + (oc.client || "").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20) + ".pdf";
   doc.save(filename);
 }
+
 
 function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail }) {
   const canDelGD = isAdmin || (userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl");
