@@ -1667,6 +1667,13 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
             <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
               <button className="btn btn-ghost" onClick={() => setStep(0)}>← Volver</button>
               <button className="btn btn-gold" onClick={() => setStep(2)}>Mapear items →</button>
+              <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10 }}
+                onClick={() => {
+                  const emptyMap = {};
+                  items.forEach((_, i) => { emptyMap[i] = "NONE"; });
+                  setMap(emptyMap);
+                  setStep(2);
+                }}>Avanzar sin mapear</button>
             </div>
           </>
         )}
