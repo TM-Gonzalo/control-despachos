@@ -1036,7 +1036,7 @@ function BsaleView({ enriched, onAssign }) {
   );
 }
 
-function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs }) {
+function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs, userEmail }) {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1484,7 +1484,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
             </div>
             <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
               <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); setPendingOverride(null); }}>Cerrar</button>
-              {isAdmin && pendingOverride && (!ocMismatch?.pdfOC || ocMismatch?.pdfOC.trim().toUpperCase().includes("PENDIENTE")) && (
+              {(isAdmin || userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl") && pendingOverride && (!ocMismatch?.pdfOC || ocMismatch?.pdfOC.trim().toUpperCase().includes("PENDIENTE")) && (
                 <button className="btn btn-gold btn-sm" onClick={() => {
                   setExt(pendingOverride.ext);
                   setNum(pendingOverride.num);
@@ -4429,7 +4429,7 @@ export default function App() {
         />
       )}
         {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} />}
-      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} />}
+      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} />}
 
       {confirmDel && (
         <div className="overlay" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
