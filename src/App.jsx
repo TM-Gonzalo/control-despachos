@@ -4256,7 +4256,7 @@ export default function App() {
                                                 )}
                                                 {PC_ENT.map(e => {
                                                   const isActive = entity === e;
-                                                  const isOther = entity && entity !== e;
+                                                  const isOther = PC_ENT.includes(entity) && entity !== e;
                                                   return (
                                                     <button key={e} onClick={() => handleToggleFactoring(f.key, e)}
                                                       style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + PC_COL[e], background: isActive ? PC_COL[e] : "transparent", color: isActive ? "var(--ink)" : PC_COL[e], opacity: isOther ? 0.3 : 1, transition:".12s", boxShadow: isActive ? "0 0 6px " + PC_COL[e] + "66" : "none" }}>{e}</button>
