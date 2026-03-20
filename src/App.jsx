@@ -640,6 +640,197 @@ function AuthScreen({ onAuth }) {
   );
 }
 
+function VentaDirectaModal({ onClose, onSave, existingOCs = [] }) {
+  const [desde, setDesde] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
+  const [hasta, setHasta] = useState(() => new Date().toISOString().slice(0,10));
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+  const [facturas, setFacturas] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const [clientEdits, setClientEdits] = useState({});
+  const [rutEdits, setRutEdits] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [notify, setNotify] = useState(null);
+
+  const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0,10) : "—";
+  const fmtMonto = n => n ? "$" + Number(n).toLocaleString("es-CL") : "—";
+
+  // Números ya asignados en OCs existentes
+  const assignedNums = new Set();
+  existingOCs.forEach(oc => {
+    (oc.dispatches || []).forEach(d => {
+      if (d.number) assignedNums.add(String(d.number).trim());
+      if (d.invoiceNumber) assignedNums.add(String(d.invoiceNumber).trim());
+    });
+    // También excluir VD ya creadas
+    if (oc._ventaDirecta && oc.dispatches?.[0]?.number)
+      assignedNums.add(String(oc.dispatches[0].number).trim());
+  });
+
+  const buscar = async () => {
+    setLoading(true); setErr(null); setFacturas([]); setSelected(new Set());
+    try {
+      const desdeTs = Math.floor(new Date(desde).getTime() / 1000);
+      const hastaTs = Math.floor(new Date(hasta + "T23:59:59").getTime() / 1000);
+      // Bsale documentTypeId 1 = factura electrónica tipo 33
+      const res = await fetchBsale("/documents.json", {
+        documentTypeId: "1",
+        emissiondateFrom: desdeTs,
+        emissiondateTo: hastaTs,
+        limit: 100,
+        offset: 0
+      });
+      const items = (res.items || []).filter(f => !assignedNums.has(String(f.number || "").trim()));
+      setFacturas(items);
+      if (!items.length) setErr("No hay facturas pendientes en ese período");
+    } catch(e) { setErr(e.message); }
+    setLoading(false);
+  };
+
+  const toggleAll = () => {
+    if (selected.size === facturas.length) setSelected(new Set());
+    else setSelected(new Set(facturas.map(f => f.id)));
+  };
+
+  // Generar número VD correlativo
+  const nextVD = () => {
+    const vds = existingOCs.filter(o => o._ventaDirecta && /^VD-\d+$/.test(o.ocNumber || ""));
+    const max = vds.reduce((m, o) => Math.max(m, parseInt(o.ocNumber.replace("VD-",""))||0), 0);
+    return max + 1;
+  };
+
+  const handleGuardar = async () => {
+    if (!selected.size) return;
+    setSaving(true);
+    try {
+      let seq = nextVD();
+      const selFacs = facturas.filter(f => selected.has(f.id));
+      for (const fac of selFacs) {
+        const num = String(fac.number || "");
+        const date = fmtDate(fac.generationDate);
+        const neto = Number(fac.netAmount || 0);
+        const total = Number(fac.totalAmount || fac.netAmount || 0) || Math.round(neto * 1.19);
+        const client = clientEdits[fac.id] || fac.address || "Sin nombre";
+        const rut = rutEdits[fac.id] || "";
+        const ocNumber = "VD-" + String(seq).padStart(3, "0");
+        seq++;
+        const newOC = {
+          id: "OC-VD-" + Date.now() + "-" + num,
+          ocNumber,
+          client,
+          rut,
+          date,
+          deliveryDate: "",
+          notes: "Venta Directa",
+          _ventaDirecta: true,
+          _closedByMonto: true,
+          items: [{ id: "it-vd-1", desc: "Venta Directa", unit: "UN", qty: 1, unitPrice: neto }],
+          dispatches: [{
+            id: "disp-vd-" + num,
+            docType: "factura",
+            number: num,
+            date,
+            netTotal: neto,
+            total,
+            items: [],
+            invoiceNumber: null,
+            gdNumber: null,
+          }]
+        };
+        await onSave(newOC);
+      }
+      setNotify(selFacs.length + " Venta" + (selFacs.length > 1 ? "s" : "") + " Directa" + (selFacs.length > 1 ? "s" : "") + " creada" + (selFacs.length > 1 ? "s" : "") + " ✓");
+      setTimeout(() => onClose(), 1500);
+    } catch(e) { setErr(e.message); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box" style={{ maxWidth:780, maxHeight:"90vh", display:"flex", flexDirection:"column" }}>
+        <div className="modal-header">
+          <div><div className="modal-title">Venta <em>Directa</em></div><div className="modal-sub">Facturas Bsale sin OC</div></div>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div style={{ padding:"16px 20px", borderBottom:"1px solid var(--line)", display:"flex", gap:10, alignItems:"flex-end", flexWrap:"wrap" }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+            <label style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>DESDE</label>
+            <input type="date" value={desde} onChange={e => setDesde(e.target.value)} style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:6, padding:"5px 8px", color:"var(--white)", fontSize:12 }} />
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+            <label style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>HASTA</label>
+            <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:6, padding:"5px 8px", color:"var(--white)", fontSize:12 }} />
+          </div>
+          <button className="btn btn-outline" onClick={buscar} disabled={loading}>
+            {loading ? "Buscando..." : "↺ Buscar en Bsale"}
+          </button>
+          {facturas.length > 0 && (
+            <span style={{ fontSize:11, color:"var(--fog)", marginLeft:4 }}>{facturas.length} factura{facturas.length !== 1 ? "s" : ""} pendiente{facturas.length !== 1 ? "s" : ""}</span>
+          )}
+        </div>
+
+        {err && <div style={{ padding:"10px 20px", color:"var(--rose)", fontSize:12 }}>{err}</div>}
+        {notify && <div style={{ padding:"10px 20px", color:"var(--lime)", fontSize:12, fontWeight:600 }}>{notify}</div>}
+
+        {facturas.length > 0 && (
+          <div style={{ flex:1, overflowY:"auto", padding:"0 20px 16px" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", marginTop:12 }}>
+              <thead>
+                <tr style={{ borderBottom:"1px solid var(--line)" }}>
+                  <th style={{ padding:"8px 6px", textAlign:"center", width:32 }}>
+                    <input type="checkbox" checked={selected.size === facturas.length} onChange={toggleAll} />
+                  </th>
+                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>N° FAC</th>
+                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>FECHA</th>
+                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>CLIENTE</th>
+                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>RUT</th>
+                  <th style={{ padding:"8px 6px", textAlign:"right", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>NETO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {facturas.map(fac => {
+                  const isSel = selected.has(fac.id);
+                  return (
+                    <tr key={fac.id} style={{ borderBottom:"1px solid var(--line2)", background: isSel ? "rgba(90,200,255,.05)" : "transparent" }}>
+                      <td style={{ padding:"8px 6px", textAlign:"center" }}>
+                        <input type="checkbox" checked={isSel} onChange={() => {
+                          setSelected(prev => { const n = new Set(prev); n.has(fac.id) ? n.delete(fac.id) : n.add(fac.id); return n; });
+                        }} />
+                      </td>
+                      <td style={{ padding:"8px 6px", color:"var(--sky)", fontFamily:"var(--fM)", fontSize:12 }}>{fac.number || "—"}</td>
+                      <td style={{ padding:"8px 6px", color:"var(--fog2)", fontSize:11 }}>{fmtDate(fac.generationDate)}</td>
+                      <td style={{ padding:"8px 6px" }}>
+                        <input value={clientEdits[fac.id] ?? (fac.address || "")} onChange={e => setClientEdits(p => ({ ...p, [fac.id]: e.target.value }))}
+                          style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"3px 6px", color:"var(--white)", fontSize:11, width:"100%" }} />
+                      </td>
+                      <td style={{ padding:"8px 6px" }}>
+                        <input value={rutEdits[fac.id] ?? ""} onChange={e => setRutEdits(p => ({ ...p, [fac.id]: e.target.value }))}
+                          placeholder="RUT"
+                          style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"3px 6px", color:"var(--white)", fontSize:11, width:110 }} />
+                      </td>
+                      <td style={{ padding:"8px 6px", textAlign:"right", color:"var(--lime)", fontSize:12 }}>{fmtMonto(fac.netAmount || 0)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ padding:"14px 20px", borderTop:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:11, color:"var(--fog)" }}>{selected.size} seleccionada{selected.size !== 1 ? "s" : ""}</span>
+          <div style={{ display:"flex", gap:8 }}>
+            <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
+            <button className="btn btn-gold" onClick={handleGuardar} disabled={saving || !selected.size}>
+              {saving ? "Guardando..." : "⚡ Crear " + selected.size + " Venta" + (selected.size !== 1 ? "s" : "") + " Directa" + (selected.size !== 1 ? "s" : "")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ImportOCModal({ onClose, onSave, apiKey, existingOCs = [] }) {
   // queue = [{ file, status: "pending"|"processing"|"done"|"error", data, items, err }]
   const [queue, setQueue] = useState([]);
@@ -2674,6 +2865,7 @@ export default function App() {
   const [fst, setFst] = useState("all");
   const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_ANTHROPIC_API_KEY || localStorage.getItem("dc_apikey") || "");
   const [showImport, setShowImport] = useState(false);
+  const [showVentaDirecta, setShowVentaDirecta] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
   const [showDispatch, setShowDispatch] = useState(null);
@@ -2817,11 +3009,12 @@ export default function App() {
       if (showDispatch) { setShowDispatch(null); return; }
       if (showDetail) { setShowDetail(null); return; }
       if (showImport) { setShowImport(false); return; }
+      if (showVentaDirecta) { setShowVentaDirecta(false); return; }
       if (showFactoringGestion) { setShowFactoringGestion(null); return; }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [showDispatch, showDetail, showImport, showFactoringGestion]);
+  }, [showDispatch, showDetail, showImport, showVentaDirecta, showFactoringGestion]);
 
   const handleAddGestion = async (ocId, comment) => {
     const updated = ocs.map(o => {
@@ -2854,6 +3047,11 @@ export default function App() {
     await persist([cleanOc, ...ocs]);
     if (!keepOpen) setShowImport(false);
     notify("OC importada ✓");
+  };
+
+  const handleSaveVentaDirecta = async (oc) => {
+    await persist([oc, ...ocs]);
+    notify("Venta Directa creada ✓");
   };
 
 
@@ -3286,6 +3484,7 @@ export default function App() {
                     <div><div className="pt">Ordenes <em>de Compra</em></div><div className="pm">{filtered.length} ORDENES</div></div>
                     <div style={{ display:"flex", gap:8 }}>
                       <button className="btn btn-gold" onClick={() => setShowImport(true)}>+ Importar OC</button>
+                      <button className="btn btn-outline" onClick={() => setShowVentaDirecta(true)}>+ Venta Directa</button>
                       <button className="btn btn-outline" onClick={() => {
                         const rows = [];
                         enriched.forEach(oc => {
@@ -4601,6 +4800,7 @@ export default function App() {
       </div>
 
       {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} existingOCs={ocs} />}
+      {showVentaDirecta && <VentaDirectaModal onClose={() => setShowVentaDirecta(false)} onSave={handleSaveVentaDirecta} existingOCs={ocs} />}
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
       {showFactoringGestion && (
         <FactoringGestionModal
