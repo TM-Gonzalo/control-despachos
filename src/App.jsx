@@ -3328,7 +3328,7 @@ export default function App() {
                 {(() => {
                   const bytes = new Blob([JSON.stringify(ocs)]).size;
                   const kb = (bytes / 1024).toFixed(1);
-                  const pct = Math.min(100, Math.round(bytes / (600 * 1024) * 100));
+                  const pct = Math.min(100, Math.round(bytes / (1024 * 1024) * 100));
                   const col = pct > 80 ? "var(--rose)" : pct > 50 ? "var(--gold)" : "var(--lime)";
                   return (
                     <div style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>
@@ -3336,7 +3336,7 @@ export default function App() {
                       <div style={{ marginTop:4, height:3, background:"var(--line2)", borderRadius:2 }}>
                         <div style={{ height:"100%", width:pct+"%", background:col, borderRadius:2, transition:".3s" }} />
                       </div>
-                      <div style={{ marginTop:3, color:col }}>{kb} KB / 600 KB ({pct}%)</div>
+                      <div style={{ marginTop:3, color:col }}>{kb} KB / 1024 KB ({pct}%)</div>
                     </div>
                   );
                 })()}
