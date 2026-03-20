@@ -4243,8 +4243,8 @@ export default function App() {
                                       <td>
                                         <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
                                           {f._ventaDirecta ? (() => {
-                                            const VD_ENT = ["Pendiente", "Cancelada"];
-                                            const VD_COL = { Pendiente: "var(--gold)", Cancelada: "var(--rose)" };
+                                            const VD_ENT = ["Pendiente", "Cobrada", "Cancelada"];
+                                            const VD_COL = { Pendiente: "var(--gold)", Cobrada: "var(--lime)", Cancelada: "var(--rose)" };
                                             return VD_ENT.map(e => {
                                               const isActive = entity === e;
                                               const isOther = entity && entity !== e;
