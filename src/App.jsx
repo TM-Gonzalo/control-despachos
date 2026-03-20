@@ -1770,16 +1770,26 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
                         });
                         return (
                           <div>
-                            <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:3 }}>
-                              <input
-                                placeholder="Buscar ítem OC..."
-                                value={mapSearch[i] || ""}
-                                onChange={e => setMapSearch(p => ({ ...p, [i]: e.target.value }))}
-                                onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); setMapSearch(p => ({ ...p, [i]: "" })); } }}
-                                style={{ flex:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontFamily:"var(--fM)", fontSize:10, padding:"3px 7px", outline:"none" }}
-                              />
-                              {mapSearch[i] && <button onClick={() => setMapSearch(p => ({ ...p, [i]: "" }))} style={{ background:"none", border:"none", color:"var(--fog)", cursor:"pointer", fontSize:11, padding:0 }}>✕</button>}
-                            </div>
+                            {(() => {
+                              const _mOC = (oc.items||[]).reduce((s,it)=>s+Number(it.qty)*Number(it.unitPrice||0),0);
+                              const _mGD = (oc.dispatches||[]).filter(d=>d.docType==="guia").reduce((s,d)=>s+Number(d.netTotal||0),0);
+                              const _mDoc = Number(ext?.netTotal||0)||items.reduce((s,it)=>s+Number(it.qty||0)*Number(it.unitPrice||0),0);
+                              const _cuadra = _mOC>0 && Math.abs((_mGD+_mDoc)-_mOC)/_mOC<0.02;
+                              const _sinMapear = Object.values(map).every(v=>!v||v==="NONE");
+                              if (!_cuadra||!_sinMapear) return null;
+                              return (
+                                <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:3 }}>
+                                  <input
+                                    placeholder="Buscar ítem OC..."
+                                    value={mapSearch[i] || ""}
+                                    onChange={e => setMapSearch(p => ({ ...p, [i]: e.target.value }))}
+                                    onKeyDown={e => { if (e.key === "Escape") { e.stopPropagation(); setMapSearch(p => ({ ...p, [i]: "" })); } }}
+                                    style={{ flex:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontFamily:"var(--fM)", fontSize:10, padding:"3px 7px", outline:"none" }}
+                                  />
+                                  {mapSearch[i] && <button onClick={() => setMapSearch(p => ({ ...p, [i]: "" }))} style={{ background:"none", border:"none", color:"var(--fog)", cursor:"pointer", fontSize:11, padding:0 }}>✕</button>}
+                                </div>
+                              );
+                            })()}
                             <select className={"map-sel" + (matched ? (excede ? " warn" : " ok") : " warn")} value={val || "NONE"}
                               onChange={e => {
                                 setMap(p => ({ ...p, [i]: e.target.value }));
