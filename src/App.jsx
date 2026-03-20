@@ -3325,6 +3325,21 @@ export default function App() {
               <div className="rail-user"><strong>{user.name}</strong>{user.email}</div>
               <button className="rail-logout" onClick={logout}>Cerrar sesion</button>
               {isAdmin && <div style={{ borderTop:"1px solid var(--line)", marginTop:10, paddingTop:10, display:"flex", flexDirection:"column", gap:5 }}>
+                {(() => {
+                  const bytes = new Blob([JSON.stringify(ocs)]).size;
+                  const kb = (bytes / 1024).toFixed(1);
+                  const pct = Math.min(100, Math.round(bytes / (600 * 1024) * 100));
+                  const col = pct > 80 ? "var(--rose)" : pct > 50 ? "var(--gold)" : "var(--lime)";
+                  return (
+                    <div style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>
+                      ALMACENAMIENTO
+                      <div style={{ marginTop:4, height:3, background:"var(--line2)", borderRadius:2 }}>
+                        <div style={{ height:"100%", width:pct+"%", background:col, borderRadius:2, transition:".3s" }} />
+                      </div>
+                      <div style={{ marginTop:3, color:col }}>{kb} KB / 600 KB ({pct}%)</div>
+                    </div>
+                  );
+                })()}
                 <button className="rail-logout" style={{ color:"var(--sky)" }} onClick={() => {
                   const data = { ocs, exportedAt: new Date().toISOString(), version: "ocs-v3" };
                   setShowExport(JSON.stringify(data, null, 2));
