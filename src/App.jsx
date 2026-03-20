@@ -4219,7 +4219,7 @@ export default function App() {
                                   const fact = isFactorizado(f.key);
                                   const entity = getEntity(f.key);
                                   return (
-                                    <tr key={f.key} style={{ opacity: fact ? 0.6 : isNo(f.key) ? 0.45 : 1 }}>
+                                    <tr key={f.key} style={{ opacity: fact ? 0.6 : (isNo(f.key) && !["Pendiente","Cobrada"].includes(entity)) ? 0.45 : 1 }}>
                                       <td>
                                         <div style={{ width:16, height:16, borderRadius:4, border: fact ? "none" : "1px solid var(--line2)", background: fact ? "var(--lime)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"var(--ink)", fontWeight:700 }}>
                                           {fact ? "✓" : ""}
