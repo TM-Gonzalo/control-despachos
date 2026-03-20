@@ -3743,7 +3743,7 @@ export default function App() {
                       // Incluir siempre aunque conIVA sea $0 (factura válida sin monto cargado aún)
                       directFacNums.add(String(d.number).trim());
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
-                      allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: null, neto, conIVA });
+                      allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, rut: oc.rut || "", desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: null, neto, conIVA });
                     }
                   });
                 });
@@ -3767,7 +3767,7 @@ export default function App() {
                       }
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       if (!gdFacMapF[key]) {
-                        gdFacMapF[key] = { key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: d.number, neto, conIVA };
+                        gdFacMapF[key] = { key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, rut: oc.rut || "", desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: d.number, neto, conIVA };
                       } else {
                         // Misma factura en múltiples GDs — acumular GD numbers en gdNumber
                         gdFacMapF[key].gdNumber = gdFacMapF[key].gdNumber + ", " + d.number;
@@ -3810,7 +3810,7 @@ export default function App() {
                   const rows = allFacsFiltered.map(f => ({
                     "Fecha": f.date,
                     "Empresa": f.client,
-                    "Ítem": f.desc,
+                    "RUT": f.rut || "",
                     "OC": f.ocNumber || "",
                     "GD": f.gdNumber ? Number(f.gdNumber) : "",
                     "Factura": f.facNumber ? Number(f.facNumber) : "",
@@ -3821,7 +3821,7 @@ export default function App() {
                   }));
                   const ws = XLSX.utils.json_to_sheet(rows);
                   ws["!cols"] = [
-                    { wch: 12 }, { wch: 28 }, { wch: 36 }, { wch: 16 },
+                    { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 16 },
                     { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }
                   ];
                   const wb = XLSX.utils.book_new();
