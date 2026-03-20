@@ -2174,7 +2174,7 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
 }
 
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail }) {
   const canDelGD = isAdmin || (userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl");
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
@@ -2781,10 +2781,17 @@ export default function App() {
   const persist = async updated => { setOcs(updated); await saveOCs(updated); };
 
   const handleCerrarPorMonto = async (ocId) => {
-    console.log("handleCerrarPorMonto llamado con ocId:", ocId);
     const updated = ocs.map(o => o.id !== ocId ? o : { ...o, _closedByMonto: true });
-    console.log("OC encontrada:", updated.find(o => o.id === ocId)?._closedByMonto);
-    await persist(updated);
+    setOcs(updated);
+    await saveOCs(updated);
+    const ocActualizada = updated.find(o => o.id === ocId);
+    if (showDetail && showDetail.id === ocId && ocActualizada) {
+      setShowDetail({
+        ...ocActualizada,
+        _closedByMonto: true,
+        items: (ocActualizada.items || []).map(it => ({ ...it, dispatched: Number(it.qty) }))
+      });
+    }
     notify("OC cerrada por monto ✓");
   };
 
