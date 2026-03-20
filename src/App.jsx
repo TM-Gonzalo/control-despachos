@@ -907,8 +907,9 @@ function ImportOCModal({ onClose, onSave, apiKey, existingOCs = [] }) {
   const statusColor = s => ({ pending: "var(--fog)", processing: "var(--gold)", done: "var(--sky)", error: "var(--rose)", saved: "var(--lime)" }[s] || "var(--fog)");
 
   return (
-    <div className="overlay">
-      <div className="modal modal-xl">
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:"var(--ink2)", border:"1px solid var(--line)", borderRadius:12, width:"min(780px,95vw)", maxHeight:"92vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,.5)", scrollbarWidth:"none" }}>
         <div className="modal-hd">
           <div>
             <div className="modal-title">Importar OC{queue.length > 1 ? "s" : ""}</div>
