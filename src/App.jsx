@@ -3901,6 +3901,7 @@ export default function App() {
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
                             {mesFactorizado > 0 && <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>}
                             {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizado</div>}
+                            {(mesTotal - mesFactorizado - mesNo) > 0 && <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesTotal - mesFactorizado - mesNo)} pendiente</div>}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                             <div style={{ fontSize:10, color:"var(--fog)" }}>{fmtCLP(mesNeto)} neto</div>
                           </div>
