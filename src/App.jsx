@@ -3284,6 +3284,7 @@ export default function App() {
                           if (dispatched.length === 0) {
                             rows.push({
                               "Cliente": oc.client || "",
+                              "RUT": oc.rut || "",
                               "N° OC": oc.ocNumber || oc.id,
                               "Fecha OC": oc.date || "",
                               "N° GD": "",
@@ -3301,6 +3302,7 @@ export default function App() {
                               const totalDespachado = dispatched.reduce((s, x) => s + (x.netTotal || x.total || 0), 0);
                               rows.push({
                                 "Cliente": oc.client || "",
+                                "RUT": oc.rut || "",
                                 "N° OC": oc.ocNumber || oc.id,
                                 "Fecha OC": oc.date || "",
                                 "N° GD": isGD ? (d.number || "") : (d.invoiceNumber ? "" : ""),
@@ -3315,7 +3317,7 @@ export default function App() {
                         });
                         const ws = XLSX.utils.json_to_sheet(rows);
                         ws["!cols"] = [
-                          {wch:30},{wch:15},{wch:12},{wch:12},{wch:12},{wch:15},{wch:15},{wch:15},{wch:12}
+                          {wch:30},{wch:14},{wch:15},{wch:12},{wch:12},{wch:12},{wch:15},{wch:15},{wch:15},{wch:12}
                         ];
                         const wb = XLSX.utils.book_new();
                         XLSX.utils.book_append_sheet(wb, ws, "Despachos");
