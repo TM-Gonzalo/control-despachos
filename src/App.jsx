@@ -153,7 +153,8 @@ const daysLeft = d => {
   if (!d) return null;
   return Math.round((new Date(d) - new Date(today())) / 86400000);
 };
-const ocStatus = (items, dispatches) => {
+const ocStatus = (items, dispatches, oc) => {
+  if (oc && oc._closedByMonto) return "closed";
   if (!items || !items.length) return "open";
   const tot = items.reduce((s, i) => s + Number(i.qty), 0);
   const dis = items.reduce((s, i) => s + Number(i.dispatched || 0), 0);
@@ -2193,7 +2194,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   const [clientVal, setClientVal] = useState(oc.client || "");
   const [editingOCNumber, setEditingOCNumber] = useState(false);
   const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
-  const st = ocStatus(oc.items, oc.dispatches);
+  const st = ocStatus(oc.items, oc.dispatches, oc);
   const totAmt = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
   const disAmt = oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
   const days = daysLeft(oc.deliveryDate);
@@ -2775,7 +2776,7 @@ export default function App() {
     ...oc,
     items: oc.items.map(it => ({
       ...it,
-      dispatched: oc._closedByMonto ? Number(it.qty) : (oc.dispatches || []).reduce((s, d) => {
+      dispatched: (oc.dispatches || []).reduce((s, d) => {
         const matched = d.items.filter(ii => (ii.ocItemId && ii.ocItemId === it.id) || (!ii.ocItemId && ii.desc.toLowerCase().trim() === it.desc.toLowerCase().trim()));
         // Si hay múltiples líneas mapeadas al mismo item, ignorar las marcadas como splitPrice
         // Si todas son splitPrice (caso raro), contar solo la primera
@@ -2804,11 +2805,7 @@ export default function App() {
     await saveOCs(updated);
     const ocActualizada = updated.find(o => o.id === ocId);
     if (showDetail && showDetail.id === ocId && ocActualizada) {
-      setShowDetail({
-        ...ocActualizada,
-        _closedByMonto: true,
-        items: (ocActualizada.items || []).map(it => ({ ...it, dispatched: Number(it.qty) }))
-      });
+      setShowDetail({ ...ocActualizada, _closedByMonto: true });
     }
     notify("OC cerrada por monto ✓");
   };
@@ -3060,9 +3057,9 @@ export default function App() {
   };
 
   const total = enriched.length;
-  const open = enriched.filter(o => ocStatus(o.items, o.dispatches) === "open").length;
-  const closed = enriched.filter(o => ocStatus(o.items, o.dispatches) === "closed").length;
-  const alerts = enriched.filter(o => { const d = daysLeft(o.deliveryDate); return d !== null && d <= 5 && ocStatus(o.items, o.dispatches) !== "closed"; });
+  const open = enriched.filter(o => ocStatus(o.items, o.dispatches, o) === "open").length;
+  const closed = enriched.filter(o => ocStatus(o.items, o.dispatches, o) === "closed").length;
+  const alerts = enriched.filter(o => { const d = daysLeft(o.deliveryDate); return d !== null && d <= 5 && ocStatus(o.items, o.dispatches, o) !== "closed"; });
   const pendingGuias = enriched.reduce((s, o) => {
     const normN = n => String(n).replace(/[\s.]/g, "");
     return s + (o.dispatches || []).filter(d => {
@@ -3075,7 +3072,7 @@ export default function App() {
     const norm = v => v.toLowerCase().replace(/\./g, "");
     const s = norm(search);
     const matchesSearch = !s || norm(o.id).includes(s) || norm(o.client).includes(s) || norm(o.ocNumber || "").includes(s);
-    const matchesStatus = fst === "all" || ocStatus(o.items, o.dispatches) === fst;
+    const matchesStatus = fst === "all" || ocStatus(o.items, o.dispatches, o) === fst;
     const matchesPeriod = ordersMonthFilter === "all" || (o.date||"").startsWith(ordersMonthFilter);
     return matchesSearch && matchesStatus && matchesPeriod;
   });
@@ -3089,8 +3086,8 @@ export default function App() {
   const applySort = (arr, { col, dir }) => {
     if (!col) return arr;
     return [...arr].sort((a, b) => {
-      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches)] ?? 0) : col === "lastActivity" ? ((a.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
-      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches)] ?? 0) : col === "lastActivity" ? ((b.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
+      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches, a)] ?? 0) : col === "lastActivity" ? ((a.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
+      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches, b)] ?? 0) : col === "lastActivity" ? ((b.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
       return av < bv ? -dir : av > bv ? dir : 0;
     });
   };
@@ -3201,7 +3198,7 @@ export default function App() {
                       <table>
                         <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--ink3)" }}><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><SortTh label="ESTADO" col="status" state={dashSort} setState={setDashSort} /><th /></tr></thead>
                         <tbody>{applySort(enriched, dashSort).map(oc => {
-                          const s = ocStatus(oc.items, oc.dispatches);
+                          const s = ocStatus(oc.items, oc.dispatches, oc);
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
                           const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
@@ -3252,7 +3249,7 @@ export default function App() {
                               "Total OC": ocTotal,
                               "Total Despachado": 0,
                               "Remanente": ocTotal,
-                              "Estado": ocStatus(oc.items, oc.dispatches)
+                              "Estado": ocStatus(oc.items, oc.dispatches, oc)
                             });
                           } else {
                             dispatched.forEach(d => {
@@ -3269,7 +3266,7 @@ export default function App() {
                                 "Total OC": ocTotal,
                                 "Total Despachado": dispTotal,
                                 "Remanente": ocTotal - totalDespachado,
-                                "Estado": ocStatus(oc.items, oc.dispatches)
+                                "Estado": ocStatus(oc.items, oc.dispatches, oc)
                               });
                             });
                           }
@@ -3316,7 +3313,7 @@ export default function App() {
                       <table>
                         <thead><tr><SortTh label="N° OC" col="ocNumber" state={ordSort} setState={setOrdSort} /><SortTh label="CLIENTE" col="client" state={ordSort} setState={setOrdSort} /><SortTh label="FECHA OC" col="date" state={ordSort} setState={setOrdSort} /><th>ENTREGA</th><SortTh label="ÚLT. ACTIVIDAD" col="lastActivity" state={ordSort} setState={setOrdSort} /><th>DOCS</th><SortTh label="TOTAL" col="monto" state={ordSort} setState={setOrdSort} /><SortTh label="PENDIENTE" col="pendiente" state={ordSort} setState={setOrdSort} /><SortTh label="AVANCE" col="pct" state={ordSort} setState={setOrdSort} /><th>ESTADO</th><th /></tr></thead>
                         <tbody>{applySort(filtered, ordSort).map(oc => {
-                          const s = ocStatus(oc.items, oc.dispatches);
+                          const s = ocStatus(oc.items, oc.dispatches, oc);
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
                           const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
@@ -3408,7 +3405,7 @@ export default function App() {
                       const totalOC   = ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0), 0);
                       const totalDis  = ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0), 0);
                       const pending   = totalOC - totalDis;
-                      const openOcs   = ocs.filter(o => ocStatus(o.items, o.dispatches) !== "closed").length;
+                      const openOcs   = ocs.filter(o => ocStatus(o.items, o.dispatches, o) !== "closed").length;
                       return { client, ocs, totalOC, totalDis, pending, openOcs };
                     }).sort((a, b) => b.pending - a.pending);
 
@@ -3458,7 +3455,7 @@ export default function App() {
                                   const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                                   const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
                                   const rem = tot - dis;
-                                  const s   = ocStatus(oc.items, oc.dispatches);
+                                  const s   = ocStatus(oc.items, oc.dispatches, oc);
                                   return (
                                     <div className="cli-oc-row" key={oc.id}>
                                       <span style={{ color:"var(--gold)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
@@ -4039,7 +4036,7 @@ export default function App() {
               })()}
 
               {view === "pending" && (() => {
-                const pendingOCs = enriched.filter(o => { const s = ocStatus(o.items, o.dispatches); return s === "open" || s === "partial"; });
+                const pendingOCs = enriched.filter(o => { const s = ocStatus(o.items, o.dispatches, o); return s === "open" || s === "partial"; });
                 const totalPend = pendingOCs.reduce((s, o) => s + o.items.reduce((a, i) => a + (Number(i.qty) - Number(i.dispatched||0)) * Number(i.unitPrice), 0), 0);
 
                 // Sort helper para esta tabla
@@ -4064,8 +4061,8 @@ export default function App() {
                   const remB = totB - disB;
                   const pctA = totA > 0 ? Math.round(disA/totA*100) : 0;
                   const pctB = totB > 0 ? Math.round(disB/totB*100) : 0;
-                  const sA = ocStatus(a.items, a.dispatches);
-                  const sB = ocStatus(b.items, b.dispatches);
+                  const sA = ocStatus(a.items, a.dispatches, a);
+                  const sB = ocStatus(b.items, b.dispatches, b);
                   let av, bv;
                   if (col === "ocNumber")     { av = a.ocNumber||a.id; bv = b.ocNumber||b.id; }
                   else if (col === "date")    { av = a.date||""; bv = b.date||""; }
@@ -4090,7 +4087,7 @@ export default function App() {
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched||0) * Number(i.unitPrice), 0);
                           const pct = tot > 0 ? Math.round(dis/tot*100) : 0;
-                          const s = ocStatus(oc.items, oc.dispatches);
+                          const s = ocStatus(oc.items, oc.dispatches, oc);
                           rows.push({
                             "Estado": bLbl(s),
                             "N° OC": oc.ocNumber || oc.id,
@@ -4115,8 +4112,8 @@ export default function App() {
                     <div className="kpis" style={{ marginBottom:22 }}>
                       {[
                         { n: pendingOCs.length, lbl: "OCs Pendientes", c: "var(--rose)" },
-                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
-                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
+                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches, o) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
+                        { n: pendingOCs.filter(o => ocStatus(o.items, o.dispatches, o) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
                         { n: fmtCLP(totalPend), lbl: "Monto Pendiente", c: "var(--rose)" },
                       ].map(({ n, lbl, c }) => (
                         <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize:38 }}>{n}</div></div>
@@ -4144,7 +4141,7 @@ export default function App() {
                           </thead>
                           <tbody>
                             {sorted.map(oc => {
-                              const s = ocStatus(oc.items, oc.dispatches);
+                              const s = ocStatus(oc.items, oc.dispatches, oc);
                               const tot = oc.items.reduce((a,i) => a+Number(i.qty)*Number(i.unitPrice),0);
                               const dis = oc.items.reduce((a,i) => a+Number(i.dispatched||0)*Number(i.unitPrice),0);
                               const pct = tot > 0 ? Math.min(100, Math.round(dis/tot*100)) : 0;
@@ -4281,7 +4278,7 @@ export default function App() {
                 // Recolectar todas las GDs sin factura
                 const pendFacs = [];
                 enriched.forEach(oc => {
-                  const ocStatusVal = ocStatus(oc.items, oc.dispatches);
+                  const ocStatusVal = ocStatus(oc.items, oc.dispatches, oc);
                   // Solo OCs que realmente están pendientes de facturar
                   if (ocStatusVal === "closed") return;
                   const normN = s => String(s).replace(/[\s.]/g, "");
@@ -4408,7 +4405,7 @@ export default function App() {
                                   <td>{(() => {
                                     const oc = enriched.find(o => o.id === g.ocId);
                                     if (!oc) return null;
-                                    const s = ocStatus(oc.items, oc.dispatches);
+                                    const s = ocStatus(oc.items, oc.dispatches, oc);
                                     return <span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>;
                                   })()}</td>
                                   <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(g.neto)}</td>
@@ -4454,10 +4451,10 @@ export default function App() {
                       const rFiltered = reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter));
                       return [
                         { n: rFiltered.length, lbl: "Total", c: "var(--white)" },
-                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
-                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
-                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "toinvoice").length, lbl: "Por Facturar", c: "var(--rose)" },
-                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches) === "closed").length, lbl: "Completadas", c: "var(--lime)" }
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches, o) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches, o) === "partial").length, lbl: "Parciales", c: "var(--gold)" },
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches, o) === "toinvoice").length, lbl: "Por Facturar", c: "var(--rose)" },
+                        { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches, o) === "closed").length, lbl: "Completadas", c: "var(--lime)" }
                       ].map(({ n, lbl, c }) => (
                         <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
                       ));
@@ -4480,7 +4477,7 @@ export default function App() {
                           const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
                           return remB - remA;
                         }).map(oc => {
-                    const s = ocStatus(oc.items, oc.dispatches);
+                    const s = ocStatus(oc.items, oc.dispatches, oc);
                     const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                     const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
                     const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
