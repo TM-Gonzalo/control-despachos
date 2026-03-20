@@ -2174,7 +2174,7 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
 }
 
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto }) {
   const canDelGD = isAdmin || (userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl");
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
@@ -2247,6 +2247,33 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
           </div>
           <div style={{ display:"flex", gap:7, alignItems:"center" }}>
             <span className={"badge " + bCls(st)}><Dot c={st === "open" ? "var(--sky)" : st === "partial" ? "var(--gold)" : st === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(st)}</span>
+            {(() => {
+              if (!isAdmin || st === "closed") return null;
+              // Calcular monto facturado
+              const dispatches = oc.dispatches || [];
+              const facNums = new Set();
+              let montoFac = 0;
+              dispatches.forEach(d => {
+                const calcN = x => Number(x.netTotal||0) || (x.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.unitPrice||0),0);
+                if (d.docType==="factura") { montoFac+=calcN(d); if(d.number) facNums.add(String(d.number).trim()); }
+              });
+              dispatches.forEach(d => {
+                const calcN = x => Number(x.netTotal||0) || (x.items||[]).reduce((s,it)=>s+Number(it.qty||0)*Number(it.unitPrice||0),0);
+                if (d.docType==="guia" && d.invoiceNumber && d.invoiceDate && !facNums.has(String(d.invoiceNumber).trim())) montoFac+=calcN(d);
+                if (d.docType==="nc") montoFac-=Number(d.netTotal||0);
+              });
+              const cuadra = totAmt > 0 && (montoFac/totAmt) >= 0.99;
+              // Verificar si hay ítems sin mapear (dispatched < qty para todos)
+              const hayItemsSinMapear = (oc.items||[]).some(it => Number(it.dispatched||0) < Number(it.qty));
+              if (!cuadra || !hayItemsSinMapear) return null;
+              return (
+                <button className="btn btn-sm" style={{ background:"var(--lime)", color:"#111", fontWeight:700, fontSize:9, padding:"3px 10px", borderRadius:5, border:"none", cursor:"pointer" }}
+                  title={"Monto facturado " + fmtCLP(montoFac) + " ≈ OC " + fmtCLP(totAmt)}
+                  onClick={() => onCerrarPorMonto && onCerrarPorMonto(oc.id)}>
+                  ⚡ Cerrar por monto
+                </button>
+              );
+            })()}
             <button className="btn btn-outline btn-sm" style={{ fontSize:9, color:"var(--fog2)", borderColor:"var(--line2)", padding:"3px 8px" }}
               onClick={() => generateOCPDF(oc, st, totAmt, disAmt, pctGlobal)}
               title="Exportar PDF">↓ PDF</button>
@@ -2752,6 +2779,26 @@ export default function App() {
   }));
 
   const persist = async updated => { setOcs(updated); await saveOCs(updated); };
+
+  const handleCerrarPorMonto = async (ocId) => {
+    // Marcar todos los ítems como dispatched = qty para que remanente = 0
+    const updated = ocs.map(o => {
+      if (o.id !== ocId) return o;
+      return {
+        ...o,
+        items: (o.items || []).map(it => ({
+          ...it,
+          dispatched: Number(it.qty)
+        }))
+      };
+    });
+    await persist(updated);
+    if (showDetail && showDetail.id === ocId) {
+      const live = updated.find(o => o.id === ocId);
+      setShowDetail(live);
+    }
+    notify("OC cerrada por monto ✓");
+  };
 
   // Esc global para cerrar ventanas emergentes
   useEffect(() => {
@@ -4497,7 +4544,7 @@ export default function App() {
           currentUserId={user.id}
         />
       )}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} />}
 
       {confirmDel && (
