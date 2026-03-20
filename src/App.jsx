@@ -4163,7 +4163,7 @@ export default function App() {
                                         {bLbl(s)}
                                       </span>
                                     </td>
-                                    <td style={{ color:"var(--gold)", fontFamily:"var(--fM)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
+                                    <td style={{ color:"var(--gold)", fontFamily:"var(--fM)", fontWeight:600 }}><span style={{ cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:2 }} onClick={() => { setView("orders"); setTimeout(() => setShowDetail(oc), 80); }}>{oc.ocNumber || oc.id}</span></td>
                                     <td style={{ color:"var(--fog2)" }}>{oc.date || "—"}</td>
                                     <td style={{ color:"var(--white)" }}>{oc.client}</td>
                                     <td style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>
