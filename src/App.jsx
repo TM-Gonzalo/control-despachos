@@ -4185,7 +4185,7 @@ export default function App() {
                                     <td style={{ textAlign:"right", color:"var(--fog2)" }}>{fmtCLP(tot)}</td>
                                     <td style={{ textAlign:"right", color:"var(--lime)" }}>{fmtCLP(dis)}</td>
                                     <td style={{ textAlign:"right", color:"var(--rose)", fontWeight:600 }}>{fmtCLP(tot-dis)}</td>
-                                    <td style={{ textAlign:"center", color:"var(--rose)" }}>
+                                    <td style={{ textAlign:"center", color:"var(--violet)" }}>
                                       {nGuias}
                                       {pendG > 0 && <span style={{ color:"var(--gold)", fontSize:9, marginLeft:3 }}>({pendG})</span>}
                                     </td>
