@@ -667,6 +667,23 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [] }) {
       assignedNums.add(String(oc.dispatches[0].number).trim());
   });
 
+  const getClientName = (fac) => {
+    const c = fac.client || {};
+    return c.company || c.businessActivity || c.razonsocial ||
+      (c.firstName || c.lastName ? [c.firstName, c.lastName].filter(Boolean).join(" ") : null) ||
+      fac.address || "Sin nombre";
+  };
+
+  const getClientRut = (fac) => {
+    const c = fac.client || {};
+    const raw = c.code || c.taxId || c.identifier || c.rut || "";
+    if (!raw) return "";
+    const clean = String(raw).replace(/\./g, "").trim();
+    const match = clean.match(/^(\d+)(-[\dkK])?$/);
+    if (!match) return String(raw);
+    return match[1].replace(/\B(?=(\d{3})+(?!\d))/g, ".") + (match[2] || "");
+  };
+
   const buscar = async () => {
     setLoading(true); setErr(null); setFacturas([]); setSelected(new Set());
     try {
@@ -674,8 +691,8 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [] }) {
       const hastaTs = Math.floor(new Date(hasta + "T23:59:59").getTime() / 1000);
       const res = await fetchBsale("/documents.json", {
         documentTypeId: "1",
-        emissiondateFrom: desdeTs,
-        emissiondateTo: hastaTs,
+        generationDateFrom: desdeTs,
+        generationDateTo: hastaTs,
         expand: "client",
         limit: 100,
         offset: 0
@@ -710,8 +727,8 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [] }) {
         const date = fmtDate(fac.generationDate);
         const neto = Number(fac.netAmount || 0);
         const total = Number(fac.totalAmount || fac.netAmount || 0) || Math.round(neto * 1.19);
-        const client = clientEdits[fac.id] ?? (fac.client?.firstName || fac.client?.lastName ? [fac.client.firstName, fac.client.lastName].filter(Boolean).join(" ") : fac.address || "Sin nombre");
-        const rut = rutEdits[fac.id] ?? (fac.client?.code || fac.client?.taxId || "");
+        const client = clientEdits[fac.id] ?? getClientName(fac);
+        const rut = rutEdits[fac.id] ?? getClientRut(fac);
         const ocNumber = "VD-" + String(seq).padStart(3, "0");
         seq++;
         const newOC = {
@@ -746,8 +763,8 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [] }) {
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:"var(--ink2)", border:"1px solid var(--line)", borderRadius:12, width:"min(820px,95vw)", maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 24px 60px rgba(0,0,0,.5)" }}>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box" style={{ maxWidth:780, maxHeight:"90vh", display:"flex", flexDirection:"column" }}>
         <div className="modal-header">
           <div><div className="modal-title">Venta <em>Directa</em></div><div className="modal-sub">Facturas Bsale sin OC</div></div>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -800,11 +817,11 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [] }) {
                       <td style={{ padding:"8px 6px", color:"var(--sky)", fontFamily:"var(--fM)", fontSize:12 }}>{fac.number || "—"}</td>
                       <td style={{ padding:"8px 6px", color:"var(--fog2)", fontSize:11 }}>{fmtDate(fac.generationDate)}</td>
                       <td style={{ padding:"8px 6px" }}>
-                        <input value={clientEdits[fac.id] ?? (fac.client?.firstName || fac.client?.lastName ? [fac.client.firstName, fac.client.lastName].filter(Boolean).join(" ") : fac.address || "")} onChange={e => setClientEdits(p => ({ ...p, [fac.id]: e.target.value }))}
+                        <input value={clientEdits[fac.id] ?? getClientName(fac)} onChange={e => setClientEdits(p => ({ ...p, [fac.id]: e.target.value }))}
                           style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"3px 6px", color:"var(--white)", fontSize:11, width:"100%" }} />
                       </td>
                       <td style={{ padding:"8px 6px" }}>
-                        <input value={rutEdits[fac.id] ?? (fac.client?.code || fac.client?.taxId || "")} onChange={e => setRutEdits(p => ({ ...p, [fac.id]: e.target.value }))}
+                        <input value={rutEdits[fac.id] ?? getClientRut(fac)} onChange={e => setRutEdits(p => ({ ...p, [fac.id]: e.target.value }))}
                           placeholder="RUT"
                           style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"3px 6px", color:"var(--white)", fontSize:11, width:110 }} />
                       </td>
