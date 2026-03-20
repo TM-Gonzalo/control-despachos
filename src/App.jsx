@@ -3235,9 +3235,10 @@ export default function App() {
                   <div className="kpis" style={{ marginBottom:18 }}>
                     {[
                       { n:enriched.length, lbl:"Total OCs", c:"var(--white)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="partial").length, lbl:"Parciales", c:"var(--gold)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches)==="closed").length, lbl:"Cerradas", c:"var(--lime)" },
+                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
+                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="partial").length, lbl:"Parciales", c:"var(--gold)" },
+                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="toinvoice").length, lbl:"Por Facturar", c:"var(--rose)" },
+                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="closed").length, lbl:"Cerradas", c:"var(--lime)" },
                     ].map(({n,lbl,c}) => (
                       <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-n" style={{ color:c }}>{n}</div><div className="kpi-l">{lbl}</div></div>
                     ))}
