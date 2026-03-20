@@ -2256,6 +2256,12 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
             </div>
           </div>
           <div style={{ display:"flex", gap:7, alignItems:"center" }}>
+            {isAdmin && st !== "closed" && (
+              <button className="btn btn-sm" style={{ background:"var(--lime)", color:"#111", fontWeight:700, fontSize:9, padding:"3px 10px", borderRadius:5, border:"none", cursor:"pointer" }}
+                onClick={() => { if (window.confirm("¿Cerrar esta OC? El remanente quedará en $0.")) onCerrarPorMonto && onCerrarPorMonto(oc.id); }}>
+                Cerrar OC
+              </button>
+            )}
             <span className={"badge " + bCls(st)}><Dot c={st === "open" ? "var(--sky)" : st === "partial" ? "var(--gold)" : st === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(st)}</span>
             <button className="btn btn-outline btn-sm" style={{ fontSize:9, color:"var(--fog2)", borderColor:"var(--line2)", padding:"3px 8px" }}
               onClick={() => generateOCPDF(oc, st, totAmt, disAmt, pctGlobal)}
