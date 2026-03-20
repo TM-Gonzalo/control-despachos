@@ -4246,14 +4246,15 @@ export default function App() {
                                         <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
                                           {(() => {
                                             const PC_ENT = ["Pendiente", "Cobrada"];
-                                            const PC_COL = { Pendiente: "var(--gold)", Cobrada: "var(--lime)" };
-                                            const showPendCob = f._ventaDirecta || entity === "No";
+                                            const PC_COL = { Pendiente: "#e8b84b", Cobrada: "#7fff5a" };
+                                            const showPendCob = f._ventaDirecta || entity === "No" || entity === "Pendiente" || entity === "Cobrada";
                                             if (showPendCob) {
                                               return (<>
-                                                {!f._ventaDirecta && (
-                                                  <button onClick={() => handleToggleFactoring(f.key, "No")}
-                                                    style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + ENTITY_COLORS["No"], background: ENTITY_COLORS["No"], color:"var(--ink)", transition:".12s", boxShadow:"0 0 6px " + ENTITY_COLORS["No"] + "66" }}>No</button>
-                                                )}
+                                                {!f._ventaDirecta && (() => {
+                                                  const noActive = entity === "No";
+                                                  return <button onClick={() => handleToggleFactoring(f.key, "No")}
+                                                    style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + ENTITY_COLORS["No"], background: noActive ? ENTITY_COLORS["No"] : "transparent", color: noActive ? "var(--ink)" : ENTITY_COLORS["No"], transition:".12s", boxShadow: noActive ? "0 0 6px " + ENTITY_COLORS["No"] + "66" : "none" }}>No</button>;
+                                                })()}
                                                 {PC_ENT.map(e => {
                                                   const isActive = entity === e;
                                                   const isOther = PC_ENT.includes(entity) && entity !== e;
