@@ -2671,6 +2671,8 @@ export default function App() {
   const [toinvoiceSort, setToinvoiceSort] = useState({ col: "date", dir: 1 });
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [facFilterTo, setFacFilterTo] = useState("");
+  const [pfFilterFrom, setPfFilterFrom] = useState("");
+  const [pfFilterTo, setPfFilterTo] = useState("");
   const [pendExpanded, setPendExpanded] = useState({});
   const [clientMonthFilter, setClientMonthFilter] = useState("all");
   const [reportsMonthFilter, setReportsMonthFilter] = useState("all");
@@ -3570,9 +3572,12 @@ export default function App() {
                   return { ...f, total: Math.max(0, f.total - nc.total), neto: Math.max(0, (f.neto||0) - nc.neto), _ncDesc: nc.total };
                 });
                 // Años disponibles
-                const availableYears = [...new Set(allFacsAdj.map(f => f.date.slice(0, 4)))].sort((a, b) => b.localeCompare(a));
-                // Filtrar por año seleccionado
-                const filteredFacs = selectedYear === "all" ? allFacsAdj : allFacsAdj.filter(f => f.date.startsWith(selectedYear));
+                // Filtrar por período
+                const filteredFacs = allFacsAdj.filter(f => {
+                  if (pfFilterFrom && f.date < pfFilterFrom) return false;
+                  if (pfFilterTo && f.date > pfFilterTo) return false;
+                  return true;
+                });
                 // Agrupar por año-mes
                 const byMonth = filteredFacs.reduce((acc, fac) => {
                   const key = fac.date.slice(0, 7); // "YYYY-MM"
@@ -3583,10 +3588,25 @@ export default function App() {
                 const months = Object.keys(byMonth).sort((a, b) => b.localeCompare(a));
                 const fmtMonth = k => { const [y, m] = k.split("-"); const names = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]; return names[parseInt(m)-1] + " " + y; };
                 const grandTotal = filteredFacs.reduce((s, f) => s + Number(f.total || f.amount || 0), 0);
+                const totalClientes = new Set(filteredFacs.map(f => f.client).filter(Boolean)).size;
 
                 return (
                   <>
-                    <div className="ph"><div><div className="pt">Reporte <em>Por Facturas</em></div><div className="pm">FACTURACIÓN POR PERÍODO</div></div></div>
+                    <div className="ph">
+                      <div><div className="pt">Reporte <em>Por Facturas</em></div><div className="pm">FACTURACIÓN POR PERÍODO</div></div>
+                      <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
+                        <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>DESDE</span>
+                        <input type="date" value={pfFilterFrom} onChange={e => setPfFilterFrom(e.target.value)}
+                          style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                        <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>HASTA</span>
+                        <input type="date" value={pfFilterTo} onChange={e => setPfFilterTo(e.target.value)}
+                          style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                        {(pfFilterFrom || pfFilterTo) && (
+                          <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 8px" }}
+                            onClick={() => { setPfFilterFrom(""); setPfFilterTo(""); }}>✕ Limpiar</button>
+                        )}
+                      </div>
+                    </div>
                     {allFacs.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay facturas registradas aun.</p></div>}
                     {allFacs.length > 0 && (
                       <>
@@ -3595,23 +3615,10 @@ export default function App() {
                             { n: months.length,         lbl: "Meses",      c: "var(--sky)"    },
                             { n: filteredFacs.length,   lbl: "Facturas",   c: "var(--teal)"   },
                             { n: fmtCLP(grandTotal),    lbl: "Total",      c: "var(--gold)"   },
+                            { n: totalClientes,         lbl: "Clientes",   c: "var(--violet)" },
                           ].map(({ n, lbl, c }) => (
                             <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
                           ))}
-                          <div className="kpi">
-                            <div className="kpi-bar" style={{ background:"var(--violet)" }} />
-                            <div className="kpi-lbl">AÑO</div>
-                            <select
-                              value={selectedYear}
-                              onChange={e => setSelectedYear(e.target.value)}
-                              style={{ background:"transparent", border:"none", color:"var(--violet)", fontFamily:"var(--fS)", fontSize:38, fontStyle:"italic", cursor:"pointer", outline:"none", width:"100%", marginTop:4 }}
-                            >
-                              <option value="all" style={{ background:"var(--ink2)", color:"var(--white)" }}>Todos</option>
-                              {availableYears.map(y => (
-                                <option key={y} value={y} style={{ background:"var(--ink2)", color:"var(--white)" }}>{y}</option>
-                              ))}
-                            </select>
-                          </div>
                         </div>
                         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:12 }}>
                         {months.map(mk => {
