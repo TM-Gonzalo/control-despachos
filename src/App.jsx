@@ -910,13 +910,16 @@ function ImportOCModal({ onClose, onSave, apiKey, existingOCs = [] }) {
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background:"var(--ink2)", border:"1px solid var(--line)", borderRadius:12, width:"min(780px,95vw)", maxHeight:"92vh", overflowY:"auto", boxShadow:"0 24px 60px rgba(0,0,0,.5)", scrollbarWidth:"none" }}>
-        <div className="modal-hd">
-          <div>
-            <div className="modal-title">Importar OC{queue.length > 1 ? "s" : ""}</div>
-            <div className="modal-sub">{queue.length > 0 ? queue.length + " archivo" + (queue.length > 1 ? "s" : "") + " seleccionado" + (queue.length > 1 ? "s" : "") : "Orden de compra del cliente"}</div>
+        <div style={{ padding:"18px 24px 14px", borderBottom:"1px solid var(--line)" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+            <div>
+              <div className="modal-title">Importar OC{queue.length > 1 ? "s" : ""}</div>
+              <div className="modal-sub">{queue.length > 0 ? queue.length + " archivo" + (queue.length > 1 ? "s" : "") + " seleccionado" + (queue.length > 1 ? "s" : "") : "Orden de compra del cliente"}</div>
+            </div>
+            <button onClick={onClose} style={{ background:"none", border:"none", color:"var(--fog)", fontSize:20, cursor:"pointer", lineHeight:1, padding:"0 2px" }}>×</button>
           </div>
-          <div className="xbtn" onClick={onClose}>✕</div>
         </div>
+        <div style={{ padding:"20px 24px" }}>
 
         {/* STEP 0: file selection */}
         {queue.length === 0 && (
@@ -1024,6 +1027,7 @@ function ImportOCModal({ onClose, onSave, apiKey, existingOCs = [] }) {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );
@@ -3991,7 +3995,7 @@ export default function App() {
                       // Incluir siempre aunque conIVA sea $0 (factura válida sin monto cargado aún)
                       directFacNums.add(String(d.number).trim());
                       const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
-                      allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, rut: oc.rut || "", desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: null, neto, conIVA });
+                      allFacs.push({ key: d.id, facNumber: d.number, date: d.date, client: oc.client, rut: oc.rut || "", desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: null, neto, conIVA, _ventaDirecta: oc._ventaDirecta || false });
                     }
                   });
                 });
@@ -4238,7 +4242,27 @@ export default function App() {
                                       </td>
                                       <td>
                                         <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
-                                          {ENTITIES.map(e => {
+                                          {f._ventaDirecta ? (() => {
+                                            const VD_ENT = ["Pendiente", "Cancelada"];
+                                            const VD_COL = { Pendiente: "var(--gold)", Cancelada: "var(--rose)" };
+                                            return VD_ENT.map(e => {
+                                              const isActive = entity === e;
+                                              const isOther = entity && entity !== e;
+                                              return (
+                                                <button key={e}
+                                                  onClick={() => handleToggleFactoring(f.key, e)}
+                                                  style={{
+                                                    padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5,
+                                                    cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700,
+                                                    border:"1px solid " + VD_COL[e],
+                                                    background: isActive ? VD_COL[e] : "transparent",
+                                                    color: isActive ? "var(--ink)" : VD_COL[e],
+                                                    opacity: isOther ? 0.3 : 1, transition:".12s",
+                                                    boxShadow: isActive ? "0 0 6px " + VD_COL[e] + "66" : "none"
+                                                  }}>{e}</button>
+                                              );
+                                            });
+                                          })() : ENTITIES.map(e => {
                                             const isActive = entity === e;
                                             const isOther = entity && entity !== e;
                                             return (
@@ -4250,12 +4274,9 @@ export default function App() {
                                                   border:"1px solid " + ENTITY_COLORS[e],
                                                   background: isActive ? ENTITY_COLORS[e] : "transparent",
                                                   color: isActive ? "var(--ink)" : ENTITY_COLORS[e],
-                                                  opacity: isOther ? 0.3 : 1,
-                                                  transition:".12s",
+                                                  opacity: isOther ? 0.3 : 1, transition:".12s",
                                                   boxShadow: isActive ? "0 0 6px " + ENTITY_COLORS[e] + "66" : "none"
-                                                }}>
-                                                {e}
-                                              </button>
+                                                }}>{e}</button>
                                             );
                                           })}
                                           {(() => {
