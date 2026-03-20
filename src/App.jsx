@@ -3232,7 +3232,7 @@ export default function App() {
                       })}
                     </div>
                   )}
-                  <div className="kpis" style={{ marginBottom:18 }}>
+                  <div className="kpis" style={{ marginBottom:18, gridTemplateColumns:"repeat(5,1fr)" }}>
                     {[
                       { n:enriched.length, lbl:"Total OCs", c:"var(--white)" },
                       { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
