@@ -801,7 +801,7 @@ function ImportOCModal({ onClose, onSave, apiKey, existingOCs = [] }) {
             )}
             <div className="ex-box">
               <div className="ex-ok">✓ DATOS EXTRAIDOS</div>
-              {[["N° OC", data.ocNumber], ["Cliente", data.client], ["Fecha", data.date], ["Entrega", data.deliveryDate], ["Notas", data.notes]].map(([k, v]) => (
+              {[["N° OC", data.ocNumber], ["Cliente", data.client], ["RUT", data.rut], ["Fecha", data.date], ["Entrega", data.deliveryDate], ["Notas", data.notes]].map(([k, v]) => (
                 <div className="ex-row" key={k}><span className="ex-k">{k}</span><span className="ex-v">{v || "—"}</span></div>
               ))}
             </div>
@@ -3146,6 +3146,48 @@ export default function App() {
                     } catch(err) { notify("Error al leer el archivo", "err"); }
                   }} />
                 </label>
+                {ocs.some(o => !o.rut) && (() => {
+                  const RUT_MAP = {
+                    "echeverría izquierdo montajes industriales s.a.": "96.870.780-9",
+                    "echeverria izquierdo montajes industriales s.a.": "96.870.780-9",
+                    "echeverría izquierdo montajes industriales sa": "96.870.780-9",
+                    "syncore montajes spa": "76.543.046-1",
+                    "syncore montajes s.p.a.": "76.543.046-1",
+                    "servicios covi spa": "78.071.294-6",
+                    "servicios covi s.p.a.": "78.071.294-6",
+                    "servicios avo ii spa": "77.726.289-0",
+                    "servicios avo ii s.p.a.": "77.726.289-0",
+                    "tecnasic s.a.": "96.917.120-1",
+                    "tecnasic sa": "96.917.120-1",
+                    "piques y túneles s.a.": "76.362.176-6",
+                    "piques y tuneles s.a.": "76.362.176-6",
+                    "piques y túneles sa": "76.362.176-6",
+                    "prefast spa": "76.622.019-3",
+                    "prefast s.p.a.": "76.622.019-3",
+                    "constructora excon s.a.": "76.443.280-0",
+                    "constructora excon sa": "76.443.280-0",
+                    "asap soluciones integrales spa": "76.173.088-6",
+                    "asap soluciones integrales s.p.a.": "76.173.088-6",
+                    "level ingeniería y construcción spa": "77.667.046-4",
+                    "level ingenieria y construccion spa": "77.667.046-4",
+                    "level ingeniería y construcción s.p.a.": "77.667.046-4",
+                  };
+                  return (
+                    <button className="rail-logout" style={{ color:"var(--gold)", fontSize:10 }} onClick={async () => {
+                      const norm = s => (s||"").toLowerCase().trim().replace(/\s+/g," ");
+                      let updated = 0;
+                      const newOcs = ocs.map(o => {
+                        if (o.rut) return o;
+                        const rut = RUT_MAP[norm(o.client)];
+                        if (rut) { updated++; return { ...o, rut }; }
+                        return o;
+                      });
+                      if (!updated) { notify("No se encontraron coincidencias", "err"); return; }
+                      await persist(newOcs);
+                      notify(updated + " OCs actualizadas con RUT ✓");
+                    }}>⚡ Migrar RUTs ({ocs.filter(o=>!o.rut).length} sin RUT)</button>
+                  );
+                })()}
               </div>}
             </div>
           </aside>
