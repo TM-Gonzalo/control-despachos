@@ -4242,43 +4242,35 @@ export default function App() {
                                       </td>
                                       <td>
                                         <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
-                                          {f._ventaDirecta ? (() => {
-                                            const VD_ENT = ["Pendiente", "Cobrada"];
-                                            const VD_COL = { Pendiente: "var(--gold)", Cobrada: "var(--lime)" };
-                                            return VD_ENT.map(e => {
+                                          {(() => {
+                                            const PC_ENT = ["Pendiente", "Cobrada"];
+                                            const PC_COL = { Pendiente: "var(--gold)", Cobrada: "var(--lime)" };
+                                            const showPendCob = f._ventaDirecta || entity === "No";
+                                            if (showPendCob) {
+                                              return (<>
+                                                {!f._ventaDirecta && (
+                                                  <button onClick={() => handleToggleFactoring(f.key, "No")}
+                                                    style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + ENTITY_COLORS["No"], background: ENTITY_COLORS["No"], color:"var(--ink)", transition:".12s", boxShadow:"0 0 6px " + ENTITY_COLORS["No"] + "66" }}>No</button>
+                                                )}
+                                                {PC_ENT.map(e => {
+                                                  const isActive = entity === e;
+                                                  const isOther = entity && entity !== e;
+                                                  return (
+                                                    <button key={e} onClick={() => handleToggleFactoring(f.key, e)}
+                                                      style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + PC_COL[e], background: isActive ? PC_COL[e] : "transparent", color: isActive ? "var(--ink)" : PC_COL[e], opacity: isOther ? 0.3 : 1, transition:".12s", boxShadow: isActive ? "0 0 6px " + PC_COL[e] + "66" : "none" }}>{e}</button>
+                                                  );
+                                                })}
+                                              </>);
+                                            }
+                                            return ENTITIES.map(e => {
                                               const isActive = entity === e;
                                               const isOther = entity && entity !== e;
                                               return (
-                                                <button key={e}
-                                                  onClick={() => handleToggleFactoring(f.key, e)}
-                                                  style={{
-                                                    padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5,
-                                                    cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700,
-                                                    border:"1px solid " + VD_COL[e],
-                                                    background: isActive ? VD_COL[e] : "transparent",
-                                                    color: isActive ? "var(--ink)" : VD_COL[e],
-                                                    opacity: isOther ? 0.3 : 1, transition:".12s",
-                                                    boxShadow: isActive ? "0 0 6px " + VD_COL[e] + "66" : "none"
-                                                  }}>{e}</button>
+                                                <button key={e} onClick={() => handleToggleFactoring(f.key, e)}
+                                                  style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + ENTITY_COLORS[e], background: isActive ? ENTITY_COLORS[e] : "transparent", color: isActive ? "var(--ink)" : ENTITY_COLORS[e], opacity: isOther ? 0.3 : 1, transition:".12s", boxShadow: isActive ? "0 0 6px " + ENTITY_COLORS[e] + "66" : "none" }}>{e}</button>
                                               );
                                             });
-                                          })() : ENTITIES.map(e => {
-                                            const isActive = entity === e;
-                                            const isOther = entity && entity !== e;
-                                            return (
-                                              <button key={e}
-                                                onClick={() => handleToggleFactoring(f.key, e)}
-                                                style={{
-                                                  padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5,
-                                                  cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700,
-                                                  border:"1px solid " + ENTITY_COLORS[e],
-                                                  background: isActive ? ENTITY_COLORS[e] : "transparent",
-                                                  color: isActive ? "var(--ink)" : ENTITY_COLORS[e],
-                                                  opacity: isOther ? 0.3 : 1, transition:".12s",
-                                                  boxShadow: isActive ? "0 0 6px " + ENTITY_COLORS[e] + "66" : "none"
-                                                }}>{e}</button>
-                                            );
-                                          })}
+                                          })()}
                                           {(() => {
                                             const cnt = (factoringGestiones[f.key] || []).length;
                                             return (
