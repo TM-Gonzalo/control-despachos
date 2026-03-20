@@ -3612,10 +3612,10 @@ export default function App() {
                       <>
                         <div className="kpis" style={{ marginBottom:22 }}>
                           {[
-                            { n: months.length,         lbl: "Meses",      c: "var(--sky)"    },
-                            { n: filteredFacs.length,   lbl: "Facturas",   c: "var(--teal)"   },
-                            { n: fmtCLP(grandTotal),    lbl: "Total",      c: "var(--gold)"   },
-                            { n: totalClientes,         lbl: "Clientes",   c: "var(--violet)" },
+                            { n: months.length,         lbl: "Meses",           c: "var(--sky)"    },
+                            { n: filteredFacs.length,   lbl: "Facturas",        c: "var(--teal)"   },
+                            { n: fmtCLP(grandTotal),    lbl: "Total Facturas",  c: "var(--gold)"   },
+                            { n: totalClientes,         lbl: "Clientes",        c: "var(--violet)" },
                           ].map(({ n, lbl, c }) => (
                             <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c, fontSize: 38 }}>{n}</div></div>
                           ))}
