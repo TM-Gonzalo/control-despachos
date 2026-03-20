@@ -1665,16 +1665,47 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
               }}>+ Item</button>
             </div>
             {err && <div style={{ color:"var(--rose)", fontSize:11, marginBottom:11 }}>⚠ {err}</div>}
+            {(() => {
+              // Botón mágico: solo admin, solo si suma GDs + doc actual ≈ monto OC
+              if (!isAdmin) return null;
+              const montoOC = (oc.items || []).reduce((s, it) => s + Number(it.qty) * Number(it.unitPrice || 0), 0);
+              if (montoOC <= 0) return null;
+              const montoGDsExistentes = (oc.dispatches || []).filter(d => d.docType === "guia").reduce((s, d) => s + Number(d.netTotal || 0), 0);
+              const montoDocActual = Number(ext?.netTotal || 0) || items.reduce((s, it) => s + Number(it.qty || 0) * Number(it.unitPrice || 0), 0);
+              const sumaTotal = montoGDsExistentes + montoDocActual;
+              const cuadra = montoOC > 0 && Math.abs(sumaTotal - montoOC) / montoOC < 0.02;
+              const ningunoMapeado = Object.values(map).every(v => !v || v === "NONE");
+              if (!cuadra || !ningunoMapeado) return null;
+              return (
+                <div style={{ background:"linear-gradient(135deg,#1a2a1a,#1a1a2a)", border:"1px solid var(--lime)", borderRadius:8, padding:"10px 14px", marginBottom:8, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <div>
+                    <div style={{ fontSize:10, color:"var(--lime)", fontWeight:600, letterSpacing:1 }}>✓ MONTOS CUADRAN — MAPEO AUTOMÁTICO DISPONIBLE</div>
+                    <div style={{ fontSize:9, color:"var(--fog)", marginTop:2 }}>
+                      GDs existentes {fmtCLP(montoGDsExistentes)} + este doc {fmtCLP(montoDocActual)} = {fmtCLP(sumaTotal)} / OC {fmtCLP(montoOC)}
+                    </div>
+                  </div>
+                  <button className="btn btn-sm" style={{ background:"var(--lime)", color:"#111", fontWeight:700, fontSize:10, padding:"5px 14px", borderRadius:6, border:"none", cursor:"pointer", whiteSpace:"nowrap" }}
+                    onClick={() => {
+                      const emptyMap = {};
+                      items.forEach((_, idx) => { emptyMap[idx] = "NONE"; });
+                      setMap(emptyMap);
+                      setStep(2);
+                    }}>⚡ Guardar sin mapear</button>
+                </div>
+              );
+            })()}
             <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
               <button className="btn btn-ghost" onClick={() => setStep(0)}>← Volver</button>
               <button className="btn btn-gold" onClick={() => setStep(2)}>Mapear items →</button>
-              <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10 }}
-                onClick={() => {
-                  const emptyMap = {};
-                  items.forEach((_, i) => { emptyMap[i] = "NONE"; });
-                  setMap(emptyMap);
-                  setStep(2);
-                }}>Avanzar sin mapear</button>
+              {isAdmin && (
+                <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10 }}
+                  onClick={() => {
+                    const emptyMap = {};
+                    items.forEach((_, i) => { emptyMap[i] = "NONE"; });
+                    setMap(emptyMap);
+                    setStep(2);
+                  }}>Avanzar sin mapear</button>
+              )}
             </div>
           </>
         )}
