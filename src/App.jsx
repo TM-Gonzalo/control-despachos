@@ -640,207 +640,184 @@ function AuthScreen({ onAuth }) {
   );
 }
 
-function VentaDirectaModal({ onClose, onSave, existingOCs = [] }) {
-  const [desde, setDesde] = useState(() => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0,10); });
-  const [hasta, setHasta] = useState(() => new Date().toISOString().slice(0,10));
+function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
+  const [step, setStep] = useState(0); // 0=subir PDF, 1=formulario
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState(null);
-  const [facturas, setFacturas] = useState([]);
-  const [selected, setSelected] = useState(new Set());
-  const [clientEdits, setClientEdits] = useState({});
-  const [rutEdits, setRutEdits] = useState({});
   const [saving, setSaving] = useState(false);
-  const [notify, setNotify] = useState(null);
+  const [err, setErr] = useState(null);
+  const [drag, setDrag] = useState(false);
+  const fileRef = useRef();
 
-  const fmtDate = ts => ts ? new Date(ts * 1000).toISOString().slice(0,10) : "—";
-  const fmtMonto = n => n ? "$" + Number(n).toLocaleString("es-CL") : "—";
+  const [form, setForm] = useState({ client: "", rut: "", facNumber: "", date: today(), neto: "", total: "" });
 
-  // Números ya asignados en OCs existentes
-  const assignedNums = new Set();
-  existingOCs.forEach(oc => {
-    (oc.dispatches || []).forEach(d => {
-      if (d.number) assignedNums.add(String(d.number).trim());
-      if (d.invoiceNumber) assignedNums.add(String(d.invoiceNumber).trim());
-    });
-    // También excluir VD ya creadas
-    if (oc._ventaDirecta && oc.dispatches?.[0]?.number)
-      assignedNums.add(String(oc.dispatches[0].number).trim());
-  });
-
-  const getClientName = (fac) => {
-    const c = fac.client || {};
-    return c.company || c.businessActivity || c.razonsocial ||
-      (c.firstName || c.lastName ? [c.firstName, c.lastName].filter(Boolean).join(" ") : null) ||
-      fac.address || "Sin nombre";
-  };
-
-  const getClientRut = (fac) => {
-    const c = fac.client || {};
-    const raw = c.code || c.taxId || c.identifier || c.rut || "";
-    if (!raw) return "";
-    const clean = String(raw).replace(/\./g, "").trim();
-    const match = clean.match(/^(\d+)(-[\dkK])?$/);
-    if (!match) return String(raw);
-    return match[1].replace(/\B(?=(\d{3})+(?!\d))/g, ".") + (match[2] || "");
-  };
-
-  const buscar = async () => {
-    setLoading(true); setErr(null); setFacturas([]); setSelected(new Set());
-    try {
-      const desdeTs = Math.floor(new Date(desde).getTime() / 1000);
-      const hastaTs = Math.floor(new Date(hasta + "T23:59:59").getTime() / 1000);
-      const res = await fetchBsale("/documents.json", {
-        documentTypeId: "1",
-        generationDateFrom: desdeTs,
-        generationDateTo: hastaTs,
-        expand: "client",
-        limit: 100,
-        offset: 0
-      });
-      const items = (res.items || []).filter(f => !assignedNums.has(String(f.number || "").trim()));
-      setFacturas(items);
-      if (!items.length) setErr("No hay facturas pendientes en ese período");
-    } catch(e) { setErr(e.message); }
-    setLoading(false);
-  };
-
-  const toggleAll = () => {
-    if (selected.size === facturas.length) setSelected(new Set());
-    else setSelected(new Set(facturas.map(f => f.id)));
-  };
-
-  // Generar número VD correlativo
   const nextVD = () => {
     const vds = existingOCs.filter(o => o._ventaDirecta && /^VD-\d+$/.test(o.ocNumber || ""));
     const max = vds.reduce((m, o) => Math.max(m, parseInt(o.ocNumber.replace("VD-",""))||0), 0);
-    return max + 1;
+    return "VD-" + String(max + 1).padStart(3, "0");
+  };
+
+  const procesarPDF = async (file) => {
+    setLoading(true); setErr(null);
+    try {
+      const b64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(",")[1]);
+        r.onerror = () => rej(new Error("Error leyendo archivo"));
+        r.readAsDataURL(file);
+      });
+      const prompt = `Extrae los datos de esta Factura Electrónica emitida por Total Metal. El campo "client" es el nombre o razón social del CLIENTE (el que recibe la factura, no Total Metal). El campo "rut" es el RUT del cliente. "facNumber" es el número de la factura. "date" es la fecha de emisión formato YYYY-MM-DD. "neto" es el monto NETO (sin IVA) como número entero sin puntos. "total" es el monto TOTAL con IVA como número entero sin puntos. Responde SOLO JSON sin texto extra ni backticks: {"client":"string","rut":"string","facNumber":"string","date":"YYYY-MM-DD","neto":0,"total":0}`;
+      const payload = {
+        model: "claude-opus-4-5",
+        max_tokens: 400,
+        messages: [{ role: "user", content: [
+          { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
+          { type: "text", text: prompt }
+        ]}]
+      };
+      let data;
+      try {
+        const r = await fetch("/api/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+        data = await r.json();
+      } catch {
+        const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" }, body: JSON.stringify(payload) });
+        data = await r.json();
+      }
+      const txt = (data.content || []).map(b => b.text || "").join("").trim();
+      const clean = txt.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      setForm({
+        client: parsed.client || "",
+        rut: parsed.rut || "",
+        facNumber: parsed.facNumber || "",
+        date: parsed.date || today(),
+        neto: parsed.neto ? String(parsed.neto) : "",
+        total: parsed.total ? String(parsed.total) : "",
+      });
+      setStep(1);
+    } catch(e) { setErr("Error extrayendo datos: " + e.message); }
+    setLoading(false);
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault(); setDrag(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === "application/pdf") procesarPDF(file);
+    else setErr("Solo se aceptan archivos PDF");
   };
 
   const handleGuardar = async () => {
-    if (!selected.size) return;
+    if (!form.client || !form.facNumber || !form.neto) { setErr("Cliente, N° Factura y Neto son obligatorios"); return; }
     setSaving(true);
     try {
-      let seq = nextVD();
-      const selFacs = facturas.filter(f => selected.has(f.id));
-      for (const fac of selFacs) {
-        const num = String(fac.number || "");
-        const date = fmtDate(fac.generationDate);
-        const neto = Number(fac.netAmount || 0);
-        const total = Number(fac.totalAmount || fac.netAmount || 0) || Math.round(neto * 1.19);
-        const client = clientEdits[fac.id] ?? getClientName(fac);
-        const rut = rutEdits[fac.id] ?? getClientRut(fac);
-        const ocNumber = "VD-" + String(seq).padStart(3, "0");
-        seq++;
-        const newOC = {
-          id: "OC-VD-" + Date.now() + "-" + num,
-          ocNumber,
-          client,
-          rut,
-          date,
-          deliveryDate: "",
-          notes: "Venta Directa",
-          _ventaDirecta: true,
-          _closedByMonto: true,
-          items: [{ id: "it-vd-1", desc: "Venta Directa", unit: "UN", qty: 1, unitPrice: neto }],
-          dispatches: [{
-            id: "disp-vd-" + num,
-            docType: "factura",
-            number: num,
-            date,
-            netTotal: neto,
-            total,
-            items: [],
-            invoiceNumber: null,
-            gdNumber: null,
-          }]
-        };
-        await onSave(newOC);
-      }
-      setNotify(selFacs.length + " Venta" + (selFacs.length > 1 ? "s" : "") + " Directa" + (selFacs.length > 1 ? "s" : "") + " creada" + (selFacs.length > 1 ? "s" : "") + " ✓");
-      setTimeout(() => onClose(), 1500);
+      const neto = Number(String(form.neto).replace(/\./g, "")) || 0;
+      const total = Number(String(form.total).replace(/\./g, "")) || Math.round(neto * 1.19);
+      const ocNumber = nextVD();
+      const newOC = {
+        id: "OC-VD-" + Date.now(),
+        ocNumber,
+        client: form.client,
+        rut: form.rut,
+        date: form.date,
+        deliveryDate: "",
+        notes: "Venta Directa",
+        _ventaDirecta: true,
+        _closedByMonto: true,
+        items: [{ id: "it-vd-1", desc: "Venta Directa", unit: "UN", qty: 1, unitPrice: neto }],
+        dispatches: [{
+          id: "disp-vd-" + form.facNumber,
+          docType: "factura",
+          number: form.facNumber,
+          date: form.date,
+          netTotal: neto,
+          total,
+          items: [],
+          invoiceNumber: null,
+          gdNumber: null,
+        }]
+      };
+      await onSave(newOC);
+      onClose();
     } catch(e) { setErr(e.message); }
     setSaving(false);
   };
 
+  const inp = (lbl, key, placeholder = "", type = "text") => (
+    <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+      <label style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>{lbl}</label>
+      <input type={type} value={form[key]} placeholder={placeholder}
+        onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+        style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:6, padding:"7px 10px", color:"var(--white)", fontSize:13, outline:"none" }} />
+    </div>
+  );
+
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box" style={{ maxWidth:780, maxHeight:"90vh", display:"flex", flexDirection:"column" }}>
-        <div className="modal-header">
-          <div><div className="modal-title">Venta <em>Directa</em></div><div className="modal-sub">Facturas Bsale sin OC</div></div>
-          <button className="modal-close" onClick={onClose}>×</button>
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.7)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:"var(--ink2)", border:"1px solid var(--line)", borderRadius:12, width:"min(500px,95vw)", display:"flex", flexDirection:"column", boxShadow:"0 24px 60px rgba(0,0,0,.5)" }}>
+
+        {/* Header */}
+        <div style={{ padding:"18px 20px 14px", borderBottom:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+          <div>
+            <div style={{ fontFamily:"var(--fS)", fontSize:20, fontStyle:"italic" }}>Venta <em style={{ color:"var(--gold)" }}>Directa</em></div>
+            <div style={{ fontSize:10, color:"var(--fog)", letterSpacing:1, marginTop:2 }}>{step === 0 ? "SUBIR FACTURA PDF" : "CONFIRMAR DATOS"}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:"var(--fog)", fontSize:20, cursor:"pointer", lineHeight:1 }}>×</button>
         </div>
-        <div style={{ padding:"16px 20px", borderBottom:"1px solid var(--line)", display:"flex", gap:10, alignItems:"flex-end", flexWrap:"wrap" }}>
-          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-            <label style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>DESDE</label>
-            <input type="date" value={desde} onChange={e => setDesde(e.target.value)} style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:6, padding:"5px 8px", color:"var(--white)", fontSize:12 }} />
-          </div>
-          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
-            <label style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>HASTA</label>
-            <input type="date" value={hasta} onChange={e => setHasta(e.target.value)} style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:6, padding:"5px 8px", color:"var(--white)", fontSize:12 }} />
-          </div>
-          <button className="btn btn-outline" onClick={buscar} disabled={loading}>
-            {loading ? "Buscando..." : "↺ Buscar en Bsale"}
-          </button>
-          {facturas.length > 0 && (
-            <span style={{ fontSize:11, color:"var(--fog)", marginLeft:4 }}>{facturas.length} factura{facturas.length !== 1 ? "s" : ""} pendiente{facturas.length !== 1 ? "s" : ""}</span>
+
+        <div style={{ padding:"20px" }}>
+          {err && <div style={{ color:"var(--rose)", fontSize:12, marginBottom:12, padding:"8px 12px", background:"rgba(255,80,80,.08)", borderRadius:6 }}>{err}</div>}
+
+          {step === 0 && (
+            <div
+              onDragOver={e => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={onDrop}
+              onClick={() => fileRef.current?.click()}
+              style={{ border:"2px dashed " + (drag ? "var(--gold)" : "var(--line2)"), borderRadius:10, padding:"40px 20px", textAlign:"center", cursor:"pointer", transition:".15s", background: drag ? "rgba(255,200,0,.04)" : "transparent" }}>
+              <input ref={fileRef} type="file" accept=".pdf" style={{ display:"none" }}
+                onChange={e => { const f = e.target.files[0]; if (f) procesarPDF(f); e.target.value = ""; }} />
+              {loading
+                ? <div style={{ color:"var(--fog)", fontSize:13 }}>Extrayendo datos...</div>
+                : <>
+                    <div style={{ fontSize:32, marginBottom:8 }}>📄</div>
+                    <div style={{ color:"var(--white)", fontSize:13, marginBottom:4 }}>Arrastra el PDF de la factura aquí</div>
+                    <div style={{ color:"var(--fog)", fontSize:11 }}>o haz clic para seleccionar</div>
+                  </>
+              }
+            </div>
+          )}
+
+          {step === 1 && (
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {inp("CLIENTE *", "client", "Razón social")}
+              {inp("RUT", "rut", "77.246.012-0")}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                {inp("N° FACTURA *", "facNumber", "1832")}
+                {inp("FECHA", "date", "", "date")}
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                {inp("NETO *", "neto", "19064")}
+                {inp("TOTAL c/IVA", "total", "22686")}
+              </div>
+              <div style={{ fontSize:10, color:"var(--fog)", marginTop:4 }}>
+                N° OC asignado: <span style={{ color:"var(--gold)", fontFamily:"var(--fM)" }}>{nextVD()}</span>
+              </div>
+            </div>
           )}
         </div>
 
-        {err && <div style={{ padding:"10px 20px", color:"var(--rose)", fontSize:12 }}>{err}</div>}
-        {notify && <div style={{ padding:"10px 20px", color:"var(--lime)", fontSize:12, fontWeight:600 }}>{notify}</div>}
-
-        {facturas.length > 0 && (
-          <div style={{ flex:1, overflowY:"auto", padding:"0 20px 16px" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", marginTop:12 }}>
-              <thead>
-                <tr style={{ borderBottom:"1px solid var(--line)" }}>
-                  <th style={{ padding:"8px 6px", textAlign:"center", width:32 }}>
-                    <input type="checkbox" checked={selected.size === facturas.length} onChange={toggleAll} />
-                  </th>
-                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>N° FAC</th>
-                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>FECHA</th>
-                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>CLIENTE</th>
-                  <th style={{ padding:"8px 6px", textAlign:"left", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>RUT</th>
-                  <th style={{ padding:"8px 6px", textAlign:"right", fontSize:10, color:"var(--fog)", letterSpacing:1 }}>NETO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {facturas.map(fac => {
-                  const isSel = selected.has(fac.id);
-                  return (
-                    <tr key={fac.id} style={{ borderBottom:"1px solid var(--line2)", background: isSel ? "rgba(90,200,255,.05)" : "transparent" }}>
-                      <td style={{ padding:"8px 6px", textAlign:"center" }}>
-                        <input type="checkbox" checked={isSel} onChange={() => {
-                          setSelected(prev => { const n = new Set(prev); n.has(fac.id) ? n.delete(fac.id) : n.add(fac.id); return n; });
-                        }} />
-                      </td>
-                      <td style={{ padding:"8px 6px", color:"var(--sky)", fontFamily:"var(--fM)", fontSize:12 }}>{fac.number || "—"}</td>
-                      <td style={{ padding:"8px 6px", color:"var(--fog2)", fontSize:11 }}>{fmtDate(fac.generationDate)}</td>
-                      <td style={{ padding:"8px 6px" }}>
-                        <input value={clientEdits[fac.id] ?? getClientName(fac)} onChange={e => setClientEdits(p => ({ ...p, [fac.id]: e.target.value }))}
-                          style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"3px 6px", color:"var(--white)", fontSize:11, width:"100%" }} />
-                      </td>
-                      <td style={{ padding:"8px 6px" }}>
-                        <input value={rutEdits[fac.id] ?? getClientRut(fac)} onChange={e => setRutEdits(p => ({ ...p, [fac.id]: e.target.value }))}
-                          placeholder="RUT"
-                          style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"3px 6px", color:"var(--white)", fontSize:11, width:110 }} />
-                      </td>
-                      <td style={{ padding:"8px 6px", textAlign:"right", color:"var(--lime)", fontSize:12 }}>{fmtMonto(fac.netAmount || 0)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
+        {/* Footer */}
         <div style={{ padding:"14px 20px", borderTop:"1px solid var(--line)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:11, color:"var(--fog)" }}>{selected.size} seleccionada{selected.size !== 1 ? "s" : ""}</span>
+          {step === 1
+            ? <button className="btn btn-outline" onClick={() => { setStep(0); setErr(null); }}>← Volver</button>
+            : <span />}
           <div style={{ display:"flex", gap:8 }}>
             <button className="btn btn-outline" onClick={onClose}>Cancelar</button>
-            <button className="btn btn-gold" onClick={handleGuardar} disabled={saving || !selected.size}>
-              {saving ? "Guardando..." : "⚡ Crear " + selected.size + " Venta" + (selected.size !== 1 ? "s" : "") + " Directa" + (selected.size !== 1 ? "s" : "")}
-            </button>
+            {step === 1 && (
+              <button className="btn btn-gold" onClick={handleGuardar} disabled={saving}>
+                {saving ? "Guardando..." : "⚡ Crear Venta Directa"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -4817,7 +4794,7 @@ export default function App() {
       </div>
 
       {showImport && <ImportOCModal onClose={() => setShowImport(false)} onSave={handleSaveOC} apiKey={apiKey} existingOCs={ocs} />}
-      {showVentaDirecta && <VentaDirectaModal onClose={() => setShowVentaDirecta(false)} onSave={handleSaveVentaDirecta} existingOCs={ocs} />}
+      {showVentaDirecta && <VentaDirectaModal onClose={() => setShowVentaDirecta(false)} onSave={handleSaveVentaDirecta} existingOCs={ocs} apiKey={apiKey} />}
       {showGestion && (() => { const gc = enriched.find(o => o.id === showGestion.id) || showGestion; return (<GestionModal oc={gc} gestiones={gc.gestiones || []} onClose={() => setShowGestion(null)} onAdd={(text) => handleAddGestion(gc.id, text)} onDel={(gId) => handleDelGestion(gc.id, gId)} isAdmin={isAdmin} currentUserId={user.id} />); })()}
       {showFactoringGestion && (
         <FactoringGestionModal
