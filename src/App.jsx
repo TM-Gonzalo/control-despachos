@@ -648,7 +648,7 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
   const [drag, setDrag] = useState(false);
   const fileRef = useRef();
 
-  const [form, setForm] = useState({ client: "", rut: "", facNumber: "", date: today(), neto: "", total: "" });
+  const [form, setForm] = useState({ client: "", rut: "", facNumber: "", date: today(), neto: "", total: "", desc: "" });
 
   const nextVD = () => {
     const vds = existingOCs.filter(o => o._ventaDirecta && /^VD-\d+$/.test(o.ocNumber || ""));
@@ -665,7 +665,7 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
         r.onerror = () => rej(new Error("Error leyendo archivo"));
         r.readAsDataURL(file);
       });
-      const prompt = `Extrae los datos de esta Factura Electrónica emitida por Total Metal. El campo "client" es el nombre o razón social del CLIENTE (el que recibe la factura, no Total Metal). El campo "rut" es el RUT del cliente. "facNumber" es el número de la factura. "date" es la fecha de emisión formato YYYY-MM-DD. "neto" es el monto NETO (sin IVA) como número entero sin puntos. "total" es el monto TOTAL con IVA como número entero sin puntos. Responde SOLO JSON sin texto extra ni backticks: {"client":"string","rut":"string","facNumber":"string","date":"YYYY-MM-DD","neto":0,"total":0}`;
+      const prompt = `Extrae los datos de esta Factura Electrónica emitida por Total Metal. El campo "client" es el nombre o razón social del CLIENTE (el que recibe la factura, no Total Metal). El campo "rut" es el RUT del cliente. "facNumber" es el número de la factura. "date" es la fecha de emisión formato YYYY-MM-DD. "neto" es el monto NETO (sin IVA) como número entero sin puntos. "total" es el monto TOTAL con IVA como número entero sin puntos. "desc" es una descripción breve de los ítems de la factura (máximo 80 caracteres, resumida si hay varios). Responde SOLO JSON sin texto extra ni backticks: {"client":"string","rut":"string","facNumber":"string","date":"YYYY-MM-DD","neto":0,"total":0,"desc":"string"}`;
       const payload = {
         model: "claude-opus-4-5",
         max_tokens: 400,
@@ -692,6 +692,7 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
         date: parsed.date || today(),
         neto: parsed.neto ? String(parsed.neto) : "",
         total: parsed.total ? String(parsed.total) : "",
+        desc: parsed.desc || "",
       });
       setStep(1);
     } catch(e) { setErr("Error extrayendo datos: " + e.message); }
@@ -722,7 +723,7 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
         notes: "Venta Directa",
         _ventaDirecta: true,
         _closedByMonto: true,
-        items: [{ id: "it-vd-1", desc: "Venta Directa", unit: "UN", qty: 1, unitPrice: neto }],
+        items: [{ id: "it-vd-1", desc: form.desc || "Venta Directa", unit: "UN", qty: 1, unitPrice: neto }],
         dispatches: [{
           id: "disp-vd-" + form.facNumber,
           docType: "factura",
@@ -791,6 +792,7 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
               {inp("CLIENTE *", "client", "Razón social")}
               {inp("RUT", "rut", "77.246.012-0")}
+              {inp("ÍTEM / DESCRIPCIÓN", "desc", "Bolsa de basura, materiales...")}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
                 {inp("N° FACTURA *", "facNumber", "1832")}
                 {inp("FECHA", "date", "", "date")}
