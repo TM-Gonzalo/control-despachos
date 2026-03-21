@@ -1784,9 +1784,9 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
                   );
                   const mismatch = doc._ocMismatch;
                   return (
-                    <button key={doc.id || idx} disabled={alreadyAdded || mismatch || loading}
-                      onClick={() => handleSelectBsaleFac(doc)}
-                      style={{ marginTop:6, width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--ink3)", border:"1px solid " + (mismatch ? "var(--rose)" : alreadyAdded ? "var(--lime)" : "var(--teal)") + "44", borderRadius:7, cursor: (alreadyAdded || mismatch) ? "default" : "pointer", opacity: mismatch ? 0.45 : 1, textAlign:"left" }}>
+                    <button key={doc.id || idx} disabled={alreadyAdded || (mismatch && !isAdmin) || loading}
+                      onClick={() => !mismatch && handleSelectBsaleFac(doc)}
+                      style={{ marginTop:6, width:"100%", display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"var(--ink3)", border:"1px solid " + (mismatch ? "var(--rose)" : alreadyAdded ? "var(--lime)" : "var(--teal)") + "44", borderRadius:7, cursor: (alreadyAdded || (mismatch && !isAdmin)) ? "default" : "pointer", opacity: (mismatch && !isAdmin) ? 0.45 : 1, textAlign:"left" }}>
                       <span className="badge bdoc-fac">FAC</span>
                       <span style={{ color:"var(--teal)", fontFamily:"var(--fM)", fontSize:13 }}>{num}</span>
                       <span style={{ color:"var(--fog2)", fontSize:11 }}>{fecha}</span>
@@ -1795,7 +1795,13 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
                       {alreadyAdded
                         ? <span style={{ fontSize:9, color:"var(--lime)", letterSpacing:1 }}>✓ YA AGREGADO</span>
                         : mismatch
-                          ? <span style={{ fontSize:9, color:"var(--rose)", letterSpacing:1 }}>✗ GD NO COINCIDE</span>
+                          ? <span style={{ display:"flex", alignItems:"center", gap:6 }}>
+                              <span style={{ fontSize:9, color:"var(--rose)", letterSpacing:1 }}>✗ GD NO COINCIDE</span>
+                              {isAdmin && <button className="btn btn-gold btn-sm" style={{ fontSize:9, padding:"2px 8px" }}
+                                onClick={e => { e.stopPropagation(); handleSelectBsaleFac(doc); }}>
+                                Ingresar igualmente →
+                              </button>}
+                            </span>
                           : <span style={{ fontSize:9, color:"var(--teal)", letterSpacing:1 }}>← VINCULAR</span>}
                     </button>
                   );
