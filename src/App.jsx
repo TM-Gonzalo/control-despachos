@@ -353,7 +353,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .srch{flex:1;background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-family:var(--fM);font-size:11px;color:var(--white);outline:none}
 .srch:focus{border-color:var(--gold)}.srch::placeholder{color:var(--fog)}
 .fsel{background:var(--ink2);border:1px solid var(--line);border-radius:6px;padding:8px 11px;font-family:var(--fM);font-size:11px;color:var(--fog2);outline:none;cursor:pointer}
-.tbl-card{background:var(--ink2);border:1px solid var(--line);border-radius:9px;overflow:hidden;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.tbl-card::-webkit-scrollbar{height:5px}.tbl-card::-webkit-scrollbar-track{background:transparent}.tbl-card::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}.tbl-card::-webkit-scrollbar-thumb:hover{background:var(--fog)}.tbl-card table{min-width:900px}
+.tbl-card{background:var(--ink2);border:1px solid var(--line);border-radius:9px;overflow:hidden;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}.tbl-card::-webkit-scrollbar{height:5px;width:5px}.tbl-card::-webkit-scrollbar-track{background:transparent}.tbl-card::-webkit-scrollbar-thumb{background:var(--line2);border-radius:99px}.tbl-card::-webkit-scrollbar-thumb:hover{background:var(--fog)}.tbl-card table{min-width:900px}.tbl-scroll{max-height:calc(100vh - 260px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
 table{width:100%;border-collapse:collapse}
 thead{background:var(--ink3)}
 th{padding:9px 14px;text-align:left;font-size:8px;letter-spacing:2.5px;color:var(--fog);font-weight:500}
@@ -3578,7 +3578,7 @@ export default function App() {
                   </div>
                   {loading ? <div className="pgload"><div className="spin" /> Cargando...</div> :
                     filtered.length === 0 ? <div className="empty"><div className="empty-ico">◫</div><p>No hay ordenes.<br />Importa una OC desde PDF para comenzar.</p></div> :
-                    <div className="tbl-card">
+                    <div className="tbl-card tbl-scroll">
                       <table>
                         <thead><tr><SortTh label="N° OC" col="ocNumber" state={ordSort} setState={setOrdSort} /><SortTh label="CLIENTE" col="client" state={ordSort} setState={setOrdSort} /><SortTh label="FECHA OC" col="date" state={ordSort} setState={setOrdSort} /><th>ENTREGA</th><SortTh label="ÚLT. ACTIVIDAD" col="lastActivity" state={ordSort} setState={setOrdSort} /><th>DOCS</th><SortTh label="TOTAL" col="monto" state={ordSort} setState={setOrdSort} /><SortTh label="PENDIENTE" col="pendiente" state={ordSort} setState={setOrdSort} /><SortTh label="AVANCE" col="pct" state={ordSort} setState={setOrdSort} /><th>ESTADO</th><th /></tr></thead>
                         <tbody>{applySort(filtered, ordSort).map(oc => {
@@ -4194,7 +4194,7 @@ export default function App() {
                             <div style={{ fontSize:10, color:"var(--fog)" }}>{fmtCLP(mesNeto)} neto</div>
                             <div style={{ marginLeft:"auto", fontSize:11, color:"var(--fog)", userSelect:"none" }}>{isCollapsed ? "▶ expandir" : "▼ recoger"}</div>
                           </div>
-                          {!isCollapsed && <div className="tbl-card">
+                          {!isCollapsed && <div className="tbl-card tbl-scroll">
                             <table style={{ tableLayout:"fixed", width:"100%", minWidth:1180 }}>
                               <colgroup>
                                 <col style={{ width:colW.check }} />
@@ -4407,7 +4407,7 @@ export default function App() {
                     </div>
                     {pendingOCs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay ordenes pendientes.</p></div>}
                     {pendingOCs.length > 0 && (
-                      <div className="tbl-card">
+                      <div className="tbl-card tbl-scroll">
                         <table>
                           <thead>
                             <tr>
@@ -4638,7 +4638,7 @@ export default function App() {
                             <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-lbl">{lbl.toUpperCase()}</div><div className="kpi-n" style={{ color:c }}>{n}</div></div>
                           ))}
                         </div>
-                        <div className="tbl-card">
+                        <div className="tbl-card tbl-scroll">
                           <table>
                             <thead>
                               <tr>
