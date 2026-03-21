@@ -83,6 +83,7 @@ async function extractPDF(b64, type, apiKey) {
   // Si falla (ej. dev local sin /api), cae al fetch directo usando apiKey del cliente.
   const payload = {
     system: "Eres un extractor de datos de PDFs. Responde SOLO JSON valido, sin texto adicional.",
+    max_tokens: 4000,
     messages: [{ role: "user", content: [
       { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } },
       { type: "text", text: prompts[type] }
@@ -109,14 +110,32 @@ async function extractPDF(b64, type, apiKey) {
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true"
       },
-      body: JSON.stringify({ ...payload, model: "claude-sonnet-4-20250514", max_tokens: 2000 })
+      body: JSON.stringify({ ...payload, model: "claude-sonnet-4-20250514", max_tokens: 4000 })
     });
   }
 
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
   const text = data.content.map(c => c.text || "").join("");
-  const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+  let parsed;
+  try {
+    parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+  } catch(jsonErr) {
+    // JSON truncado — intentar reparar agregando cierre
+    const raw = text.replace(/```json|```/g, "").trim();
+    try {
+      // Intentar cerrar el JSON truncado
+      const fixed = raw.replace(/,\s*$/, "") + "]}";
+      parsed = JSON.parse(fixed);
+    } catch(_e1) {
+      try {
+        const fixed2 = raw.replace(/,\s*$/, "") + "]}]}";
+        parsed = JSON.parse(fixed2);
+      } catch(_e2) {
+        throw new Error("Respuesta JSON incompleta — OC con demasiados ítems. Intenta de nuevo.");
+      }
+    }
+  }
   // Normalizar números chilenos: 2.463 → 2463, 1.234.567 → 1234567
   const fixNum = n => {
     if (typeof n !== "number") return n;
