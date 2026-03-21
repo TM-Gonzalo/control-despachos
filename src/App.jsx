@@ -1677,7 +1677,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
             </div>
             <div style={{ marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
               <button className="btn btn-rose btn-sm" onClick={() => { setOcMismatch(null); setPendingOverride(null); }}>Cerrar</button>
-              {(isAdmin || userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl") && pendingOverride && (!ocMismatch?.pdfOC || ocMismatch?.pdfOC.trim().toUpperCase().includes("PENDIENTE")) && (
+              {(isAdmin || userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl") && pendingOverride && (
                 <button className="btn btn-gold btn-sm" onClick={() => {
                   setExt(pendingOverride.ext);
                   setNum(pendingOverride.num);
