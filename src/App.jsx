@@ -109,7 +109,7 @@ async function extractPDF(b64, type, apiKey) {
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true"
       },
-      body: JSON.stringify({ ...payload, model: "claude-sonnet-4-20250514", max_tokens: 1000 })
+      body: JSON.stringify({ ...payload, model: "claude-sonnet-4-20250514", max_tokens: 2000 })
     });
   }
 
