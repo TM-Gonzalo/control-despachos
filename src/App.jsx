@@ -304,17 +304,17 @@ const G = `
 }}
 html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(--fM);font-size:13px;transition:background .2s,color .2s}
 .app{display:flex;height:100vh;overflow:hidden;width:100%}
-.rail{width:210px;background:var(--ink2);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
-.rail-brand{padding:20px 18px 16px;border-bottom:1px solid var(--line)}
+.rail{width:210px;background:var(--ink2);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s ease;overflow:hidden}.rail.collapsed{width:0;border-right:none}.rail-hover-zone{position:fixed;left:0;top:0;width:8px;height:100vh;z-index:500;cursor:pointer}
+.rail-brand{padding:20px 18px 16px;border-bottom:1px solid var(--line);min-width:210px}
 .rail-name{font-family:var(--fS);font-size:17px;color:var(--gold);line-height:1.15;font-style:italic}
 .rail-tm{font-size:9px;letter-spacing:2px;color:var(--gold);opacity:.6;margin-top:1px}
 .rail-sub{font-size:8px;letter-spacing:2.5px;color:var(--fog);margin-top:5px}
-.rail-nav{padding:10px 0;flex:1}
+.rail-nav{padding:10px 0;flex:1;min-width:210px}
 .rail-sec{font-size:8px;letter-spacing:2.5px;color:var(--fog);padding:12px 18px 4px}
 .rail-item{display:flex;align-items:center;gap:9px;padding:9px 18px;font-size:11px;color:var(--fog2);cursor:pointer;border-left:2px solid transparent;transition:.12s}
 .rail-item:hover{color:var(--white);background:var(--ink3)}
 .rail-item.on{color:var(--gold);border-left-color:var(--gold);background:rgba(232,184,75,.06)}
-.rail-foot{padding:13px 18px;border-top:1px solid var(--line)}
+.rail-foot{padding:13px 18px;border-top:1px solid var(--line);min-width:210px}
 .rail-user{font-size:10px;color:var(--fog2)}
 .rail-user strong{display:block;color:var(--white);margin-bottom:2px}
 .rail-logout{font-size:9px;color:var(--fog);cursor:pointer;background:none;border:none;font-family:var(--fM);letter-spacing:1px;margin-top:5px;display:block;padding:0}
@@ -2878,6 +2878,7 @@ export default function App() {
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
   const [factoringSort, setFactoringSort] = useState({ col: "facNumber", dir: -1 });
   const [toinvoiceSort, setToinvoiceSort] = useState({ col: "date", dir: 1 });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [facFilterTo, setFacFilterTo] = useState("");
   const [collapsedMonths, setCollapsedMonths] = useState(new Set());
@@ -3301,7 +3302,9 @@ export default function App() {
       <div style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100%" }}>
 
         <div className="app" style={{ flex:1, minHeight:0, width:"100%" }}>
-          <aside className="rail">
+          <div className="rail-hover-zone" onMouseEnter={() => setSidebarOpen(true)} />
+          <aside className={"rail" + (sidebarOpen ? "" : " collapsed")}
+            onMouseLeave={() => setSidebarOpen(false)}>
             <div className="rail-brand">
               <div className="rail-name">Control<br />Despachos</div>
               <div className="rail-tm">TM</div>
