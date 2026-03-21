@@ -2880,6 +2880,7 @@ export default function App() {
   const [toinvoiceSort, setToinvoiceSort] = useState({ col: "date", dir: 1 });
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [facFilterTo, setFacFilterTo] = useState("");
+  const [collapsedMonths, setCollapsedMonths] = useState(new Set());
   const [pfFilterFrom, setPfFilterFrom] = useState("");
   const [pfFilterTo, setPfFilterTo] = useState("");
   const [pendExpanded, setPendExpanded] = useState({});
@@ -4174,9 +4175,15 @@ export default function App() {
                       const mesNeto = facs.reduce((s,f) => s + f.neto, 0);
                       const mesFactorizado = facs.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
                       const mesNo = facs.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                      const isCollapsed = collapsedMonths.has(month);
+                      const toggleCollapse = () => setCollapsedMonths(prev => {
+                        const n = new Set(prev);
+                        n.has(month) ? n.delete(month) : n.add(month);
+                        return n;
+                      });
                       return (
                         <div key={month} style={{ marginBottom:28 }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10, cursor:"pointer" }} onClick={toggleCollapse}>
                             <div style={{ fontFamily:"var(--fS)", fontSize:18, fontStyle:"italic", color:"var(--white)" }}>{fmtMonth(month)}</div>
                             <div style={{ flex:1, height:1, background:"var(--line)" }} />
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
@@ -4185,8 +4192,9 @@ export default function App() {
                             {(mesTotal - mesFactorizado - mesNo) > 0 && <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesTotal - mesFactorizado - mesNo)} pendiente</div>}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                             <div style={{ fontSize:10, color:"var(--fog)" }}>{fmtCLP(mesNeto)} neto</div>
+                            <div style={{ marginLeft:"auto", fontSize:11, color:"var(--fog)", userSelect:"none" }}>{isCollapsed ? "▶ expandir" : "▼ recoger"}</div>
                           </div>
-                          <div className="tbl-card">
+                          {!isCollapsed && <div className="tbl-card">
                             <table style={{ tableLayout:"fixed", width:"100%", minWidth:1180 }}>
                               <colgroup>
                                 <col style={{ width:colW.check }} />
@@ -4305,7 +4313,7 @@ export default function App() {
                                 })}
                               </tbody>
                             </table>
-                          </div>
+                          </div>}
                         </div>
                       );
                     })}
