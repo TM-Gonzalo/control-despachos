@@ -4003,7 +4003,7 @@ export default function App() {
               })()}
 
               {view === "factoring" && isAdmin && (() => {
-                const ENTITIES = ["Santander", "Security", "Otro", "No"];
+                const ENTITIES = ["Santander", "Security", "Otro", "No", "Cobrada"];
                 const ENTITY_COLORS = { Santander: "var(--sky)", Security: "var(--gold)", Otro: "var(--violet)", No: "var(--rose)" };
 
                 // Recolectar todas las facturas (directas + vinculadas a GDs)
@@ -4177,7 +4177,9 @@ export default function App() {
                 const totalNeto = allFacsFiltered.reduce((s,f) => s + f.neto, 0);
                 const totalFactorizado = allFacsFiltered.filter(f => isFactorizado(f.key)).reduce((s,f) => s + f.conIVA, 0);
                 const totalNo = allFacsFiltered.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
-                const totalPendiente = totalConIVA - totalFactorizado - totalNo;
+                const isCobrada = key => !!(factoringData[key] && factoringData[key].entity === "Cobrada");
+                const totalCobrada = allFacsFiltered.filter(f => isCobrada(f.key)).reduce((s,f) => s + f.conIVA, 0);
+                const totalPendiente = totalConIVA - totalFactorizado - totalCobrada;
 
                 // Column widths fixed
                 const colW = { check:40, fecha:100, empresa:160, item:200, oc:130, gd:70, factura:80, monto:120, entity:370 };
@@ -4247,7 +4249,7 @@ export default function App() {
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
                             {mesFactorizado > 0 && <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>}
                             {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizado</div>}
-                            {(mesTotal - mesFactorizado - mesNo) > 0 && <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesTotal - mesFactorizado - mesNo)} pendiente</div>}
+                            {(() => { const mesCobrada = facs.filter(f => isCobrada(f.key)).reduce((s,f) => s + f.conIVA, 0); const mesPend = mesTotal - mesFactorizado - mesCobrada; return mesPend > 0 ? <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesPend)} pendiente</div> : null; })()}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                             <div style={{ fontSize:10, color:"var(--fog)" }}>{fmtCLP(mesNeto)} neto</div>
                             <div style={{ marginLeft:"auto", fontSize:11, color:"var(--fog)", userSelect:"none" }}>{isCollapsed ? "▶ expandir" : "▼ recoger"}</div>
@@ -4299,7 +4301,7 @@ export default function App() {
                                   const fact = isFactorizado(f.key);
                                   const entity = getEntity(f.key);
                                   return (
-                                    <tr key={f.key} style={{ opacity: fact ? 0.6 : (isNo(f.key) && !["Pendiente","Cobrada"].includes(entity)) ? 0.45 : 1 }}>
+                                    <tr key={f.key} style={{ opacity: fact ? 0.6 : 1 }}>
                                       <td>
                                         <div style={{ width:16, height:16, borderRadius:4, border: fact ? "none" : "1px solid var(--line2)", background: fact ? "var(--lime)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, color:"var(--ink)", fontWeight:700 }}>
                                           {fact ? "✓" : ""}
@@ -4325,34 +4327,15 @@ export default function App() {
                                       <td>
                                         <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
                                           {(() => {
-                                            const PC_ENT = ["Pendiente", "Cobrada"];
-                                            const PC_COL = { Pendiente: "#e8b84b", Cobrada: "#7fff5a" };
-                                            const showPendCob = f._ventaDirecta || entity === "No" || entity === "Pendiente" || entity === "Cobrada";
-                                            if (showPendCob) {
-                                              return (<>
-                                                {!f._ventaDirecta && (() => {
-                                                  const noActive = entity === "No";
-                                                  return <button onClick={() => handleToggleFactoring(f.key, "No")}
-                                                    style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + ENTITY_COLORS["No"], background: noActive ? ENTITY_COLORS["No"] : "transparent", color: noActive ? "var(--ink)" : ENTITY_COLORS["No"], transition:".12s", boxShadow: noActive ? "0 0 6px " + ENTITY_COLORS["No"] + "66" : "none" }}>No</button>;
-                                                })()}
-                                                {PC_ENT.map(e => {
-                                                  const isActive = entity === e;
-                                                  const isOther = PC_ENT.includes(entity) && entity !== e;
-                                                  return (
-                                                    <button key={e} onClick={() => handleToggleFactoring(f.key, e)}
-                                                      style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + PC_COL[e], background: isActive ? PC_COL[e] : "transparent", color: isActive ? "var(--ink)" : PC_COL[e], opacity: isOther ? 0.3 : 1, transition:".12s", boxShadow: isActive ? "0 0 6px " + PC_COL[e] + "66" : "none" }}>{e}</button>
-                                                  );
-                                                })}
-                                              </>);
-                                            }
-                                            return ENTITIES.map(e => {
-                                              const isActive = entity === e;
-                                              const isOther = entity && entity !== e;
-                                              return (
-                                                <button key={e} onClick={() => handleToggleFactoring(f.key, e)}
-                                                  style={{ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + ENTITY_COLORS[e], background: isActive ? ENTITY_COLORS[e] : "transparent", color: isActive ? "var(--ink)" : ENTITY_COLORS[e], opacity: isOther ? 0.3 : 1, transition:".12s", boxShadow: isActive ? "0 0 6px " + ENTITY_COLORS[e] + "66" : "none" }}>{e}</button>
-                                              );
-                                            });
+                                            // Botones: No + Cobrada siempre visibles | Santander/Security/Otro solo si no es venta directa
+                                            const BTN_STYLE = (active, col) => ({ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + col, background: active ? col : "transparent", color: active ? "var(--ink)" : col, opacity: (!entity || active) ? 1 : 0.35, transition:".12s", boxShadow: active ? "0 0 6px " + col + "66" : "none" });
+                                            return (<>
+                                              {!f._ventaDirecta && ["Santander","Security","Otro"].map(e => (
+                                                <button key={e} onClick={() => handleToggleFactoring(f.key, e)} style={BTN_STYLE(entity === e, ENTITY_COLORS[e])}>{e}</button>
+                                              ))}
+                                              <button onClick={() => handleToggleFactoring(f.key, "No")} style={BTN_STYLE(entity === "No", ENTITY_COLORS["No"])}>No</button>
+                                              <button onClick={() => handleToggleFactoring(f.key, "Cobrada")} style={BTN_STYLE(entity === "Cobrada", "#7fff5a")}>Cobrada</button>
+                                            </>);
                                           })()}
                                           {(() => {
                                             const cnt = (factoringGestiones[f.key] || []).length;
