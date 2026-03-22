@@ -3328,10 +3328,11 @@ export default function App() {
     notify("Fecha de entrega actualizada ✓");
   };
 
-  const total = enriched.length;
-  const open = enriched.filter(o => ocStatus(o.items, o.dispatches, o) === "open").length;
-  const closed = enriched.filter(o => ocStatus(o.items, o.dispatches, o) === "closed").length;
-  const alerts = enriched.filter(o => { const d = daysLeft(o.deliveryDate); return d !== null && d <= 5 && ocStatus(o.items, o.dispatches, o) !== "closed"; });
+  const enrichedNoVD = enriched.filter(o => !o._ventaDirecta);
+  const total = enrichedNoVD.length;
+  const open = enrichedNoVD.filter(o => ocStatus(o.items, o.dispatches, o) === "open").length;
+  const closed = enrichedNoVD.filter(o => ocStatus(o.items, o.dispatches, o) === "closed").length;
+  const alerts = enrichedNoVD.filter(o => { const d = daysLeft(o.deliveryDate); return d !== null && d <= 5 && ocStatus(o.items, o.dispatches, o) !== "closed"; });
   const pendingGuias = enriched.reduce((s, o) => {
     const normN = n => String(n).replace(/[\s.]/g, "");
     return s + (o.dispatches || []).filter(d => {
@@ -3523,22 +3524,22 @@ export default function App() {
                   )}
                   <div className="kpis" style={{ marginBottom:18, gridTemplateColumns:"repeat(5,1fr)" }}>
                     {[
-                      { n:enriched.length, lbl:"Total OCs", c:"var(--white)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="partial").length, lbl:"Parciales", c:"var(--gold)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="toinvoice").length, lbl:"Por Facturar", c:"var(--rose)" },
-                      { n:enriched.filter(o => ocStatus(o.items,o.dispatches,o)==="closed").length, lbl:"Cerradas", c:"var(--lime)" },
+                      { n:enrichedNoVD.length, lbl:"Total OCs", c:"var(--white)" },
+                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
+                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="partial").length, lbl:"Parciales", c:"var(--gold)" },
+                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="toinvoice").length, lbl:"Por Facturar", c:"var(--rose)" },
+                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="closed").length, lbl:"Cerradas", c:"var(--lime)" },
                     ].map(({n,lbl,c}) => (
                       <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-n" style={{ color:c }}>{n}</div><div className="kpi-l">{lbl}</div></div>
                     ))}
                   </div>
                   <div className="slbl">Todas las Ordenes</div>
                   {loading ? <div className="pgload"><div className="spin" /> Cargando...</div> :
-                    enriched.length === 0 ? <div className="empty"><div className="empty-ico">◈</div><p>Sin ordenes aun.<br />Ingresa tu API Key e importa una OC desde PDF.</p></div> :
+                    enrichedNoVD.length === 0 ? <div className="empty"><div className="empty-ico">◈</div><p>Sin ordenes aun.<br />Ingresa tu API Key e importa una OC desde PDF.</p></div> :
                     <div className="tbl-card" style={{ maxHeight:520, overflowY:"auto", scrollbarWidth:"thin", scrollbarColor:"var(--line2) transparent" }}>
                       <table>
                         <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--ink3)" }}><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><SortTh label="ESTADO" col="status" state={dashSort} setState={setDashSort} /><th /></tr></thead>
-                        <tbody>{applySort(enriched, dashSort).map(oc => {
+                        <tbody>{applySort(enrichedNoVD, dashSort).map(oc => {
                           const s = ocStatus(oc.items, oc.dispatches, oc);
                           const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
                           const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
