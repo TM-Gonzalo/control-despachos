@@ -4249,7 +4249,7 @@ export default function App() {
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
                             {mesFactorizado > 0 && <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>}
                             {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizado</div>}
-                            {(() => { const mesCobrada = facs.filter(f => isCobrada(f.key)).reduce((s,f) => s + f.conIVA, 0); const mesPend = mesTotal - mesFactorizado - mesCobrada; return mesPend > 0 ? <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesPend)} pendiente</div> : null; })()}
+                            {(() => { const mesCobrada = facs.filter(f => isCobrada(f.key)).reduce((s,f) => s + f.conIVA, 0); const mesPend = Math.max(0, mesTotal - mesFactorizado - mesCobrada); return mesPend > 0 ? <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesPend)} pendiente</div> : null; })()}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                             <div style={{ fontSize:10, color:"var(--fog)" }}>{fmtCLP(mesNeto)} neto</div>
                             <div style={{ marginLeft:"auto", fontSize:11, color:"var(--fog)", userSelect:"none" }}>{isCollapsed ? "▶ expandir" : "▼ recoger"}</div>
@@ -4327,14 +4327,23 @@ export default function App() {
                                       <td>
                                         <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
                                           {(() => {
-                                            // Botones: No + Cobrada siempre visibles | Santander/Security/Otro solo si no es venta directa
-                                            const BTN_STYLE = (active, col) => ({ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid " + col, background: active ? col : "transparent", color: active ? "var(--ink)" : col, opacity: (!entity || active) ? 1 : 0.35, transition:".12s", boxShadow: active ? "0 0 6px " + col + "66" : "none" });
+                                            const S = (active, col) => ({ padding:"3px 9px", borderRadius:4, fontSize:9, letterSpacing:.5, cursor:"pointer", fontFamily:"var(--fM)", fontWeight:700, border:"1px solid "+col, background:active?col:"transparent", color:active?"var(--ink)":col, opacity:(entity&&!active)?0.35:1, transition:".12s", boxShadow:active?"0 0 6px "+col+"66":"none" });
+                                            // Estado No: mostrar No activo + Cobrada (ocultar Santander/Security/Otro)
+                                            // Estado Cobrada: mostrar solo Cobrada activa
+                                            // Estado Factoring (Santander/Security/Otro): mostrar los 4 botones normales
+                                            // Sin estado: mostrar Santander/Security/Otro/No
+                                            const isNoActive = entity === "No";
+                                            const isCobradaActive = entity === "Cobrada";
+                                            const isFactActive = ["Santander","Security","Otro"].includes(entity);
+                                            const showSSOtro = !isNoActive && !isCobradaActive && !f._ventaDirecta;
+                                            const showNo = !isCobradaActive && !isFactActive && !f._ventaDirecta;
+                                            const showCobrada = isNoActive || isCobradaActive || f._ventaDirecta;
                                             return (<>
-                                              {!f._ventaDirecta && ["Santander","Security","Otro"].map(e => (
-                                                <button key={e} onClick={() => handleToggleFactoring(f.key, e)} style={BTN_STYLE(entity === e, ENTITY_COLORS[e])}>{e}</button>
+                                              {showSSOtro && ["Santander","Security","Otro"].map(e => (
+                                                <button key={e} onClick={() => handleToggleFactoring(f.key, e)} style={S(entity===e, ENTITY_COLORS[e])}>{e}</button>
                                               ))}
-                                              <button onClick={() => handleToggleFactoring(f.key, "No")} style={BTN_STYLE(entity === "No", ENTITY_COLORS["No"])}>No</button>
-                                              <button onClick={() => handleToggleFactoring(f.key, "Cobrada")} style={BTN_STYLE(entity === "Cobrada", "#7fff5a")}>Cobrada</button>
+                                              {showNo && <button onClick={() => handleToggleFactoring(f.key, "No")} style={S(isNoActive, ENTITY_COLORS["No"])}>No</button>}
+                                              {showCobrada && <button onClick={() => handleToggleFactoring(f.key, "Cobrada")} style={S(isCobradaActive, "#7fff5a")}>Cobrada</button>}
                                             </>);
                                           })()}
                                           {(() => {
