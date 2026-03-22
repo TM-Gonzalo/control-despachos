@@ -323,7 +323,7 @@ const G = `
 }}
 html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(--fM);font-size:13px;transition:background .2s,color .2s}
 .app{display:flex;height:100vh;overflow:hidden;width:100%}
-.rail{width:210px;background:var(--ink2);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s ease;overflow:hidden}.rail.collapsed{width:0;border-right:none}.rail-hover-zone{position:fixed;left:0;top:0;width:8px;height:100vh;z-index:500;cursor:pointer}
+.rail{width:210px;background:var(--ink2);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s ease;overflow:hidden}.rail.collapsed{width:0;border-right:none}
 .rail-brand{padding:20px 18px 16px;border-bottom:1px solid var(--line);min-width:210px}
 .rail-name{font-family:var(--fS);font-size:17px;color:var(--gold);line-height:1.15;font-style:italic}
 .rail-tm{font-size:9px;letter-spacing:2px;color:var(--gold);opacity:.6;margin-top:1px}
@@ -338,6 +338,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .rail-user strong{display:block;color:var(--white);margin-bottom:2px}
 .rail-logout{font-size:9px;color:var(--fog);cursor:pointer;background:none;border:none;font-family:var(--fM);letter-spacing:1px;margin-top:5px;display:block;padding:0}
 .rail-logout:hover{color:var(--rose)}
+.rail-toggle{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:600;width:18px;height:44px;background:var(--ink2);border:1px solid var(--line);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fog);font-size:10px;transition:left .2s ease,color .12s,background .12s}.rail-toggle:hover{color:var(--white);background:var(--ink3)}.rail-toggle.open{left:210px}
 .online-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:20px;padding:2px 8px;font-size:8px;letter-spacing:0.8px;color:var(--lime);font-family:var(--fM);margin-bottom:6px}
 .online-dot{width:5px;height:5px;border-radius:50%;background:var(--lime);box-shadow:0 0 4px var(--lime);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
@@ -3328,9 +3329,8 @@ export default function App() {
       <div style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100%" }}>
 
         <div className="app" style={{ flex:1, minHeight:0, width:"100%" }}>
-          <div className="rail-hover-zone" onMouseEnter={() => setSidebarOpen(true)} />
-          <aside className={"rail" + (sidebarOpen ? "" : " collapsed")}
-            onMouseLeave={() => setSidebarOpen(false)}>
+          <button className={"rail-toggle" + (sidebarOpen ? " open" : "")} onClick={() => setSidebarOpen(o => !o)} title={sidebarOpen ? "Cerrar menú" : "Abrir menú"}>{sidebarOpen ? "‹" : "›"}</button>
+          <aside className={"rail" + (sidebarOpen ? "" : " collapsed")}>
             <div className="rail-brand">
               <div className="rail-name">Control<br />Despachos</div>
               <div className="rail-tm">TM</div>
