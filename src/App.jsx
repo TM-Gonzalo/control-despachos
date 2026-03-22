@@ -4895,7 +4895,18 @@ export default function App() {
                   {enriched.length > 0 && (() => {
                     const rFiltered = (reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter))).filter(o => !o._ventaDirecta);
                     const byClient = rFiltered.reduce((acc, oc) => { const k = oc.client; if (!acc[k]) acc[k] = []; acc[k].push(oc); return acc; }, {});
-                    return Object.entries(byClient).map(([client, ocs]) => (
+                    const calcPending = oc => oc._closedByMonto ? 0 : oc.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
+                    const clientsSorted = Object.entries(byClient).map(([client, ocs]) => {
+                      const pending = ocs.reduce((s, o) => s + calcPending(o), 0);
+                      return { client, ocs, pending };
+                    }).sort((a, b) => b.pending - a.pending);
+                    return clientsSorted.map(({ client, ocs }) => {
+                      const isExpanded = expandedClients.has("rep-" + client);
+                      const MAX_OCS = 4;
+                      const sorted = [...ocs].sort((a, b) => calcPending(b) - calcPending(a));
+                      const visible = isExpanded ? sorted : sorted.slice(0, MAX_OCS);
+                      const hidden = sorted.length - MAX_OCS;
+                      return (
                       <div key={client} style={{ marginBottom:28 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
                           <div style={{ fontWeight:500, fontSize:16, color:"var(--fog2)" }}>{client}</div>
@@ -4903,11 +4914,7 @@ export default function App() {
                           <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>{ocs.length} OC{ocs.length !== 1 ? "s" : ""}</div>
                         </div>
                         <div className="rep-grid">
-                        {[...ocs].sort((a, b) => {
-                                    const remA = a._closedByMonto ? 0 : a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
-                                    const remB = b._closedByMonto ? 0 : b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
-                          return remB - remA;
-                        }).map(oc => {
+                        {visible.map(oc => {
                     const s = ocStatus(oc.items, oc.dispatches, oc);
                     const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
                     const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
@@ -4964,8 +4971,17 @@ export default function App() {
                     );
                   })}
                         </div>
+                        {sorted.length > MAX_OCS && (
+                          <div style={{ display:"flex", justifyContent:"center", marginTop:10 }}>
+                            <button onClick={() => setExpandedClients(prev => { const n = new Set(prev); isExpanded ? n.delete("rep-" + client) : n.add("rep-" + client); return n; })}
+                              style={{ background:"none", border:"1px solid var(--line)", borderRadius:6, color:"var(--fog2)", fontSize:10, fontFamily:"var(--fM)", letterSpacing:1, cursor:"pointer", padding:"6px 18px", display:"flex", alignItems:"center", gap:6 }}>
+                              {isExpanded ? "▲ Mostrar menos" : hidden + " OC" + (hidden !== 1 ? "s" : "") + " más ▼"}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    ));
+                      );
+                    })
                   })()}
                 </>
               )}
