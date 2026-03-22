@@ -4028,14 +4028,18 @@ export default function App() {
                     if (d.docType === "factura" && d.date && d.number) {
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
-                      // Fallback 1: calcular neto desde items del dispatch (también rescata precio del campo unit)
-                      if (!neto && d.items && d.items.length) {
-                        neto = (d.items || []).reduce((s, it) => {
+                      // Calcular neto desde items mapeados (más confiable que netTotal de Bsale)
+                      if (d.items && d.items.length) {
+                        const netoItems = (d.items || []).reduce((s, it) => {
                           const rawUnit = String(it.unit || "");
                           const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
                           return s + (Number(it.qty)||0) * p;
                         }, 0);
-                        if (neto && !conIVA) conIVA = Math.round(neto * 1.19);
+                        // Usar items si no había neto, o si items es >5% mayor (netTotal Bsale desactualizado)
+                        if (netoItems > 0 && (!neto || netoItems > neto * 1.05)) {
+                          neto = netoItems;
+                          conIVA = Math.round(neto * 1.19);
+                        }
                       }
                       // Fallback 2: buscar GD vinculada por número de factura
                       if (!conIVA) {
