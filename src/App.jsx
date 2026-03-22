@@ -4249,7 +4249,7 @@ export default function App() {
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>{facs.length} factura{facs.length !== 1 ? "s" : ""}</div>
                             {mesFactorizado > 0 && <div style={{ fontSize:10, color:"var(--lime)" }}>{fmtCLP(mesFactorizado)} factorizado</div>}
                             {mesNo > 0 && <div style={{ fontSize:10, color:"var(--rose)" }}>{fmtCLP(mesNo)} no factorizado</div>}
-                            {(() => { const mesCobrada = facs.filter(f => isCobrada(f.key)).reduce((s,f) => s + f.conIVA, 0); const mesPend = Math.max(0, mesTotal - mesFactorizado - mesCobrada); return mesPend > 0 ? <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesPend)} pendiente</div> : null; })()}
+                            {(() => { const mesCobrada = facs.filter(f => isCobrada(f.key)).reduce((s,f) => s + f.conIVA, 0); const mesPendFacs = facs.filter(f => !isFactorizado(f.key) && !isCobrada(f.key)); const mesPend = mesPendFacs.reduce((s,f) => s + Math.max(0, f.conIVA), 0); return mesPend > 0 ? <div style={{ fontSize:10, color:"var(--gold)" }}>{fmtCLP(mesPend)} pendiente</div> : null; })()}
                             <div style={{ fontSize:10, color:"var(--fog2)" }}>/ {fmtCLP(mesTotal)} total</div>
                             <div style={{ fontSize:10, color:"var(--fog)" }}>{fmtCLP(mesNeto)} neto</div>
                             <div style={{ marginLeft:"auto", fontSize:11, color:"var(--fog)", userSelect:"none" }}>{isCollapsed ? "▶ expandir" : "▼ recoger"}</div>
