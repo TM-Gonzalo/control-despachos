@@ -4221,6 +4221,8 @@ export default function App() {
                 const handleDownloadFactoringXlsx = () => {
                   const safeNum = v => { const n = Number(v); return isNaN(n) ? 0 : n; };
                   const safeStr = v => (v == null ? "" : String(v));
+
+                  // Hoja 1: Detalle facturas
                   const rows = allFacsFiltered.map(f => ({
                     "Fecha": safeStr(f.date),
                     "Empresa": safeStr(f.client),
@@ -4238,8 +4240,69 @@ export default function App() {
                     { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 16 },
                     { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }
                   ];
+
+                  // Hoja 2: Resumen por mes y condición
+                  const ENTITIES_ORDER = ["Security","Santander","Otro","Cobrada","No","Pendiente"];
+                  const byMonthMap = {};
+                  allFacsFiltered.forEach(f => {
+                    const mes = safeStr(f.date).slice(0,7);
+                    const ent = getEntity(f.key) || "Pendiente";
+                    if (!byMonthMap[mes]) byMonthMap[mes] = {};
+                    if (!byMonthMap[mes][ent]) byMonthMap[mes][ent] = { count:0, neto:0, monto:0 };
+                    byMonthMap[mes][ent].count++;
+                    byMonthMap[mes][ent].neto += safeNum(f.neto);
+                    byMonthMap[mes][ent].monto += safeNum(f.conIVA);
+                  });
+                  const fmtMes = k => { const [y,m] = k.split("-"); return ["","Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(m)] + " " + y; };
+                  const rowsMes = [];
+                  Object.keys(byMonthMap).sort((a,b) => b.localeCompare(a)).forEach(mes => {
+                    const mesNombre = fmtMes(mes);
+                    const mesData = byMonthMap[mes];
+                    const mesTotal = Object.values(mesData).reduce((s,v) => s + v.monto, 0);
+                    const mesNeto = Object.values(mesData).reduce((s,v) => s + v.neto, 0);
+                    const mesCount = Object.values(mesData).reduce((s,v) => s + v.count, 0);
+                    rowsMes.push({ "Mes": mesNombre, "Condición": "TOTAL MES", "Facturas": mesCount, "Neto": mesNeto, "Monto c/IVA": mesTotal });
+                    ENTITIES_ORDER.forEach(ent => {
+                      const v = mesData[ent];
+                      if (v && v.count > 0) rowsMes.push({ "Mes": "", "Condición": ent, "Facturas": v.count, "Neto": v.neto, "Monto c/IVA": v.monto });
+                    });
+                    rowsMes.push({ "Mes": "", "Condición": "", "Facturas": "", "Neto": "", "Monto c/IVA": "" });
+                  });
+
+                  // Hoja 3: Totales globales por condición
+                  const totalsMap = {};
+                  allFacsFiltered.forEach(f => {
+                    const ent = getEntity(f.key) || "Pendiente";
+                    if (!totalsMap[ent]) totalsMap[ent] = { count:0, neto:0, monto:0 };
+                    totalsMap[ent].count++;
+                    totalsMap[ent].neto += safeNum(f.neto);
+                    totalsMap[ent].monto += safeNum(f.conIVA);
+                  });
+                  const rowsTotals = [];
+                  ENTITIES_ORDER.forEach(ent => {
+                    const v = totalsMap[ent];
+                    if (v && v.count > 0) rowsTotals.push({ "Condición": ent, "Facturas": v.count, "Neto": v.neto, "Monto c/IVA": v.monto });
+                  });
+                  const grandCount = Object.values(totalsMap).reduce((s,v) => s + v.count, 0);
+                  const grandNeto = Object.values(totalsMap).reduce((s,v) => s + v.neto, 0);
+                  const grandMonto = Object.values(totalsMap).reduce((s,v) => s + v.monto, 0);
+                  rowsTotals.push({ "Condición": "", "Facturas": "", "Neto": "", "Monto c/IVA": "" });
+                  rowsTotals.push({ "Condición": "TOTAL", "Facturas": grandCount, "Neto": grandNeto, "Monto c/IVA": grandMonto });
+                  const factApp = ENTITIES_ORDER.filter(e => ["Santander","Security","Otro","Cobrada"].includes(e)).reduce((s,e) => s + (totalsMap[e]?.monto||0), 0);
+                  rowsTotals.push({ "Condición": "", "Facturas": "", "Neto": "", "Monto c/IVA": "" });
+                  rowsTotals.push({ "Condición": "→ App Factorizado", "Facturas": "", "Neto": "", "Monto c/IVA": factApp });
+                  rowsTotals.push({ "Condición": "→ App No Factorizado", "Facturas": "", "Neto": "", "Monto c/IVA": totalsMap["No"]?.monto||0 });
+                  rowsTotals.push({ "Condición": "→ App Pendiente", "Facturas": "", "Neto": "", "Monto c/IVA": totalsMap["Pendiente"]?.monto||0 });
+
+                  const wsMes = XLSX.utils.json_to_sheet(rowsMes);
+                  wsMes["!cols"] = [{ wch:18 },{ wch:16 },{ wch:10 },{ wch:16 },{ wch:16 }];
+                  const wsTotals = XLSX.utils.json_to_sheet(rowsTotals);
+                  wsTotals["!cols"] = [{ wch:22 },{ wch:10 },{ wch:16 },{ wch:16 }];
+
                   const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, "Factoring");
+                  XLSX.utils.book_append_sheet(wb, ws, "Detalle");
+                  XLSX.utils.book_append_sheet(wb, wsMes, "Por Mes");
+                  XLSX.utils.book_append_sheet(wb, wsTotals, "Totales");
                   const suffix = (facFilterFrom || facFilterTo)
                     ? "_" + (facFilterFrom || "") + (facFilterTo ? "_al_" + facFilterTo : "")
                     : "_" + today();
