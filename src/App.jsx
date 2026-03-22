@@ -4879,7 +4879,7 @@ export default function App() {
                   </div>
                   <div className="kpis" style={{ marginBottom:22, gridTemplateColumns:"repeat(5,1fr)" }}>
                     {(() => {
-                      const rFiltered = reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter));
+                      const rFiltered = (reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter))).filter(o => !o._ventaDirecta);
                       return [
                         { n: rFiltered.length, lbl: "Total", c: "var(--white)" },
                         { n: rFiltered.filter(o => ocStatus(o.items, o.dispatches, o) === "open").length, lbl: "Abiertas", c: "var(--sky)" },
@@ -4893,7 +4893,7 @@ export default function App() {
                   </div>
                   {enriched.length === 0 && <div className="empty"><div className="empty-ico">▤</div><p>No hay ordenes aun.</p></div>}
                   {enriched.length > 0 && (() => {
-                    const rFiltered = reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter));
+                    const rFiltered = (reportsMonthFilter === "all" ? enriched : enriched.filter(o => (o.date||"").startsWith(reportsMonthFilter))).filter(o => !o._ventaDirecta);
                     const byClient = rFiltered.reduce((acc, oc) => { const k = oc.client; if (!acc[k]) acc[k] = []; acc[k].push(oc); return acc; }, {});
                     return Object.entries(byClient).map(([client, ocs]) => (
                       <div key={client} style={{ marginBottom:28 }}>
