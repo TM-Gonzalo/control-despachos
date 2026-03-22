@@ -4196,9 +4196,33 @@ export default function App() {
 
                 return (
                   <>
-                    <div className="ph">
-                      <div><div className="pt">Reporte <em>Factoring</em></div><div className="pm">CONTROL DE FACTURAS POR FACTORIZAR</div></div>
-                      <div style={{ display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+                    <div className="ph" style={{ flexDirection:"column", alignItems:"stretch", gap:10 }}>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+                        <div><div className="pt">Reporte <em>Factoring</em></div><div className="pm">CONTROL DE FACTURAS POR FACTORIZAR</div></div>
+                        <div style={{ display:"flex", gap:16, alignItems:"center", flexWrap:"wrap" }}>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL NETO</div>
+                            <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalNeto)}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL c/IVA</div>
+                            <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalConIVA)}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>FACTORIZADO</div>
+                            <div style={{ fontSize:13, color:"var(--lime)", fontWeight:600 }}>{fmtCLP(totalFactorizado)}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>NO FACTORIZADO</div>
+                            <div style={{ fontSize:13, color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totalNo)}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>PENDIENTE</div>
+                            <div style={{ fontSize:13, color:"var(--fog2)", fontWeight:600 }}>{fmtCLP(totalPendiente)}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", paddingTop:6, borderTop:"1px solid var(--line)" }}>
                         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>DESDE</span>
                           <input type="date" value={facFilterFrom} onChange={e => setFacFilterFrom(e.target.value)}
@@ -4208,9 +4232,15 @@ export default function App() {
                             style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
                           {(facFilterFrom || facFilterTo) && (
                             <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 8px" }}
-                              onClick={() => { setFacFilterFrom(""); setFacFilterTo(""); }}>✕ Limpiar</button>
+                              onClick={() => { setFacFilterFrom(""); setFacFilterTo(""); }}>✕</button>
                           )}
                         </div>
+                        <div style={{ width:1, height:22, background:"var(--line)" }} />
+                        <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
+                          onClick={handleDownloadFactoringXlsx}>
+                          ↓ Excel
+                        </button>
+                        <div style={{ width:1, height:22, background:"var(--line)" }} />
                         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>CLIENTE</span>
                           <select value={facFilterClient} onChange={e => setFacFilterClient(e.target.value)}
@@ -4233,31 +4263,6 @@ export default function App() {
                             <option value="sin">Sin clasificar</option>
                           </select>
                           {facFilterEntity && <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 6px" }} onClick={() => setFacFilterEntity("")}>✕</button>}
-                        </div>
-                        <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
-                          onClick={handleDownloadFactoringXlsx}>
-                          ↓ Excel{(facFilterFrom || facFilterTo) ? " (filtrado)" : ""}
-                        </button>
-                        <div style={{ width:1, height:28, background:"var(--line)" }} />
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL NETO</div>
-                          <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalNeto)}</div>
-                        </div>
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>TOTAL c/IVA</div>
-                          <div style={{ fontSize:13, color:"var(--white)", fontWeight:600 }}>{fmtCLP(totalConIVA)}</div>
-                        </div>
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>FACTORIZADO</div>
-                          <div style={{ fontSize:13, color:"var(--lime)", fontWeight:600 }}>{fmtCLP(totalFactorizado)}</div>
-                        </div>
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>NO FACTORIZADO</div>
-                          <div style={{ fontSize:13, color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totalNo)}</div>
-                        </div>
-                        <div style={{ textAlign:"right" }}>
-                          <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>PENDIENTE</div>
-                          <div style={{ fontSize:13, color:"var(--fog2)", fontWeight:600 }}>{fmtCLP(totalPendiente)}</div>
                         </div>
                       </div>
                     </div>
