@@ -2909,6 +2909,7 @@ export default function App() {
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [facFilterTo, setFacFilterTo] = useState("");
   const [facFilterClient, setFacFilterClient] = useState("");
+  const [facFilterEntity, setFacFilterEntity] = useState("");
   const [collapsedMonths, setCollapsedMonths] = useState(new Set());
   const [pfFilterFrom, setPfFilterFrom] = useState("");
   const [pfFilterTo, setPfFilterTo] = useState("");
@@ -4126,12 +4127,18 @@ export default function App() {
                   return { ...f, conIVA: Math.max(0, f.conIVA - nc.conIVA), neto: Math.max(0, f.neto - nc.neto), _ncDesc: nc.conIVA };
                 });
 
-                // Filtrar por rango de fechas y cliente
+                // Listas para selectores
                 const facClients = [...new Set(allFacsAdj.map(f => f.client).filter(Boolean))].sort();
+                // Filtrar por rango de fechas, cliente y condición factoring
                 const allFacsFiltered = allFacsAdj.filter(f => {
                   if (facFilterFrom && f.date < facFilterFrom) return false;
                   if (facFilterTo && f.date > facFilterTo) return false;
                   if (facFilterClient && f.client !== facFilterClient) return false;
+                  if (facFilterEntity) {
+                    const ent = factoringData[f.key]?.entity || null;
+                    if (facFilterEntity === "sin" && ent) return false;
+                    if (facFilterEntity !== "sin" && ent !== facFilterEntity) return false;
+                  }
                   return true;
                 });
 
@@ -4207,14 +4214,25 @@ export default function App() {
                         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>CLIENTE</span>
                           <select value={facFilterClient} onChange={e => setFacFilterClient(e.target.value)}
-                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color: facFilterClient ? "var(--white)" : "var(--fog2)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)", minWidth:160 }}>
+                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color: facFilterClient ? "var(--white)" : "var(--fog2)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)", minWidth:150 }}>
                             <option value="">Todos</option>
                             {facClients.map(c => <option key={c} value={c}>{c}</option>)}
                           </select>
-                          {facFilterClient && (
-                            <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 8px" }}
-                              onClick={() => setFacFilterClient("")}>✕</button>
-                          )}
+                          {facFilterClient && <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 6px" }} onClick={() => setFacFilterClient("")}>✕</button>}
+                        </div>
+                        <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                          <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>CONDICIÓN</span>
+                          <select value={facFilterEntity} onChange={e => setFacFilterEntity(e.target.value)}
+                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color: facFilterEntity ? "var(--white)" : "var(--fog2)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)", minWidth:130 }}>
+                            <option value="">Todas</option>
+                            <option value="Santander">Santander</option>
+                            <option value="Security">Security</option>
+                            <option value="Otro">Otro</option>
+                            <option value="No">No</option>
+                            <option value="Cobrada">Cobrada</option>
+                            <option value="sin">Sin clasificar</option>
+                          </select>
+                          {facFilterEntity && <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 6px" }} onClick={() => setFacFilterEntity("")}>✕</button>}
                         </div>
                         <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
                           onClick={handleDownloadFactoringXlsx}>
