@@ -4189,7 +4189,7 @@ export default function App() {
                 const totalNo = allFacsFiltered.filter(f => isNo(f.key)).reduce((s,f) => s + f.conIVA, 0);
                 const isCobrada = key => !!(factoringData[key] && factoringData[key].entity === "Cobrada");
                 const totalCobrada = allFacsFiltered.filter(f => isCobrada(f.key)).reduce((s,f) => s + f.conIVA, 0);
-                const totalPendiente = totalConIVA - totalFactorizado - totalCobrada;
+                const totalPendiente = allFacsFiltered.filter(f => !isFactorizado(f.key) && !isCobrada(f.key)).reduce((s,f) => s + Math.max(0, f.conIVA), 0);
 
                 // Column widths fixed
                 const colW = { check:40, fecha:100, empresa:160, item:200, oc:130, gd:70, factura:80, monto:120, entity:370 };
@@ -4218,7 +4218,7 @@ export default function App() {
                           </div>
                           <div style={{ textAlign:"right" }}>
                             <div style={{ fontSize:9, letterSpacing:2, color:"var(--fog)" }}>PENDIENTE</div>
-                            <div style={{ fontSize:13, color:"var(--fog2)", fontWeight:600 }}>{fmtCLP(totalPendiente)}</div>
+                            <div style={{ fontSize:13, color:"var(--gold)", fontWeight:600 }}>{fmtCLP(totalPendiente)}</div>
                           </div>
                         </div>
                       </div>
