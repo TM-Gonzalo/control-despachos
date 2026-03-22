@@ -3842,16 +3842,33 @@ export default function App() {
                     if (d.docType === "guia" && d.invoiceNumber && d.invoiceDate) {
                       if (directFacNumsPF.has(String(d.invoiceNumber).trim())) return;
                       const key = String(d.invoiceNumber).trim();
+                      const calcNetoGD = (disp) => {
+                        let n = Number(disp.netTotal || 0);
+                        let c = Number(disp.total || 0) || Math.round(n * 1.19);
+                        // Fallback 1: invoiceItems (ítems de la factura Bsale vinculada)
+                        if (!n && disp.invoiceItems && disp.invoiceItems.length) {
+                          n = disp.invoiceItems.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
+                          if (n && !c) c = Math.round(n * 1.19);
+                        }
+                        // Fallback 2: items de la GD
+                        if (!n && disp.items && disp.items.length) {
+                          n = disp.items.reduce((s, it) => {
+                            const rawUnit = String(it.unit || "");
+                            const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                            return s + (Number(it.qty)||0) * p;
+                          }, 0);
+                          if (n && !c) c = Math.round(n * 1.19);
+                        }
+                        return { neto: n, total: c };
+                      };
                       if (!gdFacMap[key]) {
-                        const neto = Number(d.netTotal || 0);
-                        const total = Number(d.total || 0) || Math.round(neto * 1.19);
+                        const { neto, total } = calcNetoGD(d);
                         gdFacMap[key] = { ...d, number: d.invoiceNumber, date: d.invoiceDate, total, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, _fromGDs: [d.number] };
                       } else {
                         // Acumular GDs adicionales — sumar montos si la primera GD no tenía monto
                         gdFacMap[key]._fromGDs.push(d.number);
                         if (!gdFacMap[key].total) {
-                          const neto = Number(d.netTotal || 0);
-                          const total = Number(d.total || 0) || Math.round(neto * 1.19);
+                          const { neto, total } = calcNetoGD(d);
                           gdFacMap[key].total = total;
                           gdFacMap[key].neto = neto;
                         }
@@ -4055,6 +4072,12 @@ export default function App() {
                       const key = String(d.invoiceNumber).trim();
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
+                      // Fallback 1: calcular desde invoiceItems (ítems de la factura Bsale vinculada)
+                      if (!neto && d.invoiceItems && d.invoiceItems.length) {
+                        neto = d.invoiceItems.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
+                        if (neto && !conIVA) conIVA = Math.round(neto * 1.19);
+                      }
+                      // Fallback 2: calcular desde items de la GD
                       if (!neto && d.items && d.items.length) {
                         neto = (d.items || []).reduce((s, it) => {
                           const rawUnit = String(it.unit || "");
@@ -4063,7 +4086,7 @@ export default function App() {
                         }, 0);
                         if (neto && !conIVA) conIVA = Math.round(neto * 1.19);
                       }
-                      const desc = (d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
+                      const desc = (d.invoiceItems||d.items||[]).map(it => it.desc).filter(Boolean).join(", ") || "—";
                       if (!gdFacMapF[key]) {
                         gdFacMapF[key] = { key: d.id + "-inv", facNumber: d.invoiceNumber, date: d.invoiceDate, client: oc.client, rut: oc.rut || "", desc, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, gdNumber: d.number, neto, conIVA };
                       } else {
