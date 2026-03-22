@@ -3744,7 +3744,7 @@ export default function App() {
                       return acc;
                     }, {});
                     // Ordenar por monto pendiente desc
-                    const rows = Object.entries(byClient).map(([client, ocs]) => {
+                    const rows = Object.entries(byClient).filter(([client, ocs]) => ocs.some(o => !o._ventaDirecta)).map(([client, ocs]) => {
                       const totalOC   = ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0), 0);
                       const totalDis  = ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0), 0);
                       const pending   = totalOC - totalDis;
