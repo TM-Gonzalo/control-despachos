@@ -2908,7 +2908,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [facFilterTo, setFacFilterTo] = useState("");
-  const [facFilterClient, setFacFilterClient] = useState("");
+  const [facFilterClients, setFacFilterClients] = useState(new Set());
   const [facFilterEntity, setFacFilterEntity] = useState("");
   const [collapsedMonths, setCollapsedMonths] = useState(new Set());
   const [pfFilterFrom, setPfFilterFrom] = useState("");
@@ -4133,7 +4133,7 @@ export default function App() {
                 const allFacsFiltered = allFacsAdj.filter(f => {
                   if (facFilterFrom && f.date < facFilterFrom) return false;
                   if (facFilterTo && f.date > facFilterTo) return false;
-                  if (facFilterClient && f.client !== facFilterClient) return false;
+                  if (facFilterClients.size > 0 && !facFilterClients.has(f.client)) return false;
                   if (facFilterEntity) {
                     const ent = factoringData[f.key]?.entity || null;
                     if (facFilterEntity === "sin" && ent) return false;
@@ -4241,14 +4241,50 @@ export default function App() {
                           ↓ Excel
                         </button>
                         <div style={{ width:1, height:22, background:"var(--line)" }} />
-                        <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                        <div style={{ position:"relative", display:"flex", gap:6, alignItems:"center" }}>
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>CLIENTE</span>
-                          <select value={facFilterClient} onChange={e => setFacFilterClient(e.target.value)}
-                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color: facFilterClient ? "var(--white)" : "var(--fog2)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)", minWidth:150 }}>
-                            <option value="">Todos</option>
-                            {facClients.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                          {facFilterClient && <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 6px" }} onClick={() => setFacFilterClient("")}>✕</button>}
+                          {(() => {
+                            const [open, setOpen] = React.useState(false);
+                            const ref = React.useRef(null);
+                            React.useEffect(() => {
+                              const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+                              document.addEventListener("mousedown", handler);
+                              return () => document.removeEventListener("mousedown", handler);
+                            }, []);
+                            const toggle = c => {
+                              const next = new Set(facFilterClients);
+                              next.has(c) ? next.delete(c) : next.add(c);
+                              setFacFilterClients(next);
+                            };
+                            const label = facFilterClients.size === 0 ? "Todos" : facFilterClients.size === 1 ? [...facFilterClients][0] : facFilterClients.size + " clientes";
+                            return (
+                              <div ref={ref} style={{ position:"relative" }}>
+                                <button onClick={() => setOpen(o => !o)}
+                                  style={{ background:"var(--card)", border:"1px solid " + (facFilterClients.size > 0 ? "var(--sky)" : "var(--line2)"), borderRadius:4, color: facFilterClients.size > 0 ? "var(--white)" : "var(--fog2)", fontSize:11, padding:"4px 10px", fontFamily:"var(--fM)", cursor:"pointer", minWidth:160, textAlign:"left", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                                  <span>{label}</span><span style={{ fontSize:9, color:"var(--fog)" }}>▾</span>
+                                </button>
+                                {open && (
+                                  <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, zIndex:200, background:"var(--ink2)", border:"1px solid var(--line2)", borderRadius:6, minWidth:220, maxHeight:260, overflowY:"auto", padding:"6px 0", boxShadow:"0 4px 16px rgba(0,0,0,.4)" }}>
+                                    <div style={{ padding:"4px 12px 6px", borderBottom:"1px solid var(--line)" }}>
+                                      <button onClick={() => setFacFilterClients(new Set())} style={{ background:"none", border:"none", color:"var(--fog)", fontSize:9, letterSpacing:1, fontFamily:"var(--fM)", cursor:"pointer", padding:0 }}>✕ LIMPIAR</button>
+                                    </div>
+                                    {facClients.map(c => (
+                                      <div key={c} onClick={() => toggle(c)}
+                                        style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 12px", cursor:"pointer", background: facFilterClients.has(c) ? "rgba(77,184,255,.08)" : "transparent", transition:".1s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = facFilterClients.has(c) ? "rgba(77,184,255,.12)" : "var(--ink3)"}
+                                        onMouseLeave={e => e.currentTarget.style.background = facFilterClients.has(c) ? "rgba(77,184,255,.08)" : "transparent"}>
+                                        <div style={{ width:13, height:13, borderRadius:3, border:"1px solid " + (facFilterClients.has(c) ? "var(--sky)" : "var(--line2)"), background: facFilterClients.has(c) ? "var(--sky)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                          {facFilterClients.has(c) && <span style={{ color:"var(--ink)", fontSize:9, fontWeight:700 }}>✓</span>}
+                                        </div>
+                                        <span style={{ fontSize:11, color: facFilterClients.has(c) ? "var(--white)" : "var(--fog2)", fontFamily:"var(--fM)" }}>{c}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                          {facFilterClients.size > 0 && <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 6px" }} onClick={() => setFacFilterClients(new Set())}>✕</button>}
                         </div>
                         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>CONDICIÓN</span>
