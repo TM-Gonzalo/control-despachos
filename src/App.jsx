@@ -3341,6 +3341,7 @@ export default function App() {
   }, 0);
 
   const filtered = enriched.filter(o => {
+    if (o._ventaDirecta) return false;
     const norm = v => v.toLowerCase().replace(/\./g, "");
     const s = norm(search);
     const matchesSearch = !s || norm(o.id).includes(s) || norm(o.client).includes(s) || norm(o.ocNumber || "").includes(s);
