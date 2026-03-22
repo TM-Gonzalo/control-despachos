@@ -4219,17 +4219,19 @@ export default function App() {
 
                 // Función descarga Excel
                 const handleDownloadFactoringXlsx = () => {
+                  const safeNum = v => { const n = Number(v); return isNaN(n) ? 0 : n; };
+                  const safeStr = v => (v == null ? "" : String(v));
                   const rows = allFacsFiltered.map(f => ({
-                    "Fecha": f.date,
-                    "Empresa": f.client,
-                    "RUT": f.rut || "",
-                    "OC": f.ocNumber || "",
-                    "GD": f.gdNumber ? Number(f.gdNumber) : "",
-                    "Factura": f.facNumber ? Number(f.facNumber) : "",
-                    "Neto": f.neto,
-                    "Monto c/IVA": f.conIVA,
-                    "NC Descuento": f._ncDesc || 0,
-                    "Factoring": getEntity(f.key) || "Pendiente",
+                    "Fecha": safeStr(f.date),
+                    "Empresa": safeStr(f.client),
+                    "RUT": safeStr(f.rut),
+                    "OC": safeStr(f.ocNumber),
+                    "GD": safeStr(f.gdNumber),
+                    "Factura": safeStr(f.facNumber),
+                    "Neto": safeNum(f.neto),
+                    "Monto c/IVA": safeNum(f.conIVA),
+                    "NC Descuento": safeNum(f._ncDesc),
+                    "Factoring": safeStr(getEntity(f.key) || "Pendiente"),
                   }));
                   const ws = XLSX.utils.json_to_sheet(rows);
                   ws["!cols"] = [
