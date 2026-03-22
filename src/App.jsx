@@ -1728,6 +1728,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
                 <input
                   style={{ flex:1, background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"6px 10px", fontFamily:"var(--fM)", fontSize:12, color:"var(--white)", outline:"none" }}
                   placeholder="Ej: 1903"
+                  autoFocus
                   value={bsaleSearch}
                   onChange={e => { setBsaleSearch(e.target.value); setBsaleResult(null); setBsaleErr(null); }}
                   onKeyDown={e => e.key === "Enter" && searchBsale(bsaleSearch)}
