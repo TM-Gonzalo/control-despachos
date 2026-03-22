@@ -2954,6 +2954,7 @@ export default function App() {
   const [facFilterClients, setFacFilterClients] = useState(new Set());
   const [facFilterEntity, setFacFilterEntity] = useState("");
   const [collapsedMonths, setCollapsedMonths] = useState(new Set());
+  const [expandedPFMonths, setExpandedPFMonths] = useState(new Set());
   const [pfFilterFrom, setPfFilterFrom] = useState("");
   const [pfFilterTo, setPfFilterTo] = useState("");
   const [pendExpanded, setPendExpanded] = useState({});
@@ -4039,17 +4040,34 @@ export default function App() {
                                 <div className="mon-kpi"><label>CLIENTES</label><p style={{ color:"var(--sky)" }}>{Object.keys(byClient).length}</p></div>
                               </div>
                               <div className="mon-body">
-                                {[...facs].sort((a,b) => Number(b.number||0) - Number(a.number||0)).map((f, i) => (
-                                  <div className="mon-fac-row" key={i}>
-                                    <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
-                                    <span style={{ color:"var(--fog2)", fontSize:10, minWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.client}</span>
-                                    <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}{f._fromGD ? <span style={{ color:"var(--violet)", marginLeft:6 }}>· GD {f._fromGD}</span> : null}</span>
-                                    <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
-                                      <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
-                                      {f._ncDesc > 0 && <span style={{ fontSize:9, color:"#ff8c00" }}>NC -{fmtCLP(f._ncDesc)}</span>}
-                                    </span>
-                                  </div>
-                                ))}
+                                {(() => {
+                                  const MAX = 15;
+                                  const sorted = [...facs].sort((a,b) => Number(b.number||0) - Number(a.number||0));
+                                  const isExp = expandedPFMonths.has(mk);
+                                  const visible = isExp ? sorted : sorted.slice(0, MAX);
+                                  const hidden = sorted.length - MAX;
+                                  return (<>
+                                    {visible.map((f, i) => (
+                                      <div className="mon-fac-row" key={i}>
+                                        <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
+                                        <span style={{ color:"var(--fog2)", fontSize:10, minWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.client}</span>
+                                        <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}{f._fromGD ? <span style={{ color:"var(--violet)", marginLeft:6 }}>· GD {f._fromGD}</span> : null}</span>
+                                        <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
+                                          <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
+                                          {f._ncDesc > 0 && <span style={{ fontSize:9, color:"#ff8c00" }}>NC -{fmtCLP(f._ncDesc)}</span>}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {sorted.length > MAX && (
+                                      <div style={{ display:"flex", justifyContent:"center", padding:"8px 0", borderTop:"1px solid var(--line)" }}>
+                                        <button onClick={() => setExpandedPFMonths(prev => { const n = new Set(prev); isExp ? n.delete(mk) : n.add(mk); return n; })}
+                                          style={{ background:"none", border:"none", color:"var(--fog2)", fontSize:10, fontFamily:"var(--fM)", letterSpacing:1, cursor:"pointer" }}>
+                                          {isExp ? "▲ Mostrar menos" : hidden + " facturas más ▼"}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>);
+                                })()}
                               </div>
                             </div>
                           );
