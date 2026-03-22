@@ -2949,6 +2949,7 @@ export default function App() {
   const [toinvoiceSort, setToinvoiceSort] = useState({ col: "date", dir: 1 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [facFilterFrom, setFacFilterFrom] = useState("");
+  const [expandedClients, setExpandedClients] = useState(new Set());
   const [facFilterTo, setFacFilterTo] = useState("");
   const [facFilterClients, setFacFilterClients] = useState(new Set());
   const [facFilterEntity, setFacFilterEntity] = useState("");
@@ -3789,26 +3790,43 @@ export default function App() {
                                 <div className="cli-total"><label>AVANCE</label><p style={{ color:pc(pct) }}>{pct}%</p></div>
                               </div>
                               <div className="cli-oc-list">
-                                {[...ocs].sort((a, b) => {
-                                  const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
-                                  const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
-                                  return remB - remA;
-                                }).map(oc => {
-                                  const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
-                                  const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
-                                  const rem = tot - dis;
-                                  const s   = ocStatus(oc.items, oc.dispatches, oc);
-                                  return (
-                                    <div className="cli-oc-row" key={oc.id}>
-                                      <span style={{ color:"var(--gold)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
-                                      <span style={{ color:"var(--fog)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
-                                      <span style={{ color:"var(--lime)", width:100, textAlign:"right" }}>{fmtCLP(dis)}</span>
-                                      <span style={{ color: rem > 0 ? "var(--rose)" : "var(--fog2)", width:100, textAlign:"right", fontWeight: rem > 0 ? 600 : 400 }}>{fmtCLP(rem)}</span>
-                                      <span className={"badge " + bCls(s)} style={{ marginLeft:"auto" }}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
-                                      <button className="btn btn-outline btn-sm" style={{ marginLeft:8 }} onClick={() => setShowDetail(oc)}>Ver</button>
-                                    </div>
-                                  );
-                                })}
+                                {(() => {
+                                  const MAX = 5;
+                                  const isExpanded = expandedClients.has(client);
+                                  const sorted = [...ocs].sort((a, b) => {
+                                    const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
+                                    const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
+                                    return remB - remA;
+                                  });
+                                  const visible = isExpanded ? sorted : sorted.slice(0, MAX);
+                                  const hidden = sorted.length - MAX;
+                                  return (<>
+                                    {visible.map(oc => {
+                                      const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
+                                      const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
+                                      const rem = tot - dis;
+                                      const s   = ocStatus(oc.items, oc.dispatches, oc);
+                                      return (
+                                        <div className="cli-oc-row" key={oc.id}>
+                                          <span style={{ color:"var(--gold)", fontWeight:600, width:120 }}>{oc.ocNumber || oc.id}</span>
+                                          <span style={{ color:"var(--fog)", width:100, textAlign:"right" }}>{fmtCLP(tot)}</span>
+                                          <span style={{ color:"var(--lime)", width:100, textAlign:"right" }}>{fmtCLP(dis)}</span>
+                                          <span style={{ color: rem > 0 ? "var(--rose)" : "var(--fog2)", width:100, textAlign:"right", fontWeight: rem > 0 ? 600 : 400 }}>{fmtCLP(rem)}</span>
+                                          <span className={"badge " + bCls(s)} style={{ marginLeft:"auto" }}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span>
+                                          <button className="btn btn-outline btn-sm" style={{ marginLeft:8 }} onClick={() => setShowDetail(oc)}>Ver</button>
+                                        </div>
+                                      );
+                                    })}
+                                    {sorted.length > MAX && (
+                                      <div style={{ display:"flex", justifyContent:"center", padding:"8px 0", borderTop:"1px solid var(--line)" }}>
+                                        <button onClick={() => setExpandedClients(prev => { const n = new Set(prev); isExpanded ? n.delete(client) : n.add(client); return n; })}
+                                          style={{ background:"none", border:"none", color:"var(--fog2)", fontSize:10, fontFamily:"var(--fM)", letterSpacing:1, cursor:"pointer", display:"flex", alignItems:"center", gap:5 }}>
+                                          {isExpanded ? <>▲ Mostrar menos</> : <>{hidden} OC{hidden !== 1 ? "s" : ""} más ▼</>}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>);
+                                })()}
                               </div>
                             </div>
                           );
