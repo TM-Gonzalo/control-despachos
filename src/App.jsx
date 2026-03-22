@@ -4038,20 +4038,15 @@ export default function App() {
                                 <div className="mon-kpi"><label>CLIENTES</label><p style={{ color:"var(--sky)" }}>{Object.keys(byClient).length}</p></div>
                               </div>
                               <div className="mon-body">
-                                {Object.entries(byClient).map(([client, cfacs]) => (
-                                  <div className="mon-cli" key={client}>
-                                    <div className="mon-cli-name">{client.toUpperCase()} · {cfacs.length} FACTURA{cfacs.length !== 1 ? "S" : ""} · {fmtCLP(cfacs.reduce((s,f) => s+Number(f.total||0),0))}</div>
-                                    {[...cfacs].sort((a,b) => Number(b.number||0) - Number(a.number||0)).map((f, i) => (
-                                      <div className="mon-fac-row" key={i}>
-                                        <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
-                                        <span style={{ color:"var(--fog)", fontSize:10 }}>{f.date}</span>
-                                        <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}{f._fromGD ? <span style={{ color:"var(--violet)", marginLeft:6 }}>· GD {f._fromGD}</span> : null}</span>
-                                        <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
-                                          <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
-                                          {f._ncDesc > 0 && <span style={{ fontSize:9, color:"#ff8c00" }}>NC -{fmtCLP(f._ncDesc)}</span>}
-                                        </span>
-                                      </div>
-                                    ))}
+                                {[...facs].sort((a,b) => Number(b.number||0) - Number(a.number||0)).map((f, i) => (
+                                  <div className="mon-fac-row" key={i}>
+                                    <span className="badge bdoc-factura"><Dot c="var(--teal)" />Factura {f.number}</span>
+                                    <span style={{ color:"var(--fog2)", fontSize:10, minWidth:130, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.client}</span>
+                                    <span style={{ color:"var(--gold)", flex:1, fontSize:10, fontWeight:600 }}>OC {f.ocNumber}{f._fromGD ? <span style={{ color:"var(--violet)", marginLeft:6 }}>· GD {f._fromGD}</span> : null}</span>
+                                    <span style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:1 }}>
+                                      <span style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(f.total || f.amount || 0)}</span>
+                                      {f._ncDesc > 0 && <span style={{ fontSize:9, color:"#ff8c00" }}>NC -{fmtCLP(f._ncDesc)}</span>}
+                                    </span>
                                   </div>
                                 ))}
                               </div>
