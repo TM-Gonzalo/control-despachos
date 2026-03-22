@@ -2270,7 +2270,7 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   doc.text(fmtM(totAmt), c2, y);
   doc.setTextColor(40, 160, 80);
   doc.text(fmtM(disAmt), c3, y);
-  const rem0 = totAmt - disAmt;
+  const rem0 = oc._closedByMonto ? 0 : totAmt - disAmt;
   doc.setTextColor(rem0 > 0 ? 200 : 40, rem0 > 0 ? 80 : 160, 80);
   doc.text(fmtM(rem0), c4, y);
   y += 7;
@@ -2414,7 +2414,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
   const st = ocStatus(oc.items, oc.dispatches, oc);
   const totAmt = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
-  const disAmt = oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
+  const disAmt = oc._closedByMonto ? totAmt : oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
   const days = daysLeft(oc.deliveryDate);
   const dayColor = (st === "closed" || st === "toinvoice") ? "var(--fog2)" : days !== null && days <= 0 ? "var(--rose)" : days !== null && days <= 5 ? "var(--gold)" : "var(--white)";
   const dispatches = oc.dispatches || [];
@@ -2504,7 +2504,7 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
           <div className="df"><label>AVANCE GLOBAL</label><p style={{ color:pc(pctGlobal) }}>{pctGlobal}%</p></div>
           <div className="df"><label>MONTO OC</label><p style={{ color: st === "closed" ? "var(--lime)" : "var(--gold)", fontWeight:600 }}>{fmtCLP(totAmt)}</p></div>
           <div className="df"><label>DESPACHADO</label><p style={{ color:"var(--lime)", fontWeight:600 }}>{fmtCLP(disAmt)}</p></div>
-          <div className="df"><label>REMANENTE</label><p style={{ color:"var(--rose)", fontWeight:600 }}>{fmtCLP(totAmt - disAmt)}</p></div>
+          <div className="df"><label>REMANENTE</label><p style={{ color: (oc._closedByMonto || totAmt === disAmt) ? "var(--fog2)" : "var(--rose)", fontWeight:600 }}>{fmtCLP(totAmt - disAmt)}</p></div>
         </div>
         {oc.notes && <div style={{ fontSize:11, color:"var(--fog2)", marginBottom:16, padding:"9px 12px", background:"var(--ink3)", borderRadius:6, borderLeft:"2px solid var(--line2)" }}>📝 {oc.notes}</div>}
         <div className="slbl">Remanente por item</div>
@@ -3354,13 +3354,13 @@ export default function App() {
   const liveDispOC = showDispatch ? enriched.find(o => o.id === showDispatch.id) || showDispatch : null;
 
   const mkSort = (state, setState) => (col) => setState(s => ({ col, dir: s.col === col ? -s.dir : 1 }));
-  const calcPct = oc => { const tot = oc.items.reduce((a,i) => a+Number(i.qty),0); const dis = oc.items.reduce((a,i) => a+Number(i.dispatched||0),0); return tot>0?Math.min(100,Math.round(dis/tot*100)):0; };
+  const calcPct = oc => { if (oc._closedByMonto) return 100; const tot = oc.items.reduce((a,i) => a+Number(i.qty),0); const dis = oc.items.reduce((a,i) => a+Number(i.dispatched||0),0); return tot>0?Math.min(100,Math.round(dis/tot*100)):0; };
   const statusOrder = { open:0, partial:1, toinvoice:2, closed:3 };
   const applySort = (arr, { col, dir }) => {
     if (!col) return arr;
     return [...arr].sort((a, b) => {
-      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches, a)] ?? 0) : col === "lastActivity" ? ((a.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
-      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches, b)] ?? 0) : col === "lastActivity" ? ((b.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
+      let av = col === "ocNumber" ? (a.ocNumber || a.id) : col === "client" ? a.client : col === "date" ? (a.date || "") : col === "deliveryDate" ? (a.deliveryDate || "") : col === "pct" ? calcPct(a) : col === "monto" ? a.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? (a._closedByMonto ? 0 : a.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0)) : col === "status" ? (statusOrder[ocStatus(a.items, a.dispatches, a)] ?? 0) : col === "lastActivity" ? ((a.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
+      let bv = col === "ocNumber" ? (b.ocNumber || b.id) : col === "client" ? b.client : col === "date" ? (b.date || "") : col === "deliveryDate" ? (b.deliveryDate || "") : col === "pct" ? calcPct(b) : col === "monto" ? b.items.reduce((s,i) => s+Number(i.qty)*Number(i.unitPrice),0) : col === "pendiente" ? (b._closedByMonto ? 0 : b.items.reduce((s,i) => s+(Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice),0)) : col === "status" ? (statusOrder[ocStatus(b.items, b.dispatches, b)] ?? 0) : col === "lastActivity" ? ((b.dispatches||[]).flatMap(d => [d.date, d.invoiceDate]).filter(Boolean).sort((x,y) => y.localeCompare(x))[0] || "") : 0;
       return av < bv ? -dir : av > bv ? dir : 0;
     });
   };
@@ -3687,7 +3687,7 @@ export default function App() {
                                 {nFac === 0 && nGuia === 0 && <span style={{ color:"var(--fog)", fontSize:10 }}>—</span>}
                               </td>
                               <td style={{ color:"var(--gold)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + Number(i.qty)*Number(i.unitPrice), 0))}</td>
-                              <td style={{ color:"var(--rose)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc.items.reduce((a,i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0))}</td>
+                              <td style={{ color:"var(--rose)", fontWeight:600, fontSize:12, whiteSpace:"nowrap" }}>{fmtCLP(oc._closedByMonto ? 0 : oc.items.reduce((a,i) => a + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0))}</td>
                               <td style={{ minWidth:100 }}>
                                 <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                                   <div className="pbar-wrap" style={{ flex:1 }}><div className="pbar" style={{ width:pct + "%", background:pc(pct) }} /></div>
@@ -3747,7 +3747,7 @@ export default function App() {
                     // Ordenar por monto pendiente desc
                     const rows = Object.entries(byClient).filter(([client, ocs]) => ocs.some(o => !o._ventaDirecta)).map(([client, ocs]) => {
                       const totalOC   = ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0), 0);
-                      const totalDis  = ocs.reduce((s, o) => s + o.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0), 0);
+                      const totalDis  = ocs.reduce((s, o) => { const tot = o.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0); const dis = o._closedByMonto ? tot : o.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0); return s + dis; }, 0);
                       const pending   = totalOC - totalDis;
                       const openOcs   = ocs.filter(o => ocStatus(o.items, o.dispatches, o) !== "closed").length;
                       return { client, ocs, totalOC, totalDis, pending, openOcs };
@@ -3795,8 +3795,8 @@ export default function App() {
                                   const MAX = 5;
                                   const isExpanded = expandedClients.has(client);
                                   const sorted = [...ocs].sort((a, b) => {
-                                    const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
-                                    const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
+                                    const remA = a._closedByMonto ? 0 : a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
+                                    const remB = b._closedByMonto ? 0 : b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
                                     return remB - remA;
                                   });
                                   const visible = isExpanded ? sorted : sorted.slice(0, MAX);
@@ -3804,7 +3804,7 @@ export default function App() {
                                   return (<>
                                     {visible.map(oc => {
                                       const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
-                                      const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
+                                      const dis = oc._closedByMonto ? tot : oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
                                       const rem = tot - dis;
                                       const s   = ocStatus(oc.items, oc.dispatches, oc);
                                       return (
@@ -4904,8 +4904,8 @@ export default function App() {
                         </div>
                         <div className="rep-grid">
                         {[...ocs].sort((a, b) => {
-                          const remA = a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
-                          const remB = b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
+                                    const remA = a._closedByMonto ? 0 : a.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
+                                    const remB = b._closedByMonto ? 0 : b.items.reduce((s,i) => s + (Number(i.qty)-Number(i.dispatched||0))*Number(i.unitPrice), 0);
                           return remB - remA;
                         }).map(oc => {
                     const s = ocStatus(oc.items, oc.dispatches, oc);
