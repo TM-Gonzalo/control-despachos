@@ -187,7 +187,7 @@ const ocStatus = (items, dispatches, oc) => {
     if (Number(d.netTotal || 0) > 0) return Number(d.netTotal);
     const netoItems = (d.items||[]).reduce((s,it) => {
       const rawUnit = String(it.unit || "");
-      const priceFromUnit = rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0);
+      const priceFromUnit = Number(rawUnit.replace(/[$.,]/g,"")) > 0 ? Number(rawUnit.replace(/[$.,]/g,"")) : 0;
       const p = Number(it.unitPrice || 0) || priceFromUnit || 0;
       return s + (Number(it.qty)||0) * p;
     }, 0);
@@ -1666,8 +1666,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
         return { desc: it.desc, unit: it.unit || "Unidad", qty: Number(it.qty), unitPrice, ocItemId, splitPrice: splitPrice[i] ? true : undefined };
       });
       const dispTotal = mapped.reduce((s, it) => s + (Number(it.qty)||0) * (Number(it.unitPrice)||0), 0);
-      const saveNetTotal = ext?.netTotal || dispTotal || 0;
-      const saveTotal = ext?.total || (saveNetTotal ? Math.round(saveNetTotal * 1.19) : 0);
+      const saveNetTotal = Number(ext?.netTotal || 0) || dispTotal || 0;
+      const saveTotal = Number(ext?.total || 0) || (saveNetTotal ? Math.round(saveNetTotal * 1.19) : 0);
       const ncRefInvoice = docType === "nc" ? (ext?.refInvoice || null) : null;
       await onSave(oc.id, { id: "DISP-" + Date.now(), number: num, date, docType, invoiceNumber: null, gdNumber: ext?.gdNumber || null, refInvoice: ncRefInvoice, total: saveTotal, netTotal: saveNetTotal, items: mapped, createdBy: createdBy });
       // resetear para agregar otro despacho sin cerrar
@@ -3804,7 +3804,7 @@ export default function App() {
                       if (!neto && d.items && d.items.length) {
                         neto = (d.items || []).reduce((s, it) => {
                           const rawUnit = String(it.unit || "");
-                          const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                          const p = Number(it.unitPrice || 0) || (Number(rawUnit.replace(/[$.,]/g,"")) > 0 ? Number(rawUnit.replace(/[$.,]/g,"")) : 0);
                           return s + (Number(it.qty)||0) * p;
                         }, 0);
                         if (neto && !total) total = Math.round(neto * 1.19);
@@ -3854,7 +3854,7 @@ export default function App() {
                         if (!n && disp.items && disp.items.length) {
                           n = disp.items.reduce((s, it) => {
                             const rawUnit = String(it.unit || "");
-                            const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                            const p = Number(it.unitPrice || 0) || (Number(rawUnit.replace(/[$.,]/g,"")) > 0 ? Number(rawUnit.replace(/[$.,]/g,"")) : 0);
                             return s + (Number(it.qty)||0) * p;
                           }, 0);
                           if (n && !c) c = Math.round(n * 1.19);
@@ -4028,12 +4028,13 @@ export default function App() {
                     if (d.docType === "factura" && d.date && d.number) {
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
-                      if (String(d.number) === "1794") console.log("[F1794] netTotal:", d.netTotal, "total:", d.total, "items:", JSON.stringify(d.items));
                       // Calcular neto desde items mapeados (más confiable que netTotal de Bsale)
                       if (d.items && d.items.length) {
                         const netoItems = (d.items || []).reduce((s, it) => {
                           const rawUnit = String(it.unit || "");
-                          const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                          // unitPrice directo, o precio en campo unit (ej: "202.581" o "$202.581")
+                          const unitAsNum = Number(rawUnit.replace(/[$.,]/g,""));
+                          const p = Number(it.unitPrice || 0) || (unitAsNum > 0 ? unitAsNum : 0);
                           return s + (Number(it.qty)||0) * p;
                         }, 0);
                         // Usar items si no había neto, o si items es >5% mayor (netTotal Bsale desactualizado)
@@ -4086,7 +4087,7 @@ export default function App() {
                       if (!neto && d.items && d.items.length) {
                         neto = (d.items || []).reduce((s, it) => {
                           const rawUnit = String(it.unit || "");
-                          const p = Number(it.unitPrice || 0) || (rawUnit.startsWith("$") ? Number(rawUnit.replace(/[$.,]/g,"")) : (!isNaN(Number(rawUnit)) && Number(rawUnit) > 0 ? Number(rawUnit) : 0));
+                          const p = Number(it.unitPrice || 0) || (Number(rawUnit.replace(/[$.,]/g,"")) > 0 ? Number(rawUnit.replace(/[$.,]/g,"")) : 0);
                           return s + (Number(it.qty)||0) * p;
                         }, 0);
                         if (neto && !conIVA) conIVA = Math.round(neto * 1.19);
