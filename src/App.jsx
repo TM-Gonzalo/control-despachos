@@ -4028,6 +4028,7 @@ export default function App() {
                     if (d.docType === "factura" && d.date && d.number) {
                       let neto = Number(d.netTotal || 0);
                       let conIVA = Number(d.total || 0) || Math.round(neto * 1.19);
+                      if (String(d.number) === "1794") console.log("[F1794] netTotal:", d.netTotal, "total:", d.total, "items:", JSON.stringify(d.items));
                       // Calcular neto desde items mapeados (más confiable que netTotal de Bsale)
                       if (d.items && d.items.length) {
                         const netoItems = (d.items || []).reduce((s, it) => {
