@@ -1660,7 +1660,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
 
   return (
     <div className="overlay">
-      <div className="modal modal-xl">
+      <div className="modal">
         <div className="modal-hd">
           <div><div className="modal-title">Registrar Despacho</div><div className="modal-sub">{oc.ocNumber || oc.id} · {oc.client}</div></div>
           <div className="xbtn" onClick={onClose}>✕</div>
@@ -3356,7 +3356,9 @@ export default function App() {
       <div style={{ display:"flex", flexDirection:"column", height:"100vh", width:"100%" }}>
 
         <div className="app" style={{ flex:1, minHeight:0, width:"100%" }}>
+          {!showDispatch && !showDetail && !showImport && !showVentaDirecta && !showGestion && !showFactoringGestion && (
           <button className={"rail-toggle" + (sidebarOpen ? " open" : "")} onClick={() => setSidebarOpen(o => !o)} title={sidebarOpen ? "Cerrar menú" : "Abrir menú"}>{sidebarOpen ? "‹" : "›"}</button>
+        )}
           <aside className={"rail" + (sidebarOpen ? "" : " collapsed")}>
             <div className="rail-brand">
               <div className="rail-name">Control<br />Despachos</div>
