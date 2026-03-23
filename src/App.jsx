@@ -4977,8 +4977,8 @@ export default function App() {
                         {visible.map(oc => {
                     const s = ocStatus(oc.items, oc.dispatches, oc);
                     const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
-                    const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
-                    const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
+                    const dis = oc._closedByMonto ? tot : oc.items.reduce((a, i) => a + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
+                    const pct = oc._closedByMonto ? 100 : (tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0);
                     const d = daysLeft(oc.deliveryDate);
                     const disp = oc.dispatches || [];
                     const pendG = disp.filter(x => x.docType === "guia" && !x.invoiceNumber).length;
@@ -5011,21 +5011,25 @@ export default function App() {
                           <div className="rep-stat"><label>GUIAS</label><p style={{ color:"var(--rose)" }}>{disp.filter(x => x.docType === "guia").length}{pendG > 0 ? <span style={{ color:"var(--gold)", fontSize:10, marginLeft:4 }}>({pendG} pend.)</span> : null}</p></div>
                         </div>
                         <div className="rep-items">
-                          {oc.items.filter(it => Number(it.qty) - Number(it.dispatched || 0) > 0).map(it => {
-                            const rem = Number(it.qty) - Number(it.dispatched || 0);
-                            const p = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched || 0) / Number(it.qty) * 100)) : 0;
-                            return (
-                              <div key={it.id} className="rep-irow">
-                                <span style={{ flex:1, color:"var(--fog2)" }}>{it.desc}</span>
-                                <span style={{ color:"var(--gold)", width:130, textAlign:"right" }}>{fmtNum(rem)} {it.unit} pendiente</span>
-                                <div className="pbar-wrap" style={{ width:66 }}><div className="pbar" style={{ width:p + "%", background:pc(p) }} /></div>
-                                <span style={{ width:26, color:"var(--fog)", fontSize:10 }}>{p}%</span>
-                              </div>
-                            );
-                          })}
-                          {oc.items.every(it => Number(it.qty) - Number(it.dispatched || 0) <= 0) && (
-                            <div style={{ fontSize:10, color:"var(--lime)" }}>✓ Todos los items completamente despachados</div>
-                          )}
+                          {oc._closedByMonto ? (
+                            <div style={{ fontSize:10, color:"var(--lime)" }}>✓ Cerrada por monto — remanente liquidado</div>
+                          ) : (<>
+                            {oc.items.filter(it => Number(it.qty) - Number(it.dispatched || 0) > 0).map(it => {
+                              const rem = Number(it.qty) - Number(it.dispatched || 0);
+                              const p = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched || 0) / Number(it.qty) * 100)) : 0;
+                              return (
+                                <div key={it.id} className="rep-irow">
+                                  <span style={{ flex:1, color:"var(--fog2)" }}>{it.desc}</span>
+                                  <span style={{ color:"var(--gold)", width:130, textAlign:"right" }}>{fmtNum(rem)} {it.unit} pendiente</span>
+                                  <div className="pbar-wrap" style={{ width:66 }}><div className="pbar" style={{ width:p + "%", background:pc(p) }} /></div>
+                                  <span style={{ width:26, color:"var(--fog)", fontSize:10 }}>{p}%</span>
+                                </div>
+                              );
+                            })}
+                            {oc.items.every(it => Number(it.qty) - Number(it.dispatched || 0) <= 0) && (
+                              <div style={{ fontSize:10, color:"var(--lime)" }}>✓ Todos los items completamente despachados</div>
+                            )}
+                          </>)}
                         </div>
                       </div>
                     );
