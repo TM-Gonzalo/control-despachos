@@ -4203,23 +4203,22 @@ export default function App() {
                   const safeNum = v => { const n = Number(v); return isNaN(n) ? 0 : n; };
                   const safeStr = v => (v == null ? "" : String(v));
 
-                  // Hoja 1: Detalle facturas
+                  // Hoja 1: Detalle — orden y formato igual al Excel de referencia
                   const rows = allFacsFiltered.map(f => ({
-                    "Fecha": safeStr(f.date),
-                    "Empresa": safeStr(f.client),
-                    "RUT": safeStr(f.rut),
-                    "OC": safeStr(f.ocNumber),
-                    "GD": safeStr(f.gdNumber),
-                    "Factura": safeStr(f.facNumber),
-                    "Neto": safeNum(f.neto),
-                    "Monto c/IVA": safeNum(f.conIVA),
+                    "Empresa":      safeStr(f.client),
+                    "RUT":          safeStr(f.rut),
+                    "GD":           safeStr(f.gdNumber),
+                    "Factura":      safeStr(f.facNumber),
+                    "Fecha":        safeStr(f.date),
+                    "OC":           safeStr(f.ocNumber),
+                    "Monto c/IVA":  safeNum(f.conIVA),
                     "NC Descuento": safeNum(f._ncDesc),
-                    "Factoring": safeStr(getEntity(f.key) || "Pendiente"),
+                    "Factoring":    safeStr(getEntity(f.key) || "Pendiente"),
                   }));
                   const ws = XLSX.utils.json_to_sheet(rows);
                   ws["!cols"] = [
-                    { wch: 12 }, { wch: 28 }, { wch: 14 }, { wch: 16 },
-                    { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }
+                    { wch: 38 }, { wch: 14 }, { wch: 10 }, { wch: 10 },
+                    { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 14 }
                   ];
 
                   // Hoja 2: Resumen por mes y condición
