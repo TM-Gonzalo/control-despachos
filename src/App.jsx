@@ -2858,6 +2858,52 @@ function FactoringGestionModal({ facKey, facLabel, gestiones, onClose, onAdd, on
 }
 
 
+function EntityMultiSelect({ selected, onChange }) {
+  const ENTITIES = ["Santander","Security","Otro","Cobrada","No","Sin clasificar"];
+  const ENTITY_KEYS = { "Sin clasificar": "sin" };
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  const toggle = c => {
+    const next = new Set(selected);
+    next.has(c) ? next.delete(c) : next.add(c);
+    onChange(next);
+  };
+  const label = selected.size === 0 ? "Todas" : selected.size === 1 ? [...selected][0] : selected.size + " condiciones";
+  return (
+    <div ref={ref} style={{ position:"relative" }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ background:"var(--card)", border:"1px solid " + (selected.size > 0 ? "var(--sky)" : "var(--line2)"), borderRadius:4, color: selected.size > 0 ? "var(--white)" : "var(--fog2)", fontSize:11, padding:"4px 10px", fontFamily:"var(--fM)", cursor:"pointer", minWidth:130, textAlign:"left", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+        <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:120 }}>{label}</span>
+        <span style={{ fontSize:9, color:"var(--fog)", flexShrink:0 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, zIndex:200, background:"var(--ink2)", border:"1px solid var(--line2)", borderRadius:6, minWidth:160, padding:"6px 0", boxShadow:"0 4px 16px rgba(0,0,0,.4)" }}>
+          <div style={{ padding:"4px 12px 6px", borderBottom:"1px solid var(--line)" }}>
+            <button onClick={() => onChange(new Set())} style={{ background:"none", border:"none", color:"var(--fog)", fontSize:9, letterSpacing:1, fontFamily:"var(--fM)", cursor:"pointer", padding:0 }}>✕ LIMPIAR</button>
+          </div>
+          {ENTITIES.map(c => {
+            const key = ENTITY_KEYS[c] || c;
+            return (
+              <div key={key} onClick={() => toggle(key)}
+                style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 12px", cursor:"pointer", background: selected.has(key) ? "rgba(77,184,255,.08)" : "transparent" }}>
+                <div style={{ width:13, height:13, borderRadius:3, border:"1px solid " + (selected.has(key) ? "var(--sky)" : "var(--line2)"), background: selected.has(key) ? "var(--sky)" : "transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                  {selected.has(key) && <span style={{ color:"var(--ink)", fontSize:9, fontWeight:700 }}>✓</span>}
+                </div>
+                <span style={{ fontSize:11, color: selected.has(key) ? "var(--white)" : "var(--fog2)", fontFamily:"var(--fM)" }}>{c}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ClientMultiSelect({ clients, selected, onChange }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
@@ -2931,7 +2977,7 @@ export default function App() {
   const [expandedClients, setExpandedClients] = useState(new Set());
   const [facFilterTo, setFacFilterTo] = useState("");
   const [facFilterClients, setFacFilterClients] = useState(new Set());
-  const [facFilterEntity, setFacFilterEntity] = useState("");
+  const [facFilterEntity, setFacFilterEntity] = useState(new Set());
   const [collapsedMonths, setCollapsedMonths] = useState(new Set());
   const [expandedPFMonths, setExpandedPFMonths] = useState(new Set());
   const [pfFilterFrom, setPfFilterFrom] = useState("");
@@ -4190,10 +4236,11 @@ export default function App() {
                   if (facFilterFrom && f.date < facFilterFrom) return false;
                   if (facFilterTo && f.date > facFilterTo) return false;
                   if (facFilterClients.size > 0 && !facFilterClients.has(f.client)) return false;
-                  if (facFilterEntity) {
+                  if (facFilterEntity.size > 0) {
                     const ent = factoringData[f.key]?.entity || null;
-                    if (facFilterEntity === "sin" && ent) return false;
-                    if (facFilterEntity !== "sin" && ent !== facFilterEntity) return false;
+                    const sinClasificar = !ent;
+                    const match = [...facFilterEntity].some(fe => fe === "sin" ? sinClasificar : ent === fe);
+                    if (!match) return false;
                   }
                   return true;
                 });
@@ -4368,17 +4415,8 @@ export default function App() {
                         </div>
                         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>CONDICIÓN</span>
-                          <select value={facFilterEntity} onChange={e => setFacFilterEntity(e.target.value)}
-                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color: facFilterEntity ? "var(--white)" : "var(--fog2)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)", minWidth:130 }}>
-                            <option value="">Todas</option>
-                            <option value="Santander">Santander</option>
-                            <option value="Security">Security</option>
-                            <option value="Otro">Otro</option>
-                            <option value="No">No</option>
-                            <option value="Cobrada">Cobrada</option>
-                            <option value="sin">Sin clasificar</option>
-                          </select>
-                          {facFilterEntity && <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 6px" }} onClick={() => setFacFilterEntity("")}>✕</button>}
+                          <EntityMultiSelect selected={facFilterEntity} onChange={setFacFilterEntity} />
+                          {facFilterEntity.size > 0 && <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 6px" }} onClick={() => setFacFilterEntity(new Set())}>✕</button>}
                         </div>
                       </div>
                     </div>
