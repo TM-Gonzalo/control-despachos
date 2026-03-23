@@ -321,7 +321,7 @@ html,body{height:100%;background:var(--ink);color:var(--white);font-family:var(-
 .rail-user strong{display:block;color:var(--white);margin-bottom:2px}
 .rail-logout{font-size:9px;color:var(--fog);cursor:pointer;background:none;border:none;font-family:var(--fM);letter-spacing:1px;margin-top:5px;display:block;padding:0}
 .rail-logout:hover{color:var(--rose)}
-.rail-toggle{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:600;width:18px;height:44px;background:var(--ink2);border:1px solid var(--line);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fog);font-size:10px;transition:left .2s ease,color .12s,background .12s}.rail-toggle:hover{color:var(--white);background:var(--ink3)}.rail-toggle.open{left:210px}
+.rail-toggle{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:350;width:18px;height:44px;background:var(--ink2);border:1px solid var(--line);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fog);font-size:10px;transition:left .2s ease,color .12s,background .12s}.rail-toggle:hover{color:var(--white);background:var(--ink3)}.rail-toggle.open{left:210px}
 .online-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:20px;padding:2px 8px;font-size:8px;letter-spacing:0.8px;color:var(--lime);font-family:var(--fM);margin-bottom:6px}
 .online-dot{width:5px;height:5px;border-radius:50%;background:var(--lime);box-shadow:0 0 4px var(--lime);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
