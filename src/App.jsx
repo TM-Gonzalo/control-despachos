@@ -2915,6 +2915,7 @@ export default function App() {
   const [showVentaDirecta, setShowVentaDirecta] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showDetail, setShowDetail] = useState(null);
+  const [prevView, setPrevView] = useState(null);
   const [showDispatch, setShowDispatch] = useState(null);
   const [showGestion, setShowGestion] = useState(null); // oc
   const [convertTarget, setConvertTarget] = useState(null);
@@ -4466,7 +4467,7 @@ export default function App() {
                                         {(() => {
                                           const oc = enriched.find(o => (o.ocNumber || o.id) === f.ocNumber);
                                           return oc
-                                            ? <span style={{ color:"var(--gold)", cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:2 }} onClick={() => { setView("orders"); setTimeout(() => setShowDetail(oc), 80); }}>{f.ocNumber}</span>
+                                            ? <span style={{ color:"var(--gold)", cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:2 }} onClick={() => { setPrevView(view); setShowDetail(oc); }}>{f.ocNumber}</span>
                                             : <span style={{ color:"var(--gold)" }}>{f.ocNumber}</span>;
                                         })()}
                                       </td>
@@ -4651,7 +4652,7 @@ export default function App() {
                                         {bLbl(s)}
                                       </span>
                                     </td>
-                                    <td style={{ color:"var(--gold)", fontFamily:"var(--fM)", fontWeight:600 }}><span style={{ cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:2 }} onClick={() => { setView("orders"); setTimeout(() => setShowDetail(oc), 80); }}>{oc.ocNumber || oc.id}</span></td>
+                                    <td style={{ color:"var(--gold)", fontFamily:"var(--fM)", fontWeight:600 }}><span style={{ cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:2 }} onClick={() => { setPrevView(view); setShowDetail(oc); }}>{oc.ocNumber || oc.id}</span></td>
                                     <td style={{ color:"var(--fog2)" }}>{oc.date || "—"}</td>
                                     <td style={{ color:"var(--white)" }}>{oc.client}</td>
                                     <td style={{ color: d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>
@@ -4688,7 +4689,7 @@ export default function App() {
                                           </button>
                                         )}
                                         <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => setShowGestion(oc)}>Gestión</button>
-                                        <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
+                                        <button className="btn btn-outline btn-sm" onClick={() => { setPrevView(view); setShowDetail(oc); }}>Detalle →</button>
                                       </div>
                                     </td>
                                   </tr>
@@ -4886,7 +4887,7 @@ export default function App() {
                                       const oc = enriched.find(o => o.id === g.ocId);
                                       return oc
                                         ? <span style={{ cursor:"pointer", textDecoration:"underline", textDecorationStyle:"dotted", textUnderlineOffset:2 }}
-                                            onClick={() => { setView("orders"); setTimeout(() => setShowDetail(oc), 80); }}>{g.ocNumber}</span>
+                                            onClick={() => { setPrevView(view); setShowDetail(oc); }}>{g.ocNumber}</span>
                                         : g.ocNumber;
                                     })()}
                                   </td>
@@ -4990,7 +4991,7 @@ export default function App() {
                             {d !== null && d <= 5 && s !== "closed" && s !== "toinvoice" && <span className="badge b-warn"><Dot c="var(--rose)" />{d < 0 ? "Vencida" : d + "d"}</span>}
                             {pendG > 0 && <span className="badge bdoc-guia-pend"><Dot c="var(--gold)" />{pendG} guia{pendG > 1 ? "s" : ""} sin fac.</span>}
                             <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => setShowGestion(oc)}>Gestión</button>
-                            <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Detalle →</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => { setPrevView(view); setShowDetail(oc); }}>Detalle →</button>
                           </div>
                         </div>
                         <div>
@@ -5065,7 +5066,7 @@ export default function App() {
           currentUserId={user.id}
         />
       )}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => setShowDetail(null)} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} />}
 
       {confirmDel && (
