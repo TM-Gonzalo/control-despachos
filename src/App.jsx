@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
@@ -72,7 +72,7 @@ async function fetchBsale(path, params = {}) {
   return res.json();
 }
 
-async function extractPDF(b64, type, apiKey) {
+async function extractPDF(b64, type) {
   const prompts = {
     oc: `Extrae los datos de esta Orden de Compra. CONTEXTO IMPORTANTE: el receptor de esta OC es siempre "Total Metal" o "Industrial y Comercial Total Metal" (el proveedor). El campo "client" debe ser la empresa DIFERENTE a Total Metal que aparece como emisora o compradora. Busca el nombre del cliente en el encabezado como "Empresa:", "Razon Social:", "De:", "Cliente:", o en el bloque de datos del comprador/emisor. NUNCA uses "Total Metal", "Industrial y Comercial Total Metal" ni variantes como valor de "client". El campo "rut" debe ser el RUT de esa empresa cliente (busca "RUT:", "R.U.T.", "RUT Empresa", "NIT" o similar cerca del nombre del cliente); si no lo encuentras usa null. Para el campo "notes": extrae SOLO informacion operativa relevante como nombre de obra, OT, numero de proyecto, forma de pago, lugar de entrega o referencias internas. NO incluyas texto legal, instrucciones de facturacion electronica, terminos y condiciones ni notas de cumplimiento legal. Si no hay notas operativas relevantes, usa null. Responde SOLO JSON sin texto extra ni backticks: {"ocNumber":"string o null","client":"string","rut":"string o null","date":"YYYY-MM-DD o null","deliveryDate":"YYYY-MM-DD o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"notes":"string o null"}`,
     nc: `Extrae los datos de esta Nota de Credito. El campo "refInvoice" es el numero de la FACTURA a la que se aplica la NC (busca "DOC. REFERENCIA", "Referencia", "Factura N°" o similar). El campo "unit" debe ser la unidad de medida (UN, KG, MT, etc), NO el precio. El precio unitario va en "unitPrice". "netTotal" es el monto NETO (sin IVA) y "total" es el monto total con IVA, ambos como numeros POSITIVOS. IMPORTANTE: todos los valores numericos sin puntos de miles. Responde SOLO JSON sin texto extra ni backticks: {"docNumber":"string o null","docType":"nc","date":"YYYY-MM-DD o null","refInvoice":"string o null","items":[{"desc":"string","unit":"string","qty":0,"unitPrice":0}],"netTotal":0,"total":0}`,
@@ -90,29 +90,12 @@ async function extractPDF(b64, type, apiKey) {
     ]}]
   };
 
-  let res;
-  try {
-    res = await fetch("/api/claude", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    // Si el proxy devuelve 404 (dev local sin Edge Function), usar fallback
-    if (res.status === 404) throw new Error("proxy_not_found");
-  } catch {
-    // Fallback: llamada directa con la key del cliente (solo dev local)
-    if (!apiKey) throw new Error("No hay API Key configurada");
-    res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({ ...payload, model: "claude-sonnet-4-20250514", max_tokens: 4000 })
-    });
-  }
+  const res = await fetch("/api/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error("Error en proxy Claude: " + res.status);
 
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
@@ -694,14 +677,9 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
           { type: "text", text: prompt }
         ]}]
       };
-      let data;
-      try {
-        const r = await fetch("/api/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-        data = await r.json();
-      } catch {
-        const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" }, body: JSON.stringify(payload) });
-        data = await r.json();
-      }
+      const _r = await fetch("/api/claude", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!_r.ok) throw new Error("Error en proxy Claude: " + _r.status);
+      let data = await _r.json();
       const txt = (data.content || []).map(b => b.text || "").join("").trim();
       const clean = txt.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
@@ -884,7 +862,7 @@ function ImportOCModal({ onClose, onSave, apiKey, existingOCs = [] }) {
       setQueue(q => q.map((e, j) => j === i ? { ...e, status: "processing" } : e));
       try {
         const b64 = await toB64(entries[i].file);
-        const d = await extractPDF(b64, "oc", apiKey);
+        const d = await extractPDF(b64, "oc");
         const its = (d.items || []).map((it, k) => ({ ...it, id: k + 1 }));
         setQueue(q => q.map((e, j) => j === i ? { ...e, status: "done", data: { ...d, deliveryDate: "" }, items: its } : e));
       } catch(e) {
@@ -1553,7 +1531,7 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
       const b64 = await toB64(f);
       // Intentar detectar NC primero (si el PDF la menciona) extrayendo con prompt NC
       // Usamos dispatch por defecto; si el resultado tiene docType "nc", usamos ese
-      const d = await extractPDF(b64, "dispatch", apiKey);
+      const d = await extractPDF(b64, "dispatch");
       // Si la IA detectó NC en el campo docType o es una NC (no factura ni guia)
       const isNC = d.docType === "nc";
       if (isNC) {
@@ -3039,7 +3017,7 @@ export default function App() {
   const logout = () => { localStorage.removeItem("dc_user"); setUser(null); setOcs([]); };
   const isAdmin = user?.isAdmin === true;
 
-  const enriched = ocs.map(oc => ({
+  const enriched = useMemo(() => ocs.map(oc => ({
     ...oc,
     items: oc.items.map(it => ({
       ...it,
@@ -3062,7 +3040,7 @@ export default function App() {
         return d.docType === "nc" ? s - qty : s + qty;
       }, 0)
     }))
-  }));
+  })), [ocs]);
 
   const persist = async updated => { setOcs(updated); await saveOCs(updated); };
 
