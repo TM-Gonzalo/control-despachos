@@ -2409,8 +2409,19 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
     doc.setTextColor(120, 120, 120);
     doc.text("GESTIÓN / COMENTARIOS", ml, y);
     y += 5;
+    const addPage = () => {
+      doc.addPage();
+      y = 14;
+      doc.setDrawColor(220,220,220);
+      doc.line(ml, H-12, mr, H-12);
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(7);
+      doc.setTextColor(150,150,150);
+      doc.text("INDUSTRIAL Y COMERCIAL TOTALMETAL LIMITADA  ·  Generado " + new Date().toLocaleDateString("es-CL"), ml, H-7);
+      doc.text("Pág. " + doc.getNumberOfPages(), mr, H-7, { align:"right" });
+    };
     [...gestiones].reverse().forEach(g => {
-      if (y > H - 20) return;
+      if (y > H - 30) addPage();
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
@@ -2420,7 +2431,7 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
       doc.setTextColor(60, 60, 60);
       const lines = doc.splitTextToSize(g.text || "", mr - ml - 4);
       lines.forEach(line => {
-        if (y > H - 20) return;
+        if (y > H - 20) addPage();
         doc.text(line, ml + 2, y);
         y += 4;
       });
@@ -5041,7 +5052,6 @@ export default function App() {
                                   })()}</td>
                                   <td style={{ textAlign:"right", color:"var(--gold)", fontWeight:600 }}>{fmtCLP(g.neto)}</td>
                                   <td>
-                                    <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => { const oc = enriched.find(o => o.id === g.ocId); if (oc) setShowGestion(oc); }}>Gestión</button>
                                   </td>
                                 </tr>
                               ))}
