@@ -2397,6 +2397,37 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(160, 160, 160);
+  // Comentarios de Gestión
+  const gestiones = oc.gestiones || [];
+  if (gestiones.length > 0 && y < H - 40) {
+    y += 4;
+    doc.setDrawColor(220, 220, 220);
+    doc.line(ml, y, mr, y);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text("GESTIÓN / COMENTARIOS", ml, y);
+    y += 5;
+    [...gestiones].reverse().forEach(g => {
+      if (y > H - 20) return;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text((g.author || "") + "  —  " + (g.date || ""), ml, y);
+      y += 4;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(60, 60, 60);
+      const lines = doc.splitTextToSize(g.text || "", mr - ml - 4);
+      lines.forEach(line => {
+        if (y > H - 20) return;
+        doc.text(line, ml + 2, y);
+        y += 4;
+      });
+      y += 2;
+    });
+  }
+
   doc.line(ml, H - 12, mr, H - 12);
   doc.text("INDUSTRIAL Y COMERCIAL TOTALMETAL LIMITADA  ·  Generado " + new Date().toLocaleDateString("es-CL"), ml, H - 7);
   doc.text("Pág. 1", mr, H - 7, { align: "right" });
@@ -3798,7 +3829,7 @@ export default function App() {
                                 <div style={{ display:"flex", gap:5 }}>
                                   <button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Ver</button>
                                   <button className="btn btn-sky btn-sm" onClick={() => setShowDispatch(oc)} >+Doc.</button>
-                                  {s !== "closed" && <button className="btn btn-outline btn-sm" style={{ color:"var(--gold)" }} onClick={() => setShowGestion(oc)}>Gestión</button>}
+                                  {(() => { const gc = (oc.gestiones || []).length; return (<button className="btn btn-outline btn-sm" style={{ color: gc > 0 ? "var(--white)" : "var(--fog)", borderColor: gc > 0 ? "var(--gold)" : "var(--line2)", background: gc > 0 ? "rgba(232,184,75,.12)" : "transparent" }} onClick={() => setShowGestion(oc)}>Gestión{gc > 0 ? " (" + gc + ")" : ""}</button>); })()}
                                   {isAdmin ? <button className="btn btn-rose btn-sm" onClick={() => handleDelOC(oc.id)}>✕</button> : <button className="btn btn-outline btn-sm" style={{ color:"var(--fog)", fontSize:9 }} onClick={() => setConfirmDel({ type:"request", label: oc.ocNumber || oc.id })}>✕</button>}
                                 </div>
                               </td>
