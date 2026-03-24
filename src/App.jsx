@@ -3371,7 +3371,7 @@ export default function App() {
     if (o._ventaDirecta) return false;
     const norm = v => v.toLowerCase().replace(/\./g, "");
     const s = norm(search);
-    const matchesSearch = !s || norm(o.id).includes(s) || norm(o.client).includes(s) || norm(o.ocNumber || "").includes(s);
+    const matchesSearch = !s || norm(o.id).includes(s) || norm(o.client).includes(s) || norm(o.ocNumber || "").includes(s) || (o.items || []).some(it => norm(it.desc || "").includes(s));
     const matchesStatus = fst === "all" || ocStatus(o.items, o.dispatches, o) === fst;
     const matchesPeriod = ordersMonthFilter === "all" || (o.date||"").startsWith(ordersMonthFilter);
     return matchesSearch && matchesStatus && matchesPeriod;
@@ -3655,7 +3655,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="toolbar">
-                    <input className="srch" placeholder="Buscar por ID, cliente, N° OC..." value={search} onChange={e => setSearch(e.target.value)} />
+                    <input className="srch" placeholder="Buscar por ID, cliente, N° OC, ítem..." value={search} onChange={e => setSearch(e.target.value)} />
                     <select className="fsel" value={fst} onChange={e => setFst(e.target.value)}>
                       <option value="all">Todos</option>
                       <option value="open">Abiertos</option>
