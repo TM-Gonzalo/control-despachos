@@ -3189,6 +3189,17 @@ export default function App() {
 
   const persist = async updated => { setOcs(updated); await saveOCs(updated); };
 
+  const handleToggleEnEspera = async (ocId, dispId) => {
+    const updated = ocs.map(o => o.id !== ocId ? o : {
+      ...o,
+      dispatches: (o.dispatches || []).map(d =>
+        d.id !== dispId ? d : { ...d, _enEspera: !d._enEspera }
+      )
+    });
+    setOcs(updated);
+    await saveOCs(updated);
+  };
+
   const handleReopenOC = async (ocId) => {
     const updated = ocs.map(o => o.id !== ocId ? o : { ...o, _closedByMonto: false });
     setOcs(updated);
@@ -4938,7 +4949,7 @@ export default function App() {
                         const price = Number(it.unitPrice || (ocItem ? ocItem.unitPrice : 0) || 0);
                         return s + (Number(it.qty) || 0) * price;
                       }, 0);
-                      pendFacs.push({ ...d, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, dias, tol, atrasada, ocStatusVal });
+                      pendFacs.push({ ...d, neto, client: oc.client, ocNumber: oc.ocNumber || oc.id, ocId: oc.id, dias, tol, atrasada, ocStatusVal, _enEspera: !!d._enEspera });
                     }
                   });
                 });
@@ -5023,9 +5034,23 @@ export default function App() {
                               {pendFacs.map((g, i) => (
                                 <tr key={i}>
                                   <td>
-                                    {g.atrasada
-                                      ? <span className="badge b-toinvoice"><Dot c="var(--rose)" />Atrasada</span>
-                                      : <span className="badge b-closed"><Dot c="var(--lime)" />Ok</span>}
+                                    <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+                                      {g.atrasada
+                                        ? <span className="badge b-toinvoice"><Dot c="var(--rose)" />Atrasada</span>
+                                        : <span className="badge b-closed"><Dot c="var(--lime)" />Ok</span>}
+                                      {isAdmin && (
+                                        <span
+                                          title={g._enEspera ? "Quitar marca En espera" : "Marcar En espera"}
+                                          onClick={() => handleToggleEnEspera(g.ocId, g.id)}
+                                          style={{ cursor:"pointer", fontSize:10, padding:"2px 6px", borderRadius:4,
+                                            background: g._enEspera ? "rgba(232,184,75,.18)" : "transparent",
+                                            border: "1px solid " + (g._enEspera ? "var(--gold)" : "var(--line2)"),
+                                            color: g._enEspera ? "var(--gold)" : "var(--fog)",
+                                            fontFamily:"var(--fM)", letterSpacing:0.5 }}>
+                                          {g._enEspera ? "⏸ Espera" : "⏸"}
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td style={{ color:"var(--violet)", fontFamily:"var(--fM)", fontWeight:600 }}>{g.number || "—"}</td>
                                   <td style={{ color:"var(--fog2)" }}>{g.date || "—"}</td>
