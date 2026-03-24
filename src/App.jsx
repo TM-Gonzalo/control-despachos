@@ -2844,7 +2844,7 @@ function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUs
 
   return (
     <div className="overlay">
-      <div className="modal" style={{ maxWidth:560 }}>
+      <div className="modal" style={{ maxWidth:860 }}>
         <div className="modal-hd">
           <div>
             <div className="modal-title">Gestión</div>
@@ -2865,14 +2865,14 @@ function GestionModal({ oc, gestiones, onClose, onAdd, onDel, isAdmin, currentUs
             </button>
           </div>
         </div>
-        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          {gestiones.length === 0 && <div style={{ color:"var(--fog)", fontSize:12, textAlign:"center", padding:"20px 0" }}>Sin comentarios aún</div>}
+        <div style={{ columns: gestiones.length > 2 ? 2 : 1, gap:10 }}>
+          {gestiones.length === 0 && <div style={{ color:"var(--fog)", fontSize:12, textAlign:"center", padding:"20px 0", columnSpan:"all" }}>Sin comentarios aún</div>}
           {[...gestiones].reverse().map(g => (
-            <div key={g.id} style={{ background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"10px 14px" }}>
+            <div key={g.id} style={{ breakInside:"avoid", background:"var(--ink3)", border:"1px solid var(--line)", borderRadius:6, padding:"10px 14px", marginBottom:10, display:"inline-block", width:"100%" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
-                <div style={{ fontSize:13, color:"var(--white)", lineHeight:1.5, flex:1 }}>{g.text}</div>
-                {isAdmin && (
-                  <button className="btn btn-rose btn-sm" style={{ fontSize:10, padding:"2px 7px" }} onClick={() => onDel(g.id)}>✕</button>
+                <div style={{ fontSize:12, color:"var(--white)", lineHeight:1.6, flex:1, whiteSpace:"pre-wrap" }}>{g.text}</div>
+                {(isAdmin || g.authorId === currentUserId) && (
+                  <button className="btn btn-rose btn-sm" style={{ fontSize:10, padding:"2px 7px", flexShrink:0 }} onClick={() => onDel(g.id)}>✕</button>
                 )}
               </div>
               <div style={{ display:"flex", gap:10, marginTop:6 }}>
@@ -3233,7 +3233,9 @@ export default function App() {
       return { ...o, gestiones: (o.gestiones || []).filter(g => g.id !== gId) };
     });
     await persist(updated);
-    setShowGestion(updated.find(o => o.id === ocId));
+    // Mantener modal abierto con datos actualizados
+    const ocActualizada = updated.find(o => o.id === ocId);
+    if (ocActualizada) setShowGestion(ocActualizada);
   };
   const handleSaveKey = v => { setApiKey(v); localStorage.setItem("dc_apikey", v); };
   const handleSaveOC = async (oc, keepOpen) => {
