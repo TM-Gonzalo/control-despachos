@@ -156,7 +156,7 @@ const daysLeft = d => {
   return Math.round((new Date(d) - new Date(today())) / 86400000);
 };
 const ocStatus = (items, dispatches, oc) => {
-  if (oc && oc._closedByMonto) return "closed";
+  if (oc && oc._closedByMonto !== undefined && oc._closedByMonto !== false) return "closed"; // _closedByMonto puede ser number o true
   if (!items || !items.length) return "open";
   const tot = items.reduce((s, i) => s + Number(i.qty), 0);
   const dis = items.reduce((s, i) => s + Number(i.dispatched || 0), 0);
@@ -720,7 +720,7 @@ function VentaDirectaModal({ onClose, onSave, existingOCs = [], apiKey }) {
         deliveryDate: "",
         notes: "Venta Directa",
         _ventaDirecta: true,
-        _closedByMonto: true,
+        _closedByMonto: 0, // VD — sin monto despachado relevante
         items: [{ id: "it-vd-1", desc: form.desc || "Venta Directa", unit: "UN", qty: 1, unitPrice: neto }],
         dispatches: [{
           id: "disp-vd-" + form.facNumber,
@@ -2255,20 +2255,27 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   // Si está cerrada por monto, mostrar Total OC original y OC Corregida
   if (oc._closedByMonto) {
     const totOriginal = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
+    const anulado = disAmt - totOriginal;
     doc.setFillColor(252, 248, 235);
-    doc.rect(ml, y, mr - ml, 10, "F");
+    doc.rect(ml, y, mr - ml, 14, "F");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
     doc.text("TOTAL OC ORIGINAL", c1 + 2, y + 3.5);
-    doc.text("OC CORREGIDA", c3, y + 3.5);
+    doc.text("DESPACHADO", c2, y + 3.5);
+    doc.text("ANULADO POR CIERRE", c3, y + 3.5);
+    doc.text("OC CORREGIDA", c4, y + 3.5);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text(fmtM(totOriginal), c1 + 2, y + 8);
+    doc.text(fmtM(totOriginal), c1 + 2, y + 9);
+    doc.setTextColor(40, 160, 80);
+    doc.text(fmtM(disAmt), c2, y + 9);
+    doc.setTextColor(200, 80, 80);
+    doc.text(fmtM(anulado), c3, y + 9);
     doc.setTextColor(200, 140, 0);
-    doc.text(fmtM(disAmt), c3, y + 8);
-    y += 14;
+    doc.text(fmtM(disAmt), c4, y + 9);
+    y += 18;
   }
 
   // Notas
@@ -2410,7 +2417,9 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
   const st = ocStatus(oc.items, oc.dispatches, oc);
   const totAmt = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
-  const disAmt = oc._closedByMonto ? totAmt : oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
+  const disAmt = oc._closedByMonto
+    ? (typeof oc._closedByMonto === "number" ? oc._closedByMonto : totAmt)
+    : oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
   const days = daysLeft(oc.deliveryDate);
   const dayColor = (st === "closed" || st === "toinvoice") ? "var(--fog2)" : days !== null && days <= 0 ? "var(--rose)" : days !== null && days <= 5 ? "var(--gold)" : "var(--white)";
   const dispatches = oc.dispatches || [];
@@ -2504,13 +2513,29 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
             )}
           </div>
           <div className="df"><label>AVANCE GLOBAL</label><p style={{ color:pc(pctGlobal) }}>{pctGlobal}%</p></div>
-          <div className="df"><label>MONTO OC</label><p style={{ color: st === "closed" ? "var(--lime)" : "var(--gold)", fontWeight:600 }}>{fmtCLP(totAmt)}</p></div>
+          <div className="df"><label>MONTO OC</label><p style={{ color:"var(--gold)", fontWeight:600 }}>{fmtCLP(totAmt)}</p></div>
           <div className="df"><label>DESPACHADO</label><p style={{ color:"var(--lime)", fontWeight:600 }}>{fmtCLP(disAmt)}</p></div>
-          <div className="df"><label>REMANENTE</label><p style={{ color: (oc._closedByMonto || totAmt === disAmt) ? "var(--fog2)" : "var(--rose)", fontWeight:600 }}>{fmtCLP(totAmt - disAmt)}</p></div>
+          <div className="df"><label>REMANENTE</label><p style={{ color: (oc._closedByMonto || totAmt === disAmt) ? "var(--fog2)" : "var(--rose)", fontWeight:600 }}>{fmtCLP(oc._closedByMonto ? 0 : totAmt - disAmt)}</p></div>
           {oc._closedByMonto && (
-            <div className="df" style={{ gridColumn:"1 / -1", marginTop:4, padding:"7px 10px", background:"rgba(232,184,75,.07)", borderRadius:6, border:"1px solid rgba(232,184,75,.18)", display:"flex", gap:24 }}>
-              <div><label style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>TOTAL OC ORIGINAL</label><p style={{ color:"var(--fog2)", fontWeight:600, marginTop:2 }}>{fmtCLP(oc.items.reduce((s,i) => s + Number(i.qty)*Number(i.unitPrice),0))}</p></div>
-              <div><label style={{ fontSize:9, color:"var(--gold)", letterSpacing:1 }}>OC CORREGIDA</label><p style={{ color:"var(--gold)", fontWeight:600, marginTop:2 }}>{fmtCLP(disAmt)}</p></div>
+            <div style={{ gridColumn:"1 / -1", marginTop:4, padding:"10px 14px", background:"rgba(232,184,75,.07)", borderRadius:6, border:"1px solid rgba(232,184,75,.18)" }}>
+              <div style={{ display:"flex", gap:28, flexWrap:"wrap" }}>
+                <div>
+                  <label style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>TOTAL OC ORIGINAL</label>
+                  <p style={{ color:"var(--fog2)", fontWeight:600, marginTop:2 }}>{fmtCLP(totAmt)}</p>
+                </div>
+                <div>
+                  <label style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>DESPACHADO</label>
+                  <p style={{ color:"var(--lime)", fontWeight:600, marginTop:2 }}>{fmtCLP(disAmt)}</p>
+                </div>
+                <div>
+                  <label style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>ANULADO POR CIERRE</label>
+                  <p style={{ color:"var(--rose)", fontWeight:600, marginTop:2 }}>-{fmtCLP(totAmt - disAmt)}</p>
+                </div>
+                <div>
+                  <label style={{ fontSize:9, color:"var(--gold)", letterSpacing:1 }}>OC CORREGIDA</label>
+                  <p style={{ color:"var(--gold)", fontWeight:600, marginTop:2 }}>{fmtCLP(disAmt)}</p>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -3133,12 +3158,15 @@ export default function App() {
   };
 
   const handleCerrarPorMonto = async (ocId) => {
-    const updated = ocs.map(o => o.id !== ocId ? o : { ...o, _closedByMonto: true });
+    // Calcular monto despachado real al momento del cierre
+    const oc = enriched.find(o => o.id === ocId);
+    const montoReal = oc ? oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0) : 0;
+    const updated = ocs.map(o => o.id !== ocId ? o : { ...o, _closedByMonto: Math.round(montoReal) });
     setOcs(updated);
     await saveOCs(updated);
     const ocActualizada = updated.find(o => o.id === ocId);
     if (showDetail && showDetail.id === ocId && ocActualizada) {
-      setShowDetail({ ...ocActualizada, _closedByMonto: true });
+      setShowDetail({ ...ocActualizada });
     }
     notify("OC cerrada por monto ✓");
   };
