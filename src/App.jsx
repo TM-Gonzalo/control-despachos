@@ -2252,6 +2252,24 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
   doc.setTextColor(rem0 > 0 ? 200 : 40, rem0 > 0 ? 80 : 160, 80);
   doc.text(fmtM(rem0), c4, y);
   y += 7;
+  // Si está cerrada por monto, mostrar Total OC original y OC Corregida
+  if (oc._closedByMonto) {
+    const totOriginal = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
+    doc.setFillColor(252, 248, 235);
+    doc.rect(ml, y, mr - ml, 10, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 120, 120);
+    doc.text("TOTAL OC ORIGINAL", c1 + 2, y + 3.5);
+    doc.text("OC CORREGIDA", c3, y + 3.5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text(fmtM(totOriginal), c1 + 2, y + 8);
+    doc.setTextColor(200, 140, 0);
+    doc.text(fmtM(disAmt), c3, y + 8);
+    y += 14;
+  }
 
   // Notas
   if (oc.notes) {
@@ -2381,7 +2399,7 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
 }
 
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto, onReopenOC }) {
   const canDelGD = isAdmin || (userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl");
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
@@ -2459,6 +2477,12 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                 Cerrar OC
               </button>
             )}
+            {isAdmin && oc._closedByMonto && (
+              <button className="btn btn-sm" style={{ background:"var(--rose)", color:"#fff", fontWeight:700, fontSize:9, padding:"3px 10px", borderRadius:5, border:"none", cursor:"pointer" }}
+                onClick={() => { if (window.confirm("¿Reabrir esta OC? Se eliminará el cierre por monto.")) onReopenOC && onReopenOC(oc.id); }}>
+                Reabrir OC
+              </button>
+            )}
             <span className={"badge " + bCls(st)}><Dot c={st === "open" ? "var(--sky)" : st === "partial" ? "var(--gold)" : st === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(st)}</span>
             <button className="btn btn-outline btn-sm" style={{ fontSize:9, color:"var(--fog2)", borderColor:"var(--line2)", padding:"3px 8px" }}
               onClick={() => generateOCPDF(oc, st, totAmt, disAmt, pctGlobal)}
@@ -2483,6 +2507,12 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
           <div className="df"><label>MONTO OC</label><p style={{ color: st === "closed" ? "var(--lime)" : "var(--gold)", fontWeight:600 }}>{fmtCLP(totAmt)}</p></div>
           <div className="df"><label>DESPACHADO</label><p style={{ color:"var(--lime)", fontWeight:600 }}>{fmtCLP(disAmt)}</p></div>
           <div className="df"><label>REMANENTE</label><p style={{ color: (oc._closedByMonto || totAmt === disAmt) ? "var(--fog2)" : "var(--rose)", fontWeight:600 }}>{fmtCLP(totAmt - disAmt)}</p></div>
+          {oc._closedByMonto && (
+            <div className="df" style={{ gridColumn:"1 / -1", marginTop:4, padding:"7px 10px", background:"rgba(232,184,75,.07)", borderRadius:6, border:"1px solid rgba(232,184,75,.18)", display:"flex", gap:24 }}>
+              <div><label style={{ fontSize:9, color:"var(--fog)", letterSpacing:1 }}>TOTAL OC ORIGINAL</label><p style={{ color:"var(--fog2)", fontWeight:600, marginTop:2 }}>{fmtCLP(oc.items.reduce((s,i) => s + Number(i.qty)*Number(i.unitPrice),0))}</p></div>
+              <div><label style={{ fontSize:9, color:"var(--gold)", letterSpacing:1 }}>OC CORREGIDA</label><p style={{ color:"var(--gold)", fontWeight:600, marginTop:2 }}>{fmtCLP(disAmt)}</p></div>
+            </div>
+          )}
         </div>
         {oc.notes && <div style={{ fontSize:11, color:"var(--fog2)", marginBottom:16, padding:"9px 12px", background:"var(--ink3)", borderRadius:6, borderLeft:"2px solid var(--line2)" }}>📝 {oc.notes}</div>}
         <div className="slbl">Remanente por item</div>
@@ -3090,6 +3120,17 @@ export default function App() {
   })), [ocs]);
 
   const persist = async updated => { setOcs(updated); await saveOCs(updated); };
+
+  const handleReopenOC = async (ocId) => {
+    const updated = ocs.map(o => o.id !== ocId ? o : { ...o, _closedByMonto: false });
+    setOcs(updated);
+    await saveOCs(updated);
+    const ocActualizada = updated.find(o => o.id === ocId);
+    if (showDetail && showDetail.id === ocId && ocActualizada) {
+      setShowDetail({ ...ocActualizada, _closedByMonto: false });
+    }
+    showToast("OC reabierta");
+  };
 
   const handleCerrarPorMonto = async (ocId) => {
     const updated = ocs.map(o => o.id !== ocId ? o : { ...o, _closedByMonto: true });
@@ -5109,7 +5150,7 @@ export default function App() {
           currentUserId={user.id}
         />
       )}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} onReopenOC={handleReopenOC} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} />}
 
       {confirmDel && (
