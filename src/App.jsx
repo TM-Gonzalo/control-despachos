@@ -2417,9 +2417,10 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
   const st = ocStatus(oc.items, oc.dispatches, oc);
   const totAmt = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
+  const disAmtReal = oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
   const disAmt = oc._closedByMonto
-    ? (typeof oc._closedByMonto === "number" ? oc._closedByMonto : totAmt)
-    : oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
+    ? (typeof oc._closedByMonto === "number" ? oc._closedByMonto : disAmtReal)
+    : disAmtReal;
   const days = daysLeft(oc.deliveryDate);
   const dayColor = (st === "closed" || st === "toinvoice") ? "var(--fog2)" : days !== null && days <= 0 ? "var(--rose)" : days !== null && days <= 5 ? "var(--gold)" : "var(--white)";
   const dispatches = oc.dispatches || [];
