@@ -3675,50 +3675,255 @@ export default function App() {
                       })}
                     </div>
                   )}
-                  <div className="kpis" style={{ marginBottom:18, gridTemplateColumns:"repeat(5,1fr)" }}>
-                    {[
-                      { n:enrichedNoVD.length, lbl:"Total OCs", c:"var(--white)" },
-                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="open").length, lbl:"Abiertas", c:"var(--sky)" },
-                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="partial").length, lbl:"Parciales", c:"var(--gold)" },
-                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="toinvoice").length, lbl:"Por Facturar", c:"var(--rose)" },
-                      { n:enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="closed").length, lbl:"Cerradas", c:"var(--lime)" },
-                    ].map(({n,lbl,c}) => (
-                      <div key={lbl} className="kpi"><div className="kpi-bar" style={{ background:c }} /><div className="kpi-n" style={{ color:c }}>{n}</div><div className="kpi-l">{lbl}</div></div>
-                    ))}
-                  </div>
-                  <div className="slbl">Todas las Ordenes</div>
-                  {loading ? <div className="pgload"><div className="spin" /> Cargando...</div> :
-                    enrichedNoVD.length === 0 ? <div className="empty"><div className="empty-ico">◈</div><p>Sin ordenes aun.<br />Ingresa tu API Key e importa una OC desde PDF.</p></div> :
-                    <div className="tbl-card" style={{ maxHeight:520, overflowY:"auto", scrollbarWidth:"thin", scrollbarColor:"var(--line2) transparent" }}>
-                      <table>
-                        <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--ink3)" }}><tr><SortTh label="OC ID" col="ocNumber" state={dashSort} setState={setDashSort} /><SortTh label="CLIENTE" col="client" state={dashSort} setState={setDashSort} /><SortTh label="ENTREGA" col="deliveryDate" state={dashSort} setState={setDashSort} /><SortTh label="AVANCE" col="pct" state={dashSort} setState={setDashSort} /><SortTh label="ESTADO" col="status" state={dashSort} setState={setDashSort} /><th /></tr></thead>
-                        <tbody>{applySort(enrichedNoVD, dashSort).map(oc => {
-                          const s = ocStatus(oc.items, oc.dispatches, oc);
-                          const tot = oc.items.reduce((a, i) => a + Number(i.qty), 0);
-                          const dis = oc.items.reduce((a, i) => a + Number(i.dispatched || 0), 0);
-                          const pct = tot > 0 ? Math.min(100, Math.round(dis / tot * 100)) : 0;
-                          const d = daysLeft(oc.deliveryDate);
-                          const lastFacDate = (s === "closed" || s === "toinvoice") ? (() => { const facs = (oc.dispatches || []).filter(x => (x.docType === "factura" && x.date) || (x.docType === "guia" && x.invoiceDate)).map(x => x.docType === "factura" ? x.date : x.invoiceDate).sort((a,b) => b.localeCompare(a)); return facs.length ? facs[0] : null; })() : null;
-                          const entregaDisplay = lastFacDate || oc.deliveryDate || "—";
-                          return (
-                            <tr key={oc.id}>
-                              <td style={{ color:"var(--gold)", fontWeight:600 }}>{oc.ocNumber || oc.id}</td>
-                              <td style={{ fontWeight:500 }}>{oc.client}</td>
-                              <td style={{ color: s === "closed" ? "var(--fog2)" : d !== null && d <= 0 ? "var(--rose)" : d !== null && d <= 5 ? "var(--gold)" : "var(--fog2)" }}>{entregaDisplay}</td>
-                              <td style={{ minWidth:120 }}>
-                                <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                                  <div className="pbar-wrap" style={{ flex:1 }}><div className="pbar" style={{ width:pct + "%", background:pc(pct) }} /></div>
-                                  <span style={{ fontSize:10, color:"var(--fog)", width:28 }}>{pct}%</span>
+                  {/* ── ALERTAS ACCIONABLES ─────────────────────────────── */}
+                  {(() => {
+                    const sinMovimiento = enrichedNoVD.filter(o => {
+                      if (ocStatus(o.items,o.dispatches,o) === "closed") return false;
+                      const allDates = (o.dispatches||[]).map(d => d.date||d.invoiceDate||"").filter(Boolean).sort((a,b)=>b.localeCompare(a));
+                      const lastDate = allDates[0] || o.date || "";
+                      if (!lastDate) return true;
+                      const days = Math.floor((Date.now() - new Date(lastDate)) / 86400000);
+                      return days > 30;
+                    });
+                    const sinFacturar = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o) === "toinvoice");
+                    const altoMonto = enrichedNoVD.filter(o => {
+                      if (ocStatus(o.items,o.dispatches,o) === "closed") return false;
+                      const total = o.items ? o.items.reduce((s,i) => s+(Number(i.qty)||0)*(Number(i.unitPrice)||0),0) : 0;
+                      const dispatched = (o.dispatches||[]).reduce((s,d) => s+(d.netTotal||d.total||0),0);
+                      return total > 0 && (dispatched/total) >= 0.8;
+                    });
+                    const now = new Date();
+                    const mesActual = now.getMonth();
+                    const anioActual = now.getFullYear();
+                    const facsMes = [];
+                    const seenFacs = new Set();
+                    enrichedNoVD.forEach(o => {
+                      (o.dispatches||[]).forEach(d => {
+                        const num = d.docType==="factura" ? d.number : d.docType==="guia" ? d.invoiceNumber : null;
+                        const fecha = d.docType==="factura" ? d.date : d.docType==="guia" ? d.invoiceDate : null;
+                        if (num && fecha && !seenFacs.has(String(num))) {
+                          const fd = new Date(fecha);
+                          if (fd.getMonth()===mesActual && fd.getFullYear()===anioActual) {
+                            seenFacs.add(String(num));
+                            facsMes.push({ num, fecha, monto: d.netTotal||d.total||0 });
+                          }
+                        }
+                      });
+                    });
+                    const montoMes = facsMes.reduce((s,f)=>s+f.monto,0);
+                    const fmtM = n => n >= 1000000 ? "$"+Math.round(n/1000000)+"M" : n >= 1000 ? "$"+Math.round(n/1000)+"K" : "$"+n;
+                    const cardBase = { display:"flex",flexDirection:"column",gap:4,background:"var(--ink2)",border:"1px solid var(--line)",borderRadius:9,padding:"14px 16px",borderLeft:"3px solid",flex:1 };
+                    const nStyle = { fontFamily:"var(--fS)",fontSize:32,lineHeight:1,fontWeight:700 };
+                    const lblStyle = { fontSize:11,opacity:0.8,marginTop:2 };
+                    const ctaStyle = { fontSize:11,fontWeight:600,marginTop:8,cursor:"pointer",opacity:0.75,background:"none",border:"none",padding:0,textAlign:"left" };
+                    return (
+                      <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:18 }}>
+                        <div style={{...cardBase,borderLeftColor:"var(--rose)",background:"rgba(255,77,109,.06)"}}>
+                          <div style={{...nStyle,color:"var(--rose)"}}>{sinMovimiento.length}</div>
+                          <div style={{...lblStyle,color:"var(--rose)"}}>OCs sin movimiento +30d</div>
+                          <button style={{...ctaStyle,color:"var(--rose)"}} onClick={()=>setView("orders")}>Ver OCs →</button>
+                        </div>
+                        <div style={{...cardBase,borderLeftColor:"var(--gold)",background:"rgba(255,185,0,.06)"}}>
+                          <div style={{...nStyle,color:"var(--gold)"}}>{sinFacturar.length}</div>
+                          <div style={{...lblStyle,color:"var(--gold)"}}>GDs sin facturar</div>
+                          <button style={{...ctaStyle,color:"var(--gold)"}} onClick={()=>setView("pendfac")}>Ver GDs →</button>
+                        </div>
+                        <div style={{...cardBase,borderLeftColor:"#f97316",background:"rgba(249,115,22,.06)"}}>
+                          <div style={{...nStyle,color:"#f97316"}}>{altoMonto.length}</div>
+                          <div style={{...lblStyle,color:"#f97316)"}}>OCs al +80% de monto</div>
+                          <button style={{...ctaStyle,color:"#f97316"}} onClick={()=>setView("orders")}>Ver OCs →</button>
+                        </div>
+                        <div style={{...cardBase,borderLeftColor:"var(--lime)",background:"rgba(100,220,100,.06)"}}>
+                          <div style={{...nStyle,color:"var(--lime)"}}>{facsMes.length}</div>
+                          <div style={{...lblStyle,color:"var(--lime)"}}>Facturas emitidas este mes</div>
+                          <div style={{...ctaStyle,color:"var(--lime)",cursor:"default"}}>{fmtM(montoMes)} neto</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── SEMÁFORO + ACTIVIDAD ────────────────────────────────── */}
+                  {(() => {
+                    const cardSt = { background:"var(--ink2)",border:"1px solid var(--line)",borderRadius:9,padding:"14px 16px",flex:1 };
+                    const hdSt = { fontSize:9,letterSpacing:"2.5px",color:"var(--fog)",marginBottom:10,fontFamily:"var(--fM)" };
+                    const rowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13 };
+                    const lastRowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",fontSize:13 };
+                    const dotSt = c => ({ width:10,height:10,borderRadius:"50%",background:c,flexShrink:0 });
+                    const badgeSt = (bg,col) => ({ fontSize:11,padding:"2px 8px",borderRadius:999,background:bg,color:col,flexShrink:0 });
+                    const barWrap = { width:52,height:4,background:"var(--line2)",borderRadius:3,flexShrink:0 };
+                    const barFill = (pct,c) => ({ height:4,borderRadius:3,background:c,width:Math.min(100,pct)+"%"});
+
+                    // Calcular semáforo para top 5 OCs activas
+                    const activeOCs = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o) !== "closed");
+                    const ocWithMeta = activeOCs.map(o => {
+                      const s = ocStatus(o.items,o.dispatches,o);
+                      const tot = o.items ? o.items.reduce((a,i)=>a+Number(i.qty||0),0) : 0;
+                      const dis = o.items ? o.items.reduce((a,i)=>a+Number(i.dispatched||0),0) : 0;
+                      const pct = tot > 0 ? Math.min(100,Math.round(dis/tot*100)) : 0;
+                      const ocTotal = o.items ? o.items.reduce((a,i)=>a+(Number(i.qty)||0)*(Number(i.unitPrice)||0),0) : 0;
+                      const dispTotal = (o.dispatches||[]).reduce((a,d)=>a+(d.netTotal||d.total||0),0);
+                      const montoPct = ocTotal > 0 ? Math.round(dispTotal/ocTotal*100) : 0;
+                      const allDates = (o.dispatches||[]).map(d=>d.date||d.invoiceDate||"").filter(Boolean).sort((a,b)=>b.localeCompare(a));
+                      const lastDate = allDates[0]||o.date||"";
+                      const diasSinMov = lastDate ? Math.floor((Date.now()-new Date(lastDate))/86400000) : 999;
+                      let semColor = "var(--lime)"; let badgeTxt = "Al día"; let badgeBg = "rgba(100,220,100,.15)"; let badgeCol = "var(--lime)";
+                      if (diasSinMov > 30) { semColor="var(--rose)"; badgeTxt="Sin movim."; badgeBg="rgba(255,77,109,.15)"; badgeCol="var(--rose)"; }
+                      else if (s==="toinvoice") { semColor="var(--gold)"; badgeTxt="Pend. fact."; badgeBg="rgba(255,185,0,.15)"; badgeCol="var(--gold)"; }
+                      else if (montoPct >= 80) { semColor="var(--gold)"; badgeTxt=montoPct+"% monto"; badgeBg="rgba(255,185,0,.15)"; badgeCol="var(--gold)"; }
+                      return { ...o, s, pct, semColor, badgeTxt, badgeBg, badgeCol };
+                    }).sort((a,b) => {
+                      const order = { "var(--rose)":0, "var(--gold)":1, "var(--lime)":2 };
+                      return (order[a.semColor]??3)-(order[b.semColor]??3);
+                    }).slice(0,5);
+
+                    // Actividad reciente: últimos 8 despachos/facturas ordenados por fecha
+                    const feedItems = [];
+                    enrichedNoVD.forEach(o => {
+                      (o.dispatches||[]).forEach(d => {
+                        const date = d.date||d.invoiceDate||"";
+                        if (d.docType==="guia" && d.number) feedItems.push({ type:"GD", num:d.number, client:o.client, date, user:d.registeredBy||"", oc:o.ocNumber||o.id });
+                        if (d.docType==="factura" && d.number) feedItems.push({ type:"F", num:d.number, client:o.client, date, user:d.registeredBy||"", oc:o.ocNumber||o.id });
+                        if (d.docType==="guia" && d.invoiceNumber) feedItems.push({ type:"F_link", num:d.invoiceNumber, client:o.client, date:d.invoiceDate||"", user:d.registeredBy||"", oc:o.ocNumber||o.id, gdNum:d.number });
+                      });
+                    });
+                    feedItems.sort((a,b)=>b.date.localeCompare(a.date));
+                    const feed = feedItems.slice(0,6);
+                    const feedIconSt = (bg,col) => ({ width:26,height:26,borderRadius:"50%",background:bg,color:col,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,flexShrink:0,fontFamily:"var(--fM)" });
+                    const fmtDate = d => { if(!d) return ""; try { const dt=new Date(d); const now=new Date(); const diff=Math.floor((now-dt)/86400000); if(diff===0) return "Hoy"; if(diff===1) return "Ayer"; return d.slice(5,10).replace("-","/"); } catch(e){return d;} };
+
+                    return (
+                      <div style={{ display:"flex",gap:12,marginBottom:18 }}>
+                        <div style={cardSt}>
+                          <div style={hdSt}>OCS POR ESTADO — SEMÁFORO</div>
+                          {ocWithMeta.length === 0 && <div style={{color:"var(--fog)",fontSize:12}}>Sin OCs activas</div>}
+                          {ocWithMeta.map((o,i) => (
+                            <div key={o.id} style={i<ocWithMeta.length-1 ? rowSt : lastRowSt}>
+                              <div style={dotSt(o.semColor)} />
+                              <span style={{fontWeight:600,minWidth:90,fontSize:12,color:"var(--gold)"}}>{(o.ocNumber||o.id||"").slice(0,12)}</span>
+                              <span style={{flex:1,color:"var(--fog)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12}}>{o.client}</span>
+                              <div style={barWrap}><div style={barFill(o.pct, o.semColor)} /></div>
+                              <span style={badgeSt(o.badgeBg,o.badgeCol)}>{o.badgeTxt}</span>
+                              <button className="btn btn-outline btn-sm" onClick={()=>setShowDetail(o)}>Ver</button>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{...cardSt,minWidth:320,maxWidth:360}}>
+                          <div style={hdSt}>ACTIVIDAD RECIENTE</div>
+                          {feed.length===0 && <div style={{color:"var(--fog)",fontSize:12}}>Sin actividad reciente</div>}
+                          {feed.map((item,i) => (
+                            <div key={i} style={i<feed.length-1 ? {...rowSt,gap:8} : {...lastRowSt,gap:8}}>
+                              {item.type==="GD" && <div style={feedIconSt("rgba(56,140,255,.18)","var(--sky)")}>GD</div>}
+                              {item.type==="F" && <div style={feedIconSt("rgba(100,220,100,.18)","var(--lime)")}>F</div>}
+                              {item.type==="F_link" && <div style={feedIconSt("rgba(100,220,100,.18)","var(--lime)")}>F</div>}
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                  {item.user && <span style={{fontWeight:600}}>{item.user} </span>}
+                                  <span style={{color:"var(--fog)"}}>
+                                    {item.type==="GD" && `despachó GD${item.num} — ${item.client}`}
+                                    {item.type==="F" && `factura F${item.num} — ${item.client}`}
+                                    {item.type==="F_link" && `vinculó F${item.num} a GD${item.gdNum}`}
+                                  </span>
                                 </div>
-                              </td>
-                              <td><span className={"badge " + bCls(s)}><Dot c={s === "open" ? "var(--sky)" : s === "partial" ? "var(--gold)" : s === "toinvoice" ? "var(--rose)" : "var(--lime)"} />{bLbl(s)}</span></td>
-                              <td><button className="btn btn-outline btn-sm" onClick={() => setShowDetail(oc)}>Ver</button></td>
-                            </tr>
-                          );
-                        })}</tbody>
-                      </table>
-                    </div>
-                  }
+                                <div style={{fontSize:10,color:"var(--fog2)",marginTop:1}}>{fmtDate(item.date)}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── RESUMEN POR CLIENTE + DESPACHO MES ─────────────────── */}
+                  {(() => {
+                    const cardSt = { background:"var(--ink2)",border:"1px solid var(--line)",borderRadius:9,padding:"14px 16px",flex:1 };
+                    const hdSt = { fontSize:9,letterSpacing:"2.5px",color:"var(--fog)",marginBottom:10,fontFamily:"var(--fM)" };
+                    const rowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13 };
+                    const lastRowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",fontSize:13 };
+                    const badgeSt = (bg,col) => ({ fontSize:11,padding:"2px 8px",borderRadius:999,background:bg,color:col,flexShrink:0 });
+                    const fmtM = n => n >= 1000000 ? "$"+Math.round(n/1000000)+"M" : n >= 1000 ? "$"+Math.round(n/1000)+"K" : "$"+n;
+
+                    // Resumen por cliente
+                    const clientMap = {};
+                    enrichedNoVD.forEach(o => {
+                      if (!clientMap[o.client]) clientMap[o.client] = { ocs:0, pendiente:0, hayRojo:false, hayAmarillo:false };
+                      clientMap[o.client].ocs++;
+                      const s = ocStatus(o.items,o.dispatches,o);
+                      const ocTotal = o.items ? o.items.reduce((a,i)=>a+(Number(i.qty)||0)*(Number(i.unitPrice)||0),0) : 0;
+                      const dispTotal = (o.dispatches||[]).reduce((a,d)=>a+(d.netTotal||d.total||0),0);
+                      if (s!=="closed") clientMap[o.client].pendiente += (ocTotal - dispTotal);
+                      const allDates = (o.dispatches||[]).map(d=>d.date||d.invoiceDate||"").filter(Boolean).sort((a,b)=>b.localeCompare(a));
+                      const diasSinMov = allDates[0] ? Math.floor((Date.now()-new Date(allDates[0]))/86400000) : 999;
+                      if (s!=="closed" && diasSinMov>30) clientMap[o.client].hayRojo = true;
+                      if (s==="toinvoice") clientMap[o.client].hayAmarillo = true;
+                    });
+                    const clientes = Object.entries(clientMap).sort((a,b)=>b[1].pendiente-a[1].pendiente).slice(0,5);
+
+                    // KPIs del mes
+                    const now2 = new Date();
+                    const mesActual = now2.getMonth(); const anioActual = now2.getFullYear();
+                    let gdsMes=0, facsMes2=0, pendFacMes=0, montoFacMes=0, montoPendMes=0;
+                    const seenGDs=new Set(); const seenFs=new Set();
+                    enrichedNoVD.forEach(o => {
+                      (o.dispatches||[]).forEach(d => {
+                        if (d.docType==="guia" && d.number && d.date) {
+                          const fd=new Date(d.date);
+                          if (fd.getMonth()===mesActual && fd.getFullYear()===anioActual && !seenGDs.has(String(d.number))) {
+                            seenGDs.add(String(d.number)); gdsMes++;
+                            if (!d.invoiceNumber) pendFacMes++;
+                          }
+                        }
+                        const fnum = d.docType==="factura" ? d.number : d.docType==="guia" ? d.invoiceNumber : null;
+                        const fdate = d.docType==="factura" ? d.date : d.docType==="guia" ? d.invoiceDate : null;
+                        if (fnum && fdate && !seenFs.has(String(fnum))) {
+                          const fd=new Date(fdate);
+                          if (fd.getMonth()===mesActual && fd.getFullYear()===anioActual) {
+                            seenFs.add(String(fnum)); facsMes2++;
+                            montoFacMes += d.netTotal||d.total||0;
+                          }
+                        }
+                      });
+                    });
+                    const clientesActivos = new Set(enrichedNoVD.filter(o=>ocStatus(o.items,o.dispatches,o)!=="closed").map(o=>o.client)).size;
+                    const ocsAbiertas = enrichedNoVD.filter(o=>ocStatus(o.items,o.dispatches,o)!=="closed").length;
+                    const miniSt = { background:"var(--ink3)",border:"1px solid var(--line)",borderRadius:7,padding:"9px 12px",flex:1 };
+                    const miniN = col => ({ fontFamily:"var(--fS)",fontSize:22,fontWeight:700,color:col,lineHeight:1 });
+                    const miniL = { fontSize:10,color:"var(--fog)",marginTop:3,fontFamily:"var(--fM)",letterSpacing:"1px" };
+                    const dataRowSt = { display:"flex",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:12 };
+                    const lastDataRow = { display:"flex",alignItems:"center",padding:"7px 0",fontSize:12 };
+
+                    return (
+                      <div style={{ display:"flex",gap:12,marginBottom:4 }}>
+                        <div style={cardSt}>
+                          <div style={hdSt}>RESUMEN POR CLIENTE</div>
+                          {clientes.map(([client, meta], i) => {
+                            let bg = "rgba(100,220,100,.12)"; let col = "var(--lime)";
+                            if (meta.hayRojo) { bg="rgba(255,77,109,.12)"; col="var(--rose)"; }
+                            else if (meta.hayAmarillo) { bg="rgba(255,185,0,.12)"; col="var(--gold)"; }
+                            return (
+                              <div key={client} style={i<clientes.length-1?rowSt:lastRowSt}>
+                                <span style={{flex:1,fontWeight:600,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client}</span>
+                                <span style={badgeSt(bg,col)}>{meta.ocs} OC{meta.ocs!==1?"s":""}</span>
+                                <span style={{fontSize:11,color:"var(--fog)",minWidth:80,textAlign:"right"}}>{meta.pendiente>0?fmtM(meta.pendiente)+" pend.":"Al día"}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{...cardSt,minWidth:320,maxWidth:360}}>
+                          <div style={hdSt}>DESPACHO DEL MES</div>
+                          <div style={{ display:"flex",gap:8,marginBottom:14 }}>
+                            <div style={miniSt}><div style={miniN("var(--lime)")}>{gdsMes}</div><div style={miniL}>GDS EMITIDAS</div></div>
+                            <div style={miniSt}><div style={miniN("var(--sky)")}>{facsMes2}</div><div style={miniL}>FACTURADAS</div></div>
+                            <div style={miniSt}><div style={miniN("var(--rose)")}>{pendFacMes}</div><div style={miniL}>PENDIENTES</div></div>
+                          </div>
+                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>Monto facturado</span><span style={{marginLeft:"auto",fontWeight:600}}>{fmtM(montoFacMes)}</span></div>
+                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>Clientes activos</span><span style={{marginLeft:"auto",fontWeight:600}}>{clientesActivos}</span></div>
+                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>OCs abiertas</span><span style={{marginLeft:"auto",fontWeight:600}}>{ocsAbiertas}</span></div>
+                          <div style={lastDataRow}><span style={{color:"var(--fog)"}}>Total OCs</span><span style={{marginLeft:"auto",fontWeight:600}}>{enrichedNoVD.length}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="dash-copyright">© {new Date().getFullYear()} TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS</div>
                 </>
               )}
