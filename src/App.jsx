@@ -5012,33 +5012,120 @@ export default function App() {
                   <>
                     <div className="ph">
                       <div><div className="pt">Reporte <em>Pend. Despachar</em></div><div className="pm">OCS SIN COMPLETAR</div></div>
-                      {pendingOCs.length > 0 && <button className="btn btn-outline" onClick={() => {
-                        const rows = [];
-                        sorted.forEach(oc => {
-                          const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
-                          const dis = oc.items.reduce((a, i) => a + Number(i.dispatched||0) * Number(i.unitPrice), 0);
-                          const pct = tot > 0 ? Math.round(dis/tot*100) : 0;
-                          const s = ocStatus(oc.items, oc.dispatches, oc);
-                          rows.push({
-                            "Estado": bLbl(s),
-                            "N° OC": oc.ocNumber || oc.id,
-                            "Fecha OC": oc.date || "",
-                            "Cliente": oc.client,
-                            "Fecha Entrega": oc.deliveryDate || "",
-                            "Monto OC": tot,
-                            "Despachado": dis,
-                            "Remanente": tot - dis,
-                            "Avance %": pct + "%",
-                            "Guias": (oc.dispatches||[]).filter(x=>x.docType==="guia").length,
-                            "Facturas": (oc.dispatches||[]).filter(x=>x.docType==="factura").length,
+                      {pendingOCs.length > 0 && <div style={{display:"flex",gap:8}}>
+                        <button className="btn btn-outline" onClick={() => {
+                          // ── PDF ──────────────────────────────────────────────
+                          const fmtN = n => "$" + Number(n).toLocaleString("es-CL");
+                          const totalPendPDF = sorted.reduce((s,oc) => {
+                            const tot = oc.items.reduce((a,i)=>a+Number(i.qty)*Number(i.unitPrice),0);
+                            const dis = oc.items.reduce((a,i)=>a+Number(i.dispatched||0)*Number(i.unitPrice),0);
+                            return s + (tot - dis);
+                          }, 0);
+                          const nAbiertas = sorted.filter(o=>ocStatus(o.items,o.dispatches,o)==="open").length;
+                          const nParciales = sorted.filter(o=>ocStatus(o.items,o.dispatches,o)==="partial").length;
+                          const rows = sorted.map(oc => {
+                            const s = ocStatus(oc.items,oc.dispatches,oc);
+                            const tot = oc.items.reduce((a,i)=>a+Number(i.qty)*Number(i.unitPrice),0);
+                            const dis = oc.items.reduce((a,i)=>a+Number(i.dispatched||0)*Number(i.unitPrice),0);
+                            const pct = tot > 0 ? Math.round(dis/tot*100) : 0;
+                            const nGDs = (oc.dispatches||[]).filter(x=>x.docType==="guia").length;
+                            return { s, oc, tot, dis, rem: tot-dis, pct, nGDs };
                           });
-                        });
-                        const ws = XLSX.utils.json_to_sheet(rows);
-                        ws["!cols"] = [12,14,12,28,14,14,14,14,10,8,10].map(w => ({ wch: w }));
-                        const wb = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(wb, ws, "Pend Despachar");
-                        XLSX.writeFile(wb, "Reporte_Pend_Despachar_" + today() + ".xlsx");
-                      }}>↓ Exportar Excel</button>}
+                          const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Pend. Despachar</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:28px}
+  h1{font-size:20px;font-weight:700;margin-bottom:2px}
+  .sub{font-size:11px;color:#666;margin-bottom:20px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+  .kpi{border:1px solid #ddd;border-radius:6px;padding:12px 14px}
+  .kpi label{font-size:9px;letter-spacing:1.5px;color:#888;display:block;margin-bottom:4px}
+  .kpi strong{font-size:22px;font-weight:700}
+  .kpi.red strong{color:#dc2626}
+  .kpi.blue strong{color:#2563eb}
+  .kpi.amber strong{color:#d97706}
+  table{width:100%;border-collapse:collapse;font-size:10px}
+  thead tr{background:#111;color:#fff}
+  thead th{padding:7px 8px;text-align:left;font-weight:600;font-size:9px;letter-spacing:.5px}
+  thead th.r{text-align:right}
+  tbody tr:nth-child(even){background:#f9f9f9}
+  tbody td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:middle}
+  tbody td.r{text-align:right}
+  .badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:600}
+  .badge.open{background:#dbeafe;color:#1d4ed8}
+  .badge.partial{background:#fef3c7;color:#92400e}
+  .pbar{height:5px;background:#e5e7eb;border-radius:3px;min-width:50px}
+  .pbar-fill{height:5px;border-radius:3px}
+  .footer{margin-top:20px;font-size:9px;color:#aaa;text-align:center}
+</style></head><body>
+<h1>Reporte Pendientes de Despachar</h1>
+<div class="sub">INDUSTRIAL Y COMERCIAL TOTALMETAL LIMITADA &nbsp;·&nbsp; Generado el ${new Date().toLocaleDateString("es-CL", {day:"2-digit",month:"2-digit",year:"numeric"})}</div>
+<div class="kpis">
+  <div class="kpi red"><label>OCS PENDIENTES</label><strong>${sorted.length}</strong></div>
+  <div class="kpi blue"><label>ABIERTAS</label><strong>${nAbiertas}</strong></div>
+  <div class="kpi amber"><label>PARCIALES</label><strong>${nParciales}</strong></div>
+  <div class="kpi red"><label>MONTO PENDIENTE</label><strong style="font-size:15px">${fmtN(totalPendPDF)}</strong></div>
+</div>
+<table>
+  <thead><tr>
+    <th>ESTADO</th><th>N° OC</th><th>CLIENTE</th><th>FECHA OC</th><th class="r">AVANCE</th><th class="r">MONTO OC</th><th class="r">DESPACHADO</th><th class="r">REMANENTE</th><th class="r">GDs</th>
+  </tr></thead>
+  <tbody>
+    ${rows.map(({s,oc,tot,dis,rem,pct,nGDs})=>`<tr>
+      <td><span class="badge ${s==="open"?"open":"partial"}">${bLbl(s)}</span></td>
+      <td style="font-weight:600">${oc.ocNumber||oc.id}</td>
+      <td>${oc.client}</td>
+      <td style="color:#666">${oc.date||"—"}</td>
+      <td class="r">
+        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <div class="pbar" style="width:50px"><div class="pbar-fill" style="width:${pct}%;background:${pct>=80?"#16a34a":pct>=40?"#d97706":"#2563eb"}"></div></div>
+          <span>${pct}%</span>
+        </div>
+      </td>
+      <td class="r" style="color:#444">${fmtN(tot)}</td>
+      <td class="r" style="color:#16a34a">${fmtN(dis)}</td>
+      <td class="r" style="font-weight:600;color:#dc2626">${fmtN(rem)}</td>
+      <td class="r" style="color:#7c3aed">${nGDs}</td>
+    </tr>`).join("")}
+  </tbody>
+</table>
+<div class="footer">TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS · ${new Date().getFullYear()}</div>
+</body></html>`;
+                          const w = window.open("","_blank");
+                          w.document.write(html);
+                          w.document.close();
+                          w.focus();
+                          setTimeout(() => { w.print(); }, 400);
+                        }}>↓ PDF</button>
+                        <button className="btn btn-outline" onClick={() => {
+                          const rows = [];
+                          sorted.forEach(oc => {
+                            const tot = oc.items.reduce((a, i) => a + Number(i.qty) * Number(i.unitPrice), 0);
+                            const dis = oc.items.reduce((a, i) => a + Number(i.dispatched||0) * Number(i.unitPrice), 0);
+                            const pct = tot > 0 ? Math.round(dis/tot*100) : 0;
+                            const s = ocStatus(oc.items, oc.dispatches, oc);
+                            rows.push({
+                              "Estado": bLbl(s),
+                              "N° OC": oc.ocNumber || oc.id,
+                              "Fecha OC": oc.date || "",
+                              "Cliente": oc.client,
+                              "Fecha Entrega": oc.deliveryDate || "",
+                              "Monto OC": tot,
+                              "Despachado": dis,
+                              "Remanente": tot - dis,
+                              "Avance %": pct + "%",
+                              "Guias": (oc.dispatches||[]).filter(x=>x.docType==="guia").length,
+                              "Facturas": (oc.dispatches||[]).filter(x=>x.docType==="factura").length,
+                            });
+                          });
+                          const ws = XLSX.utils.json_to_sheet(rows);
+                          ws["!cols"] = [12,14,12,28,14,14,14,14,10,8,10].map(w => ({ wch: w }));
+                          const wb = XLSX.utils.book_new();
+                          XLSX.utils.book_append_sheet(wb, ws, "Pend Despachar");
+                          XLSX.writeFile(wb, "Reporte_Pend_Despachar_" + today() + ".xlsx");
+                        }}>↓ Excel</button>
+                      </div>}
                     </div>
                     <div className="kpis" style={{ marginBottom:22 }}>
                       {[
