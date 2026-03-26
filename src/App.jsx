@@ -3812,9 +3812,11 @@ export default function App() {
                           {feed.length===0 && <div style={{color:"var(--fog)",fontSize:12}}>Sin actividad reciente</div>}
                           {feed.map((item,i) => (
                             <div key={i} style={i<feed.length-1 ? {...rowSt,gap:8} : {...lastRowSt,gap:8}}>
-                              {item.type==="GD" && <div style={feedIconSt("rgba(56,140,255,.18)","var(--sky)")}>GD</div>}
-                              {item.type==="F" && <div style={feedIconSt("rgba(100,220,100,.18)","var(--lime)")}>F</div>}
-                              {item.type==="F_link" && <div style={feedIconSt("rgba(100,220,100,.18)","var(--lime)")}>F</div>}
+                              {(() => {
+                                const inicial = item.user ? item.user.split("@")[0].charAt(0).toUpperCase() : (item.type==="F"||item.type==="F_link"?"F":"G");
+                                const [bg, col] = (item.type==="GD") ? ["rgba(56,140,255,.18)","var(--sky)"] : ["rgba(100,220,100,.18)","var(--lime)"];
+                                return <div style={feedIconSt(bg,col)}>{inicial}</div>;
+                              })()}
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                                   {item.user && <span style={{fontWeight:600}}>{item.user} </span>}
