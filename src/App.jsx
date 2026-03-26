@@ -1383,7 +1383,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
             invoiceDate: date,
             netTotal,
             total,
-            items: facItems
+            items: facItems,
+            registeredBy: createdBy
           });
           setLastSaved({ num, docType: "factura", linked: true });
           setSavedCount(c => c + 1);
@@ -1401,7 +1402,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
         netTotal,
         total,
         items: facItems,
-        gdNumber: gdNumber || null
+        gdNumber: gdNumber || null,
+        registeredBy: createdBy
       });
       setLastSaved({ num, docType: "factura", linked: !!gdNumber });
       setSavedCount(c => c + 1);
@@ -1510,7 +1512,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
             invoiceNumber: d.docNumber || "",
             invoiceDate: d.date || today(),
             netTotal: d.netTotal || 0,
-            total: d.total || 0
+            total: d.total || 0,
+            registeredBy: createdBy
           });
           setLastSaved({ num: d.docNumber, docType: "factura", linked: true });
           setSavedCount(c => c + 1);
@@ -1581,7 +1584,8 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
             invoiceNumber: d.docNumber || "",
             invoiceDate: d.date || today(),
             netTotal: d.netTotal || 0,
-            total: d.total || 0
+            total: d.total || 0,
+            registeredBy: createdBy
           });
           setLastSaved({ num: d.docNumber, docType: "factura", linked: true });
           setSavedCount(c => c + 1);
@@ -5453,7 +5457,7 @@ export default function App() {
         />
       )}
         {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} onReopenOC={handleReopenOC} />}
-      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} />}
+      {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} createdBy={user?.email} />}
 
       {confirmDel && (
         <div className="overlay" onClick={e => e.target === e.currentTarget && setConfirmDel(null)}>
