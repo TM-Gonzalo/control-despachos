@@ -5363,6 +5363,7 @@ export default function App() {
   .badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:600}
   .badge.ok{background:#dcfce7;color:#166534}
   .badge.late{background:#fee2e2;color:#991b1b}
+  .badge.wait{background:#fef3c7;color:#92400e}
   .footer{margin-top:20px;font-size:9px;color:#aaa;text-align:center}
 </style></head><body>
 <h1>Reporte Pendientes de Facturar</h1>
@@ -5375,11 +5376,12 @@ export default function App() {
 </div>
 <table>
   <thead><tr>
-    <th>ESTADO</th><th>N° GD</th><th>FECHA GD</th><th>DÍAS</th><th>CLIENTE</th><th>N° OC</th><th>ESTADO OC</th><th class="r">MONTO NETO</th>
+    <th>ESTADO</th><th>ESPERA</th><th>N° GD</th><th>FECHA GD</th><th>DÍAS</th><th>CLIENTE</th><th>N° OC</th><th>ESTADO OC</th><th class="r">MONTO NETO</th>
   </tr></thead>
   <tbody>
     ${pendFacs.map(g=>`<tr>
       <td><span class="badge ${g.atrasada?"late":"ok"}">${g.atrasada?"Atrasada":"Ok"}</span></td>
+      <td>${g._enEspera?"<span class=\\'badge wait\\'>⏸ Espera</span>":"\'—\'"}</td>
       <td style="font-weight:600">${g.number||"—"}</td>
       <td style="color:#666">${g.date||"—"}</td>
       <td style="color:${g.atrasada?"#dc2626":"#111"};font-weight:${g.atrasada?"600":"400"}">${g.dias!==null?g.dias+"d":"—"}</td>
