@@ -3930,6 +3930,85 @@ export default function App() {
                     );
                   })()}
 
+
+                  {/* ── GDs PENDIENTES + ESTADO OCs ────────────────────────── */}
+                  {(() => {
+                    const cardSt = { background:"var(--ink2)",border:"1px solid var(--line)",borderRadius:9,padding:"14px 16px",flex:1 };
+                    const hdSt = { fontSize:9,letterSpacing:"2.5px",color:"var(--fog)",marginBottom:10,fontFamily:"var(--fM)" };
+                    const rowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:12 };
+                    const lastRowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",fontSize:12 };
+                    const badgeSt = (bg,col) => ({ fontSize:11,padding:"2px 8px",borderRadius:999,background:bg,color:col,flexShrink:0 });
+
+                    // D — GDs más antiguas sin facturar
+                    const gdsPendientes = [];
+                    enrichedNoVD.forEach(o => {
+                      (o.dispatches||[]).forEach(d => {
+                        if (d.docType !== "guia" || !d.number) return;
+                        const yaFacturada = (o.dispatches||[]).some(f =>
+                          (f.docType==="factura" && f.gdNumber && String(f.gdNumber).replace(/[\s.]/g,"") === String(d.number).replace(/[\s.]/g,"")) ||
+                          (f.docType==="guia" && f.invoiceNumber && String(f._gdLink))
+                        ) || d.invoiceNumber;
+                        if (yaFacturada) return;
+                        const fecha = d.date || "";
+                        const dias = fecha ? Math.floor((Date.now() - new Date(fecha)) / 86400000) : 0;
+                        gdsPendientes.push({ gdNum: d.number, client: o.client, ocNum: o.ocNumber||o.id, dias, fecha });
+                      });
+                    });
+                    gdsPendientes.sort((a,b) => b.dias - a.dias);
+                    const topGDs = gdsPendientes.slice(0,6);
+
+                    // E — Estado OCs
+                    const nOpen = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="open").length;
+                    const nPartial = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="partial").length;
+                    const nToInvoice = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="toinvoice").length;
+                    const nClosed = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="closed").length;
+                    const total = enrichedNoVD.length || 1;
+                    const barRow = (label, n, color) => {
+                      const pct = Math.round(n / total * 100);
+                      return (
+                        <div style={{ marginBottom:12 }}>
+                          <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:12 }}>
+                            <span style={{ color:"var(--fog)" }}>{label}</span>
+                            <span style={{ fontWeight:600,color }}>{n} <span style={{ color:"var(--fog)",fontWeight:400,fontSize:11 }}>({pct}%)</span></span>
+                          </div>
+                          <div style={{ height:6,background:"var(--line2)",borderRadius:3 }}>
+                            <div style={{ height:6,borderRadius:3,background:color,width:pct+"%" }} />
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div style={{ display:"flex",gap:12,marginBottom:18 }}>
+                        <div style={cardSt}>
+                          <div style={hdSt}>GDs MÁS ANTIGUAS SIN FACTURAR</div>
+                          {topGDs.length === 0 && <div style={{color:"var(--fog)",fontSize:12}}>Sin GDs pendientes</div>}
+                          {topGDs.map((g,i) => (
+                            <div key={g.gdNum} style={i<topGDs.length-1?rowSt:lastRowSt}>
+                              <span style={{fontWeight:600,color:"var(--gold)",minWidth:60}}>GD{g.gdNum}</span>
+                              <span style={{flex:1,color:"var(--fog)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.client}</span>
+                              <span style={{color:"var(--fog2)",fontSize:11,minWidth:60,textAlign:"right"}}>{g.ocNum}</span>
+                              <span style={badgeSt(g.dias > 14 ? "rgba(255,77,109,.15)" : "rgba(255,185,0,.15)", g.dias > 14 ? "var(--rose)" : "var(--gold)")}>
+                                {g.dias}d
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{...cardSt,minWidth:320,maxWidth:360}}>
+                          <div style={hdSt}>ESTADO DE OCs — {total} TOTAL</div>
+                          {barRow("Abiertas", nOpen, "var(--sky)")}
+                          {barRow("Parciales", nPartial, "var(--gold)")}
+                          {barRow("Por facturar", nToInvoice, "var(--rose)")}
+                          {barRow("Cerradas", nClosed, "var(--lime)")}
+                          <div style={{ borderTop:"1px solid var(--line)",marginTop:8,paddingTop:10,display:"flex",justifyContent:"space-between",fontSize:12 }}>
+                            <span style={{color:"var(--fog)"}}>Tasa de cierre</span>
+                            <span style={{fontWeight:600,color:"var(--lime)"}}>{Math.round(nClosed/total*100)}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="dash-copyright">© {new Date().getFullYear()} TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS</div>
                 </>
               )}
