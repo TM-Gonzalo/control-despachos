@@ -3796,7 +3796,7 @@ export default function App() {
                     const fmtDate = d => { if(!d) return ""; try { const dt=new Date(d); const now=new Date(); const diff=Math.floor((now-dt)/86400000); if(diff===0) return "Hoy"; if(diff===1) return "Ayer"; return d.slice(5,10).replace("-","/"); } catch(e){return d;} };
 
                     return (
-                      <div style={{ display:"flex",gap:12,marginBottom:18 }}>
+                      <div style={{ display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12,marginBottom:12 }}>
                         <div style={cardSt}>
                           <div style={hdSt}>OCS POR ESTADO — SEMÁFORO</div>
                           {ocWithMeta.length === 0 && <div style={{color:"var(--fog)",fontSize:12}}>Sin OCs activas</div>}
@@ -3811,7 +3811,7 @@ export default function App() {
                             </div>
                           ))}
                         </div>
-                        <div style={{...cardSt,minWidth:320,maxWidth:360}}>
+                        <div style={cardSt}>
                           <div style={hdSt}>ACTIVIDAD RECIENTE</div>
                           {feed.length===0 && <div style={{color:"var(--fog)",fontSize:12}}>Sin actividad reciente</div>}
                           {feed.map((item,i) => (
@@ -3835,39 +3835,63 @@ export default function App() {
                             </div>
                           ))}
                         </div>
+                        <div style={cardSt}>
+                          <div style={hdSt}>RESUMEN POR CLIENTE</div>
+                          {(() => {
+                            const fmtM = n => n >= 1000000 ? "$"+Math.round(n/1000000)+"M" : n >= 1000 ? "$"+Math.round(n/1000)+"K" : "$"+n;
+                            const badgeSt2 = (bg,col) => ({ fontSize:11,padding:"2px 8px",borderRadius:999,background:bg,color:col,flexShrink:0 });
+                            const clientMap = {};
+                            enrichedNoVD.forEach(o => {
+                              if (!clientMap[o.client]) clientMap[o.client] = { ocs:0, pendiente:0, hayRojo:false, hayAmarillo:false };
+                              clientMap[o.client].ocs++;
+                              const s = ocStatus(o.items,o.dispatches,o);
+                              const ocTotal = o.items ? o.items.reduce((a,i)=>a+(Number(i.qty)||0)*(Number(i.unitPrice)||0),0) : 0;
+                              const dispTotal = (o.dispatches||[]).reduce((a,d)=>a+(d.netTotal||d.total||0),0);
+                              if (s!=="closed") clientMap[o.client].pendiente += (ocTotal - dispTotal);
+                              const allDates = (o.dispatches||[]).map(d=>d.date||d.invoiceDate||"").filter(Boolean).sort((a,b)=>b.localeCompare(a));
+                              const diasSinMov = allDates[0] ? Math.floor((Date.now()-new Date(allDates[0]))/86400000) : 999;
+                              if (s!=="closed" && diasSinMov>30) clientMap[o.client].hayRojo = true;
+                              if (s==="toinvoice") clientMap[o.client].hayAmarillo = true;
+                            });
+                            const clientes2 = Object.entries(clientMap).sort((a,b)=>b[1].pendiente-a[1].pendiente).slice(0,5);
+                            const rowSt2 = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:12 };
+                            const lastRowSt2 = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",fontSize:12 };
+                            return clientes2.map(([client, meta], i) => {
+                              let bg = "rgba(100,220,100,.12)"; let col = "var(--lime)";
+                              if (meta.hayRojo) { bg="rgba(255,77,109,.12)"; col="var(--rose)"; }
+                              else if (meta.hayAmarillo) { bg="rgba(255,185,0,.12)"; col="var(--gold)"; }
+                              return (
+                                <div key={client} style={i<clientes2.length-1?rowSt2:lastRowSt2}>
+                                  <span style={{flex:1,fontWeight:600,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client}</span>
+                                  <span style={badgeSt2(bg,col)}>{meta.ocs} OC{meta.ocs!==1?"s":""}</span>
+                                  <span style={{fontSize:11,color:"var(--fog)",minWidth:80,textAlign:"right"}}>{meta.pendiente>0?fmtM(meta.pendiente)+" pend.":"Al día"}</span>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
                       </div>
                     );
                   })()}
 
-                  {/* ── RESUMEN POR CLIENTE + DESPACHO MES ─────────────────── */}
+                  {/* ── DESPACHO MES + GDs PENDIENTES + ESTADO OCs ──────── */}
                   {(() => {
                     const cardSt = { background:"var(--ink2)",border:"1px solid var(--line)",borderRadius:9,padding:"14px 16px",flex:1 };
                     const hdSt = { fontSize:9,letterSpacing:"2.5px",color:"var(--fog)",marginBottom:10,fontFamily:"var(--fM)" };
-                    const rowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:13 };
-                    const lastRowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",fontSize:13 };
+                    const rowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:12 };
+                    const lastRowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",fontSize:12 };
                     const badgeSt = (bg,col) => ({ fontSize:11,padding:"2px 8px",borderRadius:999,background:bg,color:col,flexShrink:0 });
+                    const miniSt = { background:"var(--ink3)",border:"1px solid var(--line)",borderRadius:7,padding:"9px 12px",flex:1 };
+                    const miniN = col => ({ fontFamily:"var(--fS)",fontSize:22,fontWeight:700,color:col,lineHeight:1 });
+                    const miniL = { fontSize:10,color:"var(--fog)",marginTop:3,fontFamily:"var(--fM)",letterSpacing:"1px" };
+                    const dataRowSt = { display:"flex",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:12 };
+                    const lastDataRow = { display:"flex",alignItems:"center",padding:"7px 0",fontSize:12 };
                     const fmtM = n => n >= 1000000 ? "$"+Math.round(n/1000000)+"M" : n >= 1000 ? "$"+Math.round(n/1000)+"K" : "$"+n;
 
-                    // Resumen por cliente
-                    const clientMap = {};
-                    enrichedNoVD.forEach(o => {
-                      if (!clientMap[o.client]) clientMap[o.client] = { ocs:0, pendiente:0, hayRojo:false, hayAmarillo:false };
-                      clientMap[o.client].ocs++;
-                      const s = ocStatus(o.items,o.dispatches,o);
-                      const ocTotal = o.items ? o.items.reduce((a,i)=>a+(Number(i.qty)||0)*(Number(i.unitPrice)||0),0) : 0;
-                      const dispTotal = (o.dispatches||[]).reduce((a,d)=>a+(d.netTotal||d.total||0),0);
-                      if (s!=="closed") clientMap[o.client].pendiente += (ocTotal - dispTotal);
-                      const allDates = (o.dispatches||[]).map(d=>d.date||d.invoiceDate||"").filter(Boolean).sort((a,b)=>b.localeCompare(a));
-                      const diasSinMov = allDates[0] ? Math.floor((Date.now()-new Date(allDates[0]))/86400000) : 999;
-                      if (s!=="closed" && diasSinMov>30) clientMap[o.client].hayRojo = true;
-                      if (s==="toinvoice") clientMap[o.client].hayAmarillo = true;
-                    });
-                    const clientes = Object.entries(clientMap).sort((a,b)=>b[1].pendiente-a[1].pendiente).slice(0,5);
-
-                    // KPIs del mes
+                    // Despacho del mes
                     const now2 = new Date();
                     const mesActual = now2.getMonth(); const anioActual = now2.getFullYear();
-                    let gdsMes=0, facsMes2=0, pendFacMes=0, montoFacMes=0, montoPendMes=0;
+                    let gdsMes=0, facsMes2=0, pendFacMes=0, montoFacMes=0;
                     const seenGDs=new Set(); const seenFs=new Set();
                     enrichedNoVD.forEach(o => {
                       (o.dispatches||[]).forEach(d => {
@@ -3891,82 +3915,34 @@ export default function App() {
                     });
                     const clientesActivos = new Set(enrichedNoVD.filter(o=>ocStatus(o.items,o.dispatches,o)!=="closed").map(o=>o.client)).size;
                     const ocsAbiertas = enrichedNoVD.filter(o=>ocStatus(o.items,o.dispatches,o)!=="closed").length;
-                    const miniSt = { background:"var(--ink3)",border:"1px solid var(--line)",borderRadius:7,padding:"9px 12px",flex:1 };
-                    const miniN = col => ({ fontFamily:"var(--fS)",fontSize:22,fontWeight:700,color:col,lineHeight:1 });
-                    const miniL = { fontSize:10,color:"var(--fog)",marginTop:3,fontFamily:"var(--fM)",letterSpacing:"1px" };
-                    const dataRowSt = { display:"flex",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:12 };
-                    const lastDataRow = { display:"flex",alignItems:"center",padding:"7px 0",fontSize:12 };
 
-                    return (
-                      <div style={{ display:"flex",gap:12,marginBottom:4 }}>
-                        <div style={cardSt}>
-                          <div style={hdSt}>RESUMEN POR CLIENTE</div>
-                          {clientes.map(([client, meta], i) => {
-                            let bg = "rgba(100,220,100,.12)"; let col = "var(--lime)";
-                            if (meta.hayRojo) { bg="rgba(255,77,109,.12)"; col="var(--rose)"; }
-                            else if (meta.hayAmarillo) { bg="rgba(255,185,0,.12)"; col="var(--gold)"; }
-                            return (
-                              <div key={client} style={i<clientes.length-1?rowSt:lastRowSt}>
-                                <span style={{flex:1,fontWeight:600,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{client}</span>
-                                <span style={badgeSt(bg,col)}>{meta.ocs} OC{meta.ocs!==1?"s":""}</span>
-                                <span style={{fontSize:11,color:"var(--fog)",minWidth:80,textAlign:"right"}}>{meta.pendiente>0?fmtM(meta.pendiente)+" pend.":"Al día"}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div style={{...cardSt,minWidth:320,maxWidth:360}}>
-                          <div style={hdSt}>DESPACHO DEL MES</div>
-                          <div style={{ display:"flex",gap:8,marginBottom:14 }}>
-                            <div style={miniSt}><div style={miniN("var(--lime)")}>{gdsMes}</div><div style={miniL}>GDS EMITIDAS</div></div>
-                            <div style={miniSt}><div style={miniN("var(--sky)")}>{facsMes2}</div><div style={miniL}>FACTURADAS</div></div>
-                            <div style={miniSt}><div style={miniN("var(--rose)")}>{pendFacMes}</div><div style={miniL}>PENDIENTES</div></div>
-                          </div>
-                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>Monto facturado</span><span style={{marginLeft:"auto",fontWeight:600}}>{fmtM(montoFacMes)}</span></div>
-                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>Clientes activos</span><span style={{marginLeft:"auto",fontWeight:600}}>{clientesActivos}</span></div>
-                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>OCs abiertas</span><span style={{marginLeft:"auto",fontWeight:600}}>{ocsAbiertas}</span></div>
-                          <div style={lastDataRow}><span style={{color:"var(--fog)"}}>Total OCs</span><span style={{marginLeft:"auto",fontWeight:600}}>{enrichedNoVD.length}</span></div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-
-                  {/* ── GDs PENDIENTES + ESTADO OCs ────────────────────────── */}
-                  {(() => {
-                    const cardSt = { background:"var(--ink2)",border:"1px solid var(--line)",borderRadius:9,padding:"14px 16px",flex:1 };
-                    const hdSt = { fontSize:9,letterSpacing:"2.5px",color:"var(--fog)",marginBottom:10,fontFamily:"var(--fM)" };
-                    const rowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid var(--line)",fontSize:12 };
-                    const lastRowSt = { display:"flex",alignItems:"center",gap:10,padding:"7px 0",fontSize:12 };
-                    const badgeSt = (bg,col) => ({ fontSize:11,padding:"2px 8px",borderRadius:999,background:bg,color:col,flexShrink:0 });
-
-                    // D — GDs más antiguas sin facturar
+                    // GDs pendientes
                     const gdsPendientes = [];
                     enrichedNoVD.forEach(o => {
                       (o.dispatches||[]).forEach(d => {
                         if (d.docType !== "guia" || !d.number) return;
                         const yaFacturada = (o.dispatches||[]).some(f =>
-                          (f.docType==="factura" && f.gdNumber && String(f.gdNumber).replace(/[\s.]/g,"") === String(d.number).replace(/[\s.]/g,"")) ||
-                          (f.docType==="guia" && f.invoiceNumber && String(f._gdLink))
+                          (f.docType==="factura" && f.gdNumber && String(f.gdNumber).replace(/[\s.]/g,"") === String(d.number).replace(/[\s.]/g,""))
                         ) || d.invoiceNumber;
                         if (yaFacturada) return;
                         const fecha = d.date || "";
                         const dias = fecha ? Math.floor((Date.now() - new Date(fecha)) / 86400000) : 0;
-                        gdsPendientes.push({ gdNum: d.number, client: o.client, ocNum: o.ocNumber||o.id, dias, fecha });
+                        gdsPendientes.push({ gdNum: d.number, client: o.client, ocNum: o.ocNumber||o.id, dias });
                       });
                     });
                     gdsPendientes.sort((a,b) => b.dias - a.dias);
-                    const topGDs = gdsPendientes.slice(0,6);
+                    const topGDs = gdsPendientes.slice(0,5);
 
-                    // E — Estado OCs
+                    // Estado OCs
                     const nOpen = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="open").length;
                     const nPartial = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="partial").length;
                     const nToInvoice = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="toinvoice").length;
                     const nClosed = enrichedNoVD.filter(o => ocStatus(o.items,o.dispatches,o)==="closed").length;
-                    const total = enrichedNoVD.length || 1;
+                    const totalOCs = enrichedNoVD.length || 1;
                     const barRow = (label, n, color) => {
-                      const pct = Math.round(n / total * 100);
+                      const pct = Math.round(n / totalOCs * 100);
                       return (
-                        <div style={{ marginBottom:12 }}>
+                        <div style={{ marginBottom:10 }} key={label}>
                           <div style={{ display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:12 }}>
                             <span style={{ color:"var(--fog)" }}>{label}</span>
                             <span style={{ fontWeight:600,color }}>{n} <span style={{ color:"var(--fog)",fontWeight:400,fontSize:11 }}>({pct}%)</span></span>
@@ -3979,7 +3955,19 @@ export default function App() {
                     };
 
                     return (
-                      <div style={{ display:"flex",gap:12,marginBottom:18 }}>
+                      <div style={{ display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:12,marginBottom:12 }}>
+                        <div style={cardSt}>
+                          <div style={hdSt}>DESPACHO DEL MES</div>
+                          <div style={{ display:"flex",gap:8,marginBottom:14 }}>
+                            <div style={miniSt}><div style={miniN("var(--lime)")}>{gdsMes}</div><div style={miniL}>GDS EMITIDAS</div></div>
+                            <div style={miniSt}><div style={miniN("var(--sky)")}>{facsMes2}</div><div style={miniL}>FACTURADAS</div></div>
+                            <div style={miniSt}><div style={miniN("var(--rose)")}>{pendFacMes}</div><div style={miniL}>PENDIENTES</div></div>
+                          </div>
+                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>Monto facturado</span><span style={{marginLeft:"auto",fontWeight:600}}>{fmtM(montoFacMes)}</span></div>
+                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>Clientes activos</span><span style={{marginLeft:"auto",fontWeight:600}}>{clientesActivos}</span></div>
+                          <div style={dataRowSt}><span style={{color:"var(--fog)"}}>OCs abiertas</span><span style={{marginLeft:"auto",fontWeight:600}}>{ocsAbiertas}</span></div>
+                          <div style={lastDataRow}><span style={{color:"var(--fog)"}}>Total OCs</span><span style={{marginLeft:"auto",fontWeight:600}}>{enrichedNoVD.length}</span></div>
+                        </div>
                         <div style={cardSt}>
                           <div style={hdSt}>GDs MÁS ANTIGUAS SIN FACTURAR</div>
                           {topGDs.length === 0 && <div style={{color:"var(--fog)",fontSize:12}}>Sin GDs pendientes</div>}
@@ -3987,29 +3975,29 @@ export default function App() {
                             <div key={g.gdNum} style={i<topGDs.length-1?rowSt:lastRowSt}>
                               <span style={{fontWeight:600,color:"var(--gold)",minWidth:60}}>GD{g.gdNum}</span>
                               <span style={{flex:1,color:"var(--fog)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.client}</span>
-                              <span style={{color:"var(--fog2)",fontSize:11,minWidth:60,textAlign:"right"}}>{g.ocNum}</span>
+                              <span style={{fontSize:11,color:"var(--fog2)",minWidth:55,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.ocNum}</span>
                               <span style={badgeSt(g.dias > 14 ? "rgba(255,77,109,.15)" : "rgba(255,185,0,.15)", g.dias > 14 ? "var(--rose)" : "var(--gold)")}>
                                 {g.dias}d
                               </span>
                             </div>
                           ))}
                         </div>
-                        <div style={{...cardSt,minWidth:320,maxWidth:360}}>
-                          <div style={hdSt}>ESTADO DE OCs — {total} TOTAL</div>
+                        <div style={cardSt}>
+                          <div style={hdSt}>ESTADO DE OCs — {totalOCs} TOTAL</div>
                           {barRow("Abiertas", nOpen, "var(--sky)")}
                           {barRow("Parciales", nPartial, "var(--gold)")}
                           {barRow("Por facturar", nToInvoice, "var(--rose)")}
                           {barRow("Cerradas", nClosed, "var(--lime)")}
-                          <div style={{ borderTop:"1px solid var(--line)",marginTop:8,paddingTop:10,display:"flex",justifyContent:"space-between",fontSize:12 }}>
+                          <div style={{ borderTop:"1px solid var(--line)",marginTop:6,paddingTop:10,display:"flex",justifyContent:"space-between",fontSize:12 }}>
                             <span style={{color:"var(--fog)"}}>Tasa de cierre</span>
-                            <span style={{fontWeight:600,color:"var(--lime)"}}>{Math.round(nClosed/total*100)}%</span>
+                            <span style={{fontWeight:600,color:"var(--lime)"}}>{Math.round(nClosed/totalOCs*100)}%</span>
                           </div>
                         </div>
                       </div>
                     );
                   })()}
 
-                  <div className="dash-copyright">© {new Date().getFullYear()} TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS</div>
+                                    <div className="dash-copyright">© {new Date().getFullYear()} TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS</div>
                 </>
               )}
 
