@@ -3073,7 +3073,7 @@ export default function App() {
   const [ordSort, setOrdSort] = useState({ col: null, dir: 1 });
   const [pendSort, setPendSort] = useState({ col: "date", dir: 1 });
   const [factoringSort, setFactoringSort] = useState({ col: "facNumber", dir: -1 });
-  const [toinvoiceSort, setToinvoiceSort] = useState({ col: "date", dir: 1 });
+  const [toinvoiceSort, setToinvoiceSort] = useState({ col: "number", dir: -1 });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [expandedClients, setExpandedClients] = useState(new Set());
