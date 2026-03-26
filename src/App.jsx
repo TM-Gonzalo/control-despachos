@@ -5333,27 +5333,93 @@ export default function App() {
                     <div className="ph">
                       <div><div className="pt">Reporte <em>Pend. Facturar</em></div><div className="pm">GUÍAS SIN FACTURA VINCULADA</div></div>
                       {pendFacs.length > 0 && (
-                        <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
-                          onClick={() => {
-                            const rows = pendFacs.map(g => ({
-                              "Estado": g.atrasada ? "Atrasada" : "Ok",
-                              "N° GD": g.number || "",
-                              "Fecha GD": g.date || "",
-                              "Días": g.dias !== null ? g.dias : "",
-                              "Tolerancia": g.tol + "d",
-                              "Cliente": g.client || "",
-                              "OC": g.ocNumber || "",
-                              "Estado OC": { open:"Abierta", partial:"Parcial", toinvoice:"Por Facturar", closed:"Cerrada" }[g.ocStatusVal] || "",
-                              "Monto Neto": g.neto || 0,
-                            }));
-                            const ws = XLSX.utils.json_to_sheet(rows);
-                            ws["!cols"] = [{ wch:10 },{ wch:10 },{ wch:12 },{ wch:8 },{ wch:12 },{ wch:32 },{ wch:18 },{ wch:14 },{ wch:16 }];
-                            const wb = XLSX.utils.book_new();
-                            XLSX.utils.book_append_sheet(wb, ws, "Pend. Facturar");
-                            XLSX.writeFile(wb, "Pend_Facturar_" + today() + ".xlsx");
-                          }}>
-                          ↓ Excel
-                        </button>
+                        <div style={{display:"flex",gap:8}}>
+                          <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
+                            onClick={() => {
+                              const fmtN = n => "$" + Number(n).toLocaleString("es-CL");
+                              const nAtrasadas = pendFacs.filter(g=>g.atrasada).length;
+                              const totalNetoP = pendFacs.reduce((s,g)=>s+(g.neto||0),0);
+                              const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Pend. Facturar</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:28px}
+  h1{font-size:20px;font-weight:700;margin-bottom:2px}
+  .sub{font-size:11px;color:#666;margin-bottom:20px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+  .kpi{border:1px solid #ddd;border-radius:6px;padding:12px 14px}
+  .kpi label{font-size:9px;letter-spacing:1.5px;color:#888;display:block;margin-bottom:4px}
+  .kpi strong{font-size:20px;font-weight:700}
+  .kpi.amber strong{color:#d97706}
+  .kpi.red strong{color:#dc2626}
+  .kpi.blue strong{color:#2563eb}
+  table{width:100%;border-collapse:collapse;font-size:10px}
+  thead tr{background:#111;color:#fff}
+  thead th{padding:7px 8px;text-align:left;font-weight:600;font-size:9px;letter-spacing:.5px}
+  thead th.r{text-align:right}
+  tbody tr:nth-child(even){background:#f9f9f9}
+  tbody td{padding:6px 8px;border-bottom:1px solid #eee}
+  tbody td.r{text-align:right}
+  .badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:9px;font-weight:600}
+  .badge.ok{background:#dcfce7;color:#166534}
+  .badge.late{background:#fee2e2;color:#991b1b}
+  .footer{margin-top:20px;font-size:9px;color:#aaa;text-align:center}
+</style></head><body>
+<h1>Reporte Pendientes de Facturar</h1>
+<div class="sub">INDUSTRIAL Y COMERCIAL TOTALMETAL LIMITADA &nbsp;·&nbsp; Generado el ${new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})}</div>
+<div class="kpis">
+  <div class="kpi amber"><label>GDs PENDIENTES</label><strong>${pendFacs.length}</strong></div>
+  <div class="kpi red"><label>ATRASADAS</label><strong>${nAtrasadas}</strong></div>
+  <div class="kpi blue"><label>MONTO NETO</label><strong style="font-size:14px">${fmtN(totalNetoP)}</strong></div>
+  <div class="kpi blue"><label>TOTAL C/IVA</label><strong style="font-size:14px">${fmtN(Math.round(totalNetoP*1.19))}</strong></div>
+</div>
+<table>
+  <thead><tr>
+    <th>ESTADO</th><th>N° GD</th><th>FECHA GD</th><th>DÍAS</th><th>CLIENTE</th><th>N° OC</th><th>ESTADO OC</th><th class="r">MONTO NETO</th>
+  </tr></thead>
+  <tbody>
+    ${pendFacs.map(g=>`<tr>
+      <td><span class="badge ${g.atrasada?"late":"ok"}">${g.atrasada?"Atrasada":"Ok"}</span></td>
+      <td style="font-weight:600">${g.number||"—"}</td>
+      <td style="color:#666">${g.date||"—"}</td>
+      <td style="color:${g.atrasada?"#dc2626":"#111"};font-weight:${g.atrasada?"600":"400"}">${g.dias!==null?g.dias+"d":"—"}</td>
+      <td>${g.client||"—"}</td>
+      <td style="font-weight:600">${g.ocNumber||"—"}</td>
+      <td>${{open:"Abierta",partial:"Parcial",toinvoice:"Por Facturar",closed:"Cerrada"}[g.ocStatusVal]||"—"}</td>
+      <td class="r" style="font-weight:600">${fmtN(g.neto||0)}</td>
+    </tr>`).join("")}
+  </tbody>
+</table>
+<div class="footer">TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS · ${new Date().getFullYear()}</div>
+</body></html>`;
+                              const w = window.open("","_blank");
+                              w.document.write(html);
+                              w.document.close();
+                              w.focus();
+                              setTimeout(() => { w.print(); }, 400);
+                            }}>↓ PDF</button>
+                          <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
+                            onClick={() => {
+                              const rows = pendFacs.map(g => ({
+                                "Estado": g.atrasada ? "Atrasada" : "Ok",
+                                "N° GD": g.number || "",
+                                "Fecha GD": g.date || "",
+                                "Días": g.dias !== null ? g.dias : "",
+                                "Tolerancia": g.tol + "d",
+                                "Cliente": g.client || "",
+                                "OC": g.ocNumber || "",
+                                "Estado OC": { open:"Abierta", partial:"Parcial", toinvoice:"Por Facturar", closed:"Cerrada" }[g.ocStatusVal] || "",
+                                "Monto Neto": g.neto || 0,
+                              }));
+                              const ws = XLSX.utils.json_to_sheet(rows);
+                              ws["!cols"] = [{ wch:10 },{ wch:10 },{ wch:12 },{ wch:8 },{ wch:12 },{ wch:32 },{ wch:18 },{ wch:14 },{ wch:16 }];
+                              const wb = XLSX.utils.book_new();
+                              XLSX.utils.book_append_sheet(wb, ws, "Pend. Facturar");
+                              XLSX.writeFile(wb, "Pend_Facturar_" + today() + ".xlsx");
+                            }}>
+                            ↓ Excel
+                          </button>
+                        </div>
                       )}
                     </div>
                     {pendFacs.length === 0 && <div className="empty"><div className="empty-ico">✓</div><p>No hay guías pendientes de facturar.</p></div>}
