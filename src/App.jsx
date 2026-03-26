@@ -2452,7 +2452,7 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
 }
 
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto, onReopenOC }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, onUpdateItem, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto, onReopenOC }) {
   const canDelGD = isAdmin || (userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl");
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
@@ -2461,6 +2461,8 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
   const [clientVal, setClientVal] = useState(oc.client || "");
   const [editingOCNumber, setEditingOCNumber] = useState(false);
   const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
+  const [editingItem, setEditingItem] = useState(null); // { itemId, field }
+  const [itemEditVal, setItemEditVal] = useState("");
   const st = ocStatus(oc.items, oc.dispatches, oc);
   const totAmt = oc.items.reduce((s, i) => s + Number(i.qty) * Number(i.unitPrice), 0);
   const disAmtReal = oc.items.reduce((s, i) => s + Number(i.dispatched || 0) * Number(i.unitPrice), 0);
@@ -2594,12 +2596,39 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
             <tbody>{oc.items.map(it => {
               const rem = Number(it.qty) - Number(it.dispatched || 0);
               const pct = it.qty > 0 ? Math.min(100, Math.round(Number(it.dispatched || 0) / Number(it.qty) * 100)) : 0;
+              const isEditingQty = isAdmin && editingItem?.itemId === it.id && editingItem?.field === "qty";
+              const isEditingPrice = isAdmin && editingItem?.itemId === it.id && editingItem?.field === "unitPrice";
+              const inlineInputSt = { background:"var(--ink3)", border:"1px solid var(--teal)", borderRadius:4, color:"var(--white)", fontFamily:"var(--fM)", fontSize:11, padding:"2px 6px", width:90, textAlign:"right" };
+              const saveItem = (field) => {
+                const val = Number(itemEditVal);
+                if (!isNaN(val) && val >= 0) onUpdateItem(oc.id, it.id, field, val);
+                setEditingItem(null);
+              };
+              const editableCellSt = { textAlign:"right", color:"var(--fog2)", fontFamily:"var(--fM)", fontSize:11, cursor: isAdmin ? "pointer" : "default", userSelect:"none" };
               return (
                 <tr key={it.id}>
                   <td style={{ fontWeight:500 }}>{it.desc}</td>
                   <td style={{ color:"var(--fog)" }}>{it.unit}</td>
-                  <td style={{ textAlign:"right", color:"var(--fog2)", fontFamily:"var(--fM)", fontSize:11 }}>{it.unitPrice ? fmtCLP(Number(it.unitPrice)) : <span style={{ color:"var(--fog)" }}>—</span>}</td>
-                  <td>{fmtNum(it.qty)}</td>
+                  <td style={editableCellSt} title={isAdmin ? "Click para editar precio" : undefined}
+                    onClick={() => { if (!isAdmin || isEditingPrice) return; setEditingItem({ itemId:it.id, field:"unitPrice" }); setItemEditVal(String(it.unitPrice||0)); }}>
+                    {isEditingPrice
+                      ? <input autoFocus style={inlineInputSt} value={itemEditVal} type="number"
+                          onChange={e => setItemEditVal(e.target.value)}
+                          onBlur={() => saveItem("unitPrice")}
+                          onKeyDown={e => { if (e.key==="Enter") saveItem("unitPrice"); if (e.key==="Escape") setEditingItem(null); }} />
+                      : <span style={{ borderBottom: isAdmin ? "1px dashed var(--line2)" : "none" }}>{it.unitPrice ? fmtCLP(Number(it.unitPrice)) : <span style={{ color:"var(--fog)" }}>—</span>}</span>
+                    }
+                  </td>
+                  <td style={{ cursor: isAdmin ? "pointer" : "default" }} title={isAdmin ? "Click para editar cantidad" : undefined}
+                    onClick={() => { if (!isAdmin || isEditingQty) return; setEditingItem({ itemId:it.id, field:"qty" }); setItemEditVal(String(it.qty||0)); }}>
+                    {isEditingQty
+                      ? <input autoFocus style={{...inlineInputSt, width:70, textAlign:"left"}} value={itemEditVal} type="number"
+                          onChange={e => setItemEditVal(e.target.value)}
+                          onBlur={() => saveItem("qty")}
+                          onKeyDown={e => { if (e.key==="Enter") saveItem("qty"); if (e.key==="Escape") setEditingItem(null); }} />
+                      : <span style={{ borderBottom: isAdmin ? "1px dashed var(--line2)" : "none" }}>{fmtNum(it.qty)}</span>
+                    }
+                  </td>
                   <td style={{ color:"var(--lime)" }}>{fmtNum(it.dispatched || 0)}</td>
                   <td>{rem > 0 ? <span style={{ color:"var(--gold)", fontWeight:500 }}>{fmtNum(rem)} pend.</span> : rem === 0 ? <span style={{ color:"var(--lime)" }}>✓ Completo</span> : <span style={{ color:"var(--rose)", fontWeight:500 }}>{fmtNum(Math.abs(rem))} excedido</span>}</td>
                   <td style={{ minWidth:110 }}>
@@ -3474,6 +3503,17 @@ export default function App() {
     const updated = { ...factoringGestiones, [facKey]: (factoringGestiones[facKey] || []).filter(g => g.id !== gId) };
     setFactoringGestiones(updated);
     await storage.set("factoring-gestiones-v1", JSON.stringify(updated));
+  };
+
+  const handleUpdateItem = async (ocId, itemId, field, val) => {
+    const updated = ocs.map(o => {
+      if (o.id !== ocId) return o;
+      return { ...o, items: o.items.map(it => it.id === itemId ? { ...it, [field]: val } : it) };
+    });
+    await persist(updated);
+    setShowDetail(null);
+    setTimeout(() => setShowDetail(updated.find(o => o.id === ocId) || null), 50);
+    notify("Ítem actualizado ✓");
   };
 
   const handleUpdateDelivery = async (ocId, newDate) => {
@@ -5678,7 +5718,7 @@ export default function App() {
           currentUserId={user.id}
         />
       )}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} onReopenOC={handleReopenOC} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} onUpdateItem={handleUpdateItem} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} onReopenOC={handleReopenOC} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} createdBy={user?.email} />}
 
       {confirmDel && (
