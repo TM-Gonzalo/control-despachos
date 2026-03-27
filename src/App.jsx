@@ -3107,7 +3107,7 @@ export default function App() {
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [expandedClients, setExpandedClients] = useState(new Set());
   const [facFilterTo, setFacFilterTo] = useState("");
-  const [facFilterMode, setFacFilterMode] = useState("fecha"); // "fecha" | "numero"
+  const [facFilterMode, setFacFilterMode] = useState("fecha");
   const [facFilterClients, setFacFilterClients] = useState(new Set());
   const [facFilterEntity, setFacFilterEntity] = useState(new Set());
   const [collapsedMonths, setCollapsedMonths] = useState(new Set());
