@@ -3107,6 +3107,7 @@ export default function App() {
   const [facFilterFrom, setFacFilterFrom] = useState("");
   const [expandedClients, setExpandedClients] = useState(new Set());
   const [facFilterTo, setFacFilterTo] = useState("");
+  const [facFilterMode, setFacFilterMode] = useState("fecha"); // "fecha" | "numero"
   const [facFilterClients, setFacFilterClients] = useState(new Set());
   const [facFilterEntity, setFacFilterEntity] = useState(new Set());
   const [collapsedMonths, setCollapsedMonths] = useState(new Set());
@@ -4676,8 +4677,14 @@ export default function App() {
                 const facClients = [...new Set(allFacsAdj.map(f => f.client).filter(Boolean))].sort();
                 // Filtrar por rango de fechas, cliente y condición factoring
                 const allFacsFiltered = allFacsAdj.filter(f => {
-                  if (facFilterFrom && f.date < facFilterFrom) return false;
-                  if (facFilterTo && f.date > facFilterTo) return false;
+                  if (facFilterMode === "fecha") {
+                    if (facFilterFrom && f.date < facFilterFrom) return false;
+                    if (facFilterTo && f.date > facFilterTo) return false;
+                  } else {
+                    const fnum = Number(String(f.number || "").replace(/\D/g, ""));
+                    if (facFilterFrom && fnum < Number(facFilterFrom)) return false;
+                    if (facFilterTo && fnum > Number(facFilterTo)) return false;
+                  }
                   if (facFilterClients.size > 0 && !facFilterClients.has(f.client)) return false;
                   if (facFilterEntity.size > 0) {
                     const ent = factoringData[f.key]?.entity || null;
@@ -4834,12 +4841,26 @@ export default function App() {
                       </div>
                       <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap", paddingTop:6, borderTop:"1px solid var(--line)" }}>
                         <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                          <div style={{ display:"flex", border:"1px solid var(--line2)", borderRadius:4, overflow:"hidden", marginRight:4 }}>
+                            {[["fecha","Fecha"],["numero","N° Factura"]].map(([mode, lbl]) => (
+                              <button key={mode} onClick={() => { setFacFilterMode(mode); setFacFilterFrom(""); setFacFilterTo(""); }}
+                                style={{ padding:"2px 9px", fontSize:10, fontFamily:"var(--fM)", border:"none", cursor:"pointer", background: facFilterMode===mode ? "var(--line2)" : "transparent", color: facFilterMode===mode ? "var(--white)" : "var(--fog)", transition:".12s" }}>{lbl}</button>
+                            ))}
+                          </div>
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>DESDE</span>
-                          <input type="date" value={facFilterFrom} onChange={e => setFacFilterFrom(e.target.value)}
-                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                          {facFilterMode === "fecha"
+                            ? <input type="date" value={facFilterFrom} onChange={e => setFacFilterFrom(e.target.value)}
+                                style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                            : <input type="number" value={facFilterFrom} onChange={e => setFacFilterFrom(e.target.value)} placeholder="ej: 1900"
+                                style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)", width:90 }} />
+                          }
                           <span style={{ fontSize:9, letterSpacing:1.5, color:"var(--fog)", fontFamily:"var(--fM)" }}>HASTA</span>
-                          <input type="date" value={facFilterTo} onChange={e => setFacFilterTo(e.target.value)}
-                            style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                          {facFilterMode === "fecha"
+                            ? <input type="date" value={facFilterTo} onChange={e => setFacFilterTo(e.target.value)}
+                                style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)" }} />
+                            : <input type="number" value={facFilterTo} onChange={e => setFacFilterTo(e.target.value)} placeholder="ej: 1950"
+                                style={{ background:"var(--card)", border:"1px solid var(--line2)", borderRadius:4, color:"var(--white)", fontSize:11, padding:"3px 7px", fontFamily:"var(--fM)", width:90 }} />
+                          }
                           {(facFilterFrom || facFilterTo) && (
                             <button className="btn btn-outline btn-sm" style={{ fontSize:10, padding:"2px 8px" }}
                               onClick={() => { setFacFilterFrom(""); setFacFilterTo(""); }}>✕</button>
