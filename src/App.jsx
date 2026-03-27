@@ -3863,7 +3863,7 @@ export default function App() {
                               })()}
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                  {item.user && <span style={{fontWeight:600}}>{item.user.split("@")[0].charAt(0).toUpperCase()} </span>}
+                                  
                                   <span style={{color:"var(--fog)"}}>
                                     {item.type==="GD" && `despachó GD${item.num} — ${item.client}`}
                                     {item.type==="F" && `factura F${item.num} — ${item.client}`}
