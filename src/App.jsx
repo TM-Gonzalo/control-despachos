@@ -4681,7 +4681,7 @@ export default function App() {
                     if (facFilterFrom && f.date < facFilterFrom) return false;
                     if (facFilterTo && f.date > facFilterTo) return false;
                   } else {
-                    const fnum = Number(String(f.number || "").replace(/\D/g, ""));
+                    const fnum = Number(String(f.facNumber || f.number || "").replace(/\D/g, ""));
                     if (facFilterFrom && fnum < Number(facFilterFrom)) return false;
                     if (facFilterTo && fnum > Number(facFilterTo)) return false;
                   }
