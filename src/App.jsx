@@ -3825,9 +3825,9 @@ export default function App() {
                     enrichedNoVD.forEach(o => {
                       (o.dispatches||[]).forEach(d => {
                         const date = d.date||d.invoiceDate||"";
-                        if (d.docType==="guia" && d.number) feedItems.push({ type:"GD", num:d.number, client:o.client, date, user:d.registeredBy||"", oc:o.ocNumber||o.id });
-                        if (d.docType==="factura" && d.number) feedItems.push({ type:"F", num:d.number, client:o.client, date, user:d.registeredBy||"", oc:o.ocNumber||o.id });
-                        if (d.docType==="guia" && d.invoiceNumber) feedItems.push({ type:"F_link", num:d.invoiceNumber, client:o.client, date:d.invoiceDate||"", user:d.registeredBy||"", oc:o.ocNumber||o.id, gdNum:d.number });
+                        if (d.docType==="guia" && d.number) feedItems.push({ type:"GD", num:d.number, client:o.client, date, user:d.registeredBy||d.createdBy||"", oc:o.ocNumber||o.id });
+                        if (d.docType==="factura" && d.number) feedItems.push({ type:"F", num:d.number, client:o.client, date, user:d.registeredBy||d.createdBy||"", oc:o.ocNumber||o.id });
+                        if (d.docType==="guia" && d.invoiceNumber) feedItems.push({ type:"F_link", num:d.invoiceNumber, client:o.client, date:d.invoiceDate||"", user:d.registeredBy||d.createdBy||"", oc:o.ocNumber||o.id, gdNum:d.number });
                       });
                     });
                     feedItems.sort((a,b)=>b.date.localeCompare(a.date));
@@ -3857,7 +3857,7 @@ export default function App() {
                           {feed.map((item,i) => (
                             <div key={i} style={i<feed.length-1 ? {...rowSt,gap:8} : {...lastRowSt,gap:8}}>
                               {(() => {
-                                const inicial = item.user ? item.user.split("@")[0].charAt(0).toUpperCase() : (item.type==="F"||item.type==="F_link"?"F":"G");
+                                const inicial = item.user ? item.user.split("@")[0].charAt(0).toUpperCase() : "?";
                                 const [bg, col] = (item.type==="GD") ? ["rgba(56,140,255,.18)","var(--sky)"] : ["rgba(100,220,100,.18)","var(--lime)"];
                                 return <div style={feedIconSt(bg,col)}>{inicial}</div>;
                               })()}
