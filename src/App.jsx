@@ -4868,6 +4868,90 @@ export default function App() {
                         </div>
                         <div style={{ width:1, height:22, background:"var(--line)" }} />
                         <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
+                          onClick={() => {
+                            const fmtN = n => "$" + Number(n).toLocaleString("es-CL");
+                            const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Factoring</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:28px}
+  h1{font-size:20px;font-weight:700;margin-bottom:2px}
+  .sub{font-size:11px;color:#666;margin-bottom:20px}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px}
+  .kpi{border:1px solid #ddd;border-radius:6px;padding:10px 12px}
+  .kpi label{font-size:9px;letter-spacing:1.5px;color:#888;display:block;margin-bottom:4px}
+  .kpi strong{font-size:14px;font-weight:700}
+  .kpi.white strong{color:#111}
+  .kpi.blue strong{color:#2563eb}
+  .kpi.green strong{color:#16a34a}
+  .kpi.red strong{color:#dc2626}
+  .kpi.amber strong{color:#d97706}
+  .month-title{font-size:15px;font-style:italic;font-weight:600;margin:20px 0 8px;padding-bottom:4px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:baseline}
+  .month-title span{font-size:10px;color:#888;font-style:normal;font-weight:400}
+  table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:4px}
+  thead tr{background:#111;color:#fff}
+  thead th{padding:6px 8px;text-align:left;font-weight:600;font-size:9px;letter-spacing:.5px}
+  thead th.r{text-align:right}
+  tbody tr:nth-child(even){background:#f9f9f9}
+  tbody td{padding:5px 8px;border-bottom:1px solid #eee}
+  tbody td.r{text-align:right}
+  .badge{display:inline-block;padding:2px 6px;border-radius:99px;font-size:9px;font-weight:600}
+  .badge.pend{background:#fef3c7;color:#92400e}
+  .badge.fact{background:#dcfce7;color:#166534}
+  .badge.no{background:#fee2e2;color:#991b1b}
+  .badge.cob{background:#dbeafe;color:#1d4ed8}
+  .footer{margin-top:20px;font-size:9px;color:#aaa;text-align:center}
+</style></head><body>
+<h1>Reporte Factoring</h1>
+<div class="sub">INDUSTRIAL Y COMERCIAL TOTALMETAL LIMITADA &nbsp;·&nbsp; Generado el ${new Date().toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})}</div>
+<div class="kpis">
+  <div class="kpi white"><label>FACTURAS</label><strong>${allFacsFiltered.length}</strong></div>
+  <div class="kpi blue"><label>MONTO NETO</label><strong>${fmtN(totalNeto)}</strong></div>
+  <div class="kpi blue"><label>TOTAL c/IVA</label><strong>${fmtN(totalConIVA)}</strong></div>
+  <div class="kpi green"><label>FACTORIZADO</label><strong>${fmtN(totalFactorizado)}</strong></div>
+  <div class="kpi amber"><label>PENDIENTE</label><strong>${fmtN(totalPendiente)}</strong></div>
+</div>
+${months.map(month => {
+  const facs = byMonth[month];
+  const mesTotal = facs.reduce((s,f)=>s+f.conIVA,0);
+  const mesNeto = facs.reduce((s,f)=>s+f.neto,0);
+  const label = (() => { const [y,m] = month.split("-"); return ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][parseInt(m)-1]+" "+y; })();
+  return `<div class="month-title">${label} <span>${facs.length} factura${facs.length!==1?"s":""} &nbsp;·&nbsp; ${fmtN(mesNeto)} neto &nbsp;·&nbsp; ${fmtN(mesTotal)} c/IVA</span></div>
+<table>
+  <thead><tr>
+    <th>FECHA</th><th>EMPRESA</th><th>ÍTEM</th><th>OC</th><th>GD</th><th>FACTURA</th><th class="r">MONTO c/IVA</th><th>FACTORING</th>
+  </tr></thead>
+  <tbody>
+    ${facs.map(f => {
+      const entity = getEntity(f.key);
+      const fact = isFactorizado(f.key);
+      const isNo2 = isNo(f.key);
+      const isCob = isCobrada(f.key);
+      const badgeCls = isCob?"cob":fact?"fact":isNo2?"no":"pend";
+      const badgeLbl = isCob?"Cobrada":fact?(entity||"Factorizado"):isNo2?"No factorizar":"Pendiente";
+      return `<tr style="opacity:${fact?0.7:1}">
+        <td style="color:#666">${f.date||"—"}</td>
+        <td>${f.client||"—"}</td>
+        <td style="color:#444">${f.desc||"—"}</td>
+        <td style="font-weight:600">${f.ocNumber||"—"}</td>
+        <td style="color:#7c3aed">${f.gdNumber||"—"}</td>
+        <td style="color:#0891b2;font-weight:600">${f.facNumber||"—"}</td>
+        <td class="r" style="font-weight:600">${fmtN(f.conIVA||0)}</td>
+        <td><span class="badge ${badgeCls}">${badgeLbl}</span></td>
+      </tr>`;
+    }).join("")}
+  </tbody>
+</table>`;
+}).join("")}
+<div class="footer">TOTAL METAL LTDA. · TODOS LOS DERECHOS RESERVADOS · ${new Date().getFullYear()}</div>
+</body></html>`;
+                            const w = window.open("","_blank");
+                            w.document.write(html);
+                            w.document.close();
+                            w.focus();
+                            setTimeout(() => { w.print(); }, 400);
+                          }}>↓ PDF</button>
+                        <button className="btn btn-outline btn-sm" style={{ color:"var(--fog2)", borderColor:"var(--line2)", fontSize:10, padding:"4px 12px" }}
                           onClick={handleDownloadFactoringXlsx}>
                           ↓ Excel
                         </button>
