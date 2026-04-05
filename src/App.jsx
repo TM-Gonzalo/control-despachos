@@ -3766,17 +3766,17 @@ export default function App() {
                         <div style={{...cardBase,borderLeftColor:"var(--rose)",background:"rgba(255,77,109,.06)"}}>
                           <div style={{...nStyle,color:"var(--rose)"}}>{sinMovimiento.length}</div>
                           <div style={{...lblStyle,color:"var(--rose)"}}>OCs sin movimiento +30d</div>
-                          <button style={{...ctaStyle,color:"var(--rose)"}} onClick={()=>setView("orders")}>Ver OCs →</button>
+                
                         </div>
                         <div style={{...cardBase,borderLeftColor:"var(--gold)",background:"rgba(255,185,0,.06)"}}>
                           <div style={{...nStyle,color:"var(--gold)"}}>{sinFacturar.length}</div>
                           <div style={{...lblStyle,color:"var(--gold)"}}>GDs sin facturar</div>
-                          <button style={{...ctaStyle,color:"var(--gold)"}} onClick={()=>setView("pendfac")}>Ver GDs →</button>
+                
                         </div>
                         <div style={{...cardBase,borderLeftColor:"#f97316",background:"rgba(249,115,22,.06)"}}>
                           <div style={{...nStyle,color:"#f97316"}}>{altoMonto.length}</div>
                           <div style={{...lblStyle,color:"#f97316)"}}>OCs al +80% de monto</div>
-                          <button style={{...ctaStyle,color:"#f97316"}} onClick={()=>setView("orders")}>Ver OCs →</button>
+                
                         </div>
                         <div style={{...cardBase,borderLeftColor:"var(--lime)",background:"rgba(100,220,100,.06)"}}>
                           <div style={{...nStyle,color:"var(--lime)"}}>{facsMes.length}</div>
