@@ -3391,7 +3391,7 @@ export default function App() {
       const updated = ocs.map(o => o.id === ocId ? {
         ...o,
         dispatches: (o.dispatches || []).map(d =>
-          d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: invoiceItems || [] } : d
+          d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: invoiceItems || [], registeredBy: user?.email || d.registeredBy } : d
         )
       } : o);
       await persist(updated);
@@ -3405,7 +3405,7 @@ export default function App() {
         ...o,
         dispatches: (o.dispatches || [])
           .filter(d => d.id !== dispId)
-          .map(d => d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: items || [] } : d)
+          .map(d => d.id === gdId ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: items || [], registeredBy: user?.email || d.registeredBy } : d)
       } : o);
       await persist(updated);
       if (showDetail && showDetail.id === ocId) setShowDetail(updated.find(o => o.id === ocId));
@@ -3418,7 +3418,7 @@ export default function App() {
       const updated = ocs.map(o => o.id === ocId ? {
         ...o,
         dispatches: (o.dispatches || []).map(d => d.id === dispId
-          ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: items || [] }
+          ? { ...d, invoiceNumber, invoiceDate, netTotal: netTotal || d.netTotal, total: total || d.total, invoiceItems: items || [], registeredBy: user?.email || d.registeredBy }
           : d
         )
       } : o);
