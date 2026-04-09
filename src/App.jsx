@@ -1693,6 +1693,24 @@ function AddDispatchModal({ oc, onClose, onSave, apiKey, createdBy, isAdmin, ocs
                 }}>Ingresar igualmente →</button>
               )}
             </div>
+            {(oc.rut || isAdmin) && (
+              <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
+                {editingRut ? (
+                  <>
+                    <span style={{ fontSize:10, color:"var(--fog)", fontFamily:"var(--fM)" }}>RUT</span>
+                    <input value={rutVal} onChange={e => setRutVal(e.target.value)} onKeyDown={e => { if (e.key==="Enter") { onUpdateRut(oc.id, rutVal); setEditingRut(false); } if (e.key==="Escape") setEditingRut(false); }} autoFocus style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:5, color:"var(--white)", fontFamily:"var(--fM)", fontSize:11, padding:"3px 8px", width:130 }} />
+                    <button className="btn btn-teal btn-sm" onClick={() => { onUpdateRut(oc.id, rutVal); setEditingRut(false); }}>✓</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingRut(false)}>✕</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize:10, color:"var(--fog)", fontFamily:"var(--fM)" }}>RUT</span>
+                    <span style={{ fontSize:11, color:"var(--fog2)" }}>{oc.rut || <span style={{ color:"var(--fog)", fontStyle:"italic" }}>sin RUT</span>}</span>
+                    {isAdmin && <span onClick={() => { setEditingRut(true); setRutVal(oc.rut || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", marginLeft:4 }}>✎</span>}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
         {step === 0 && (
@@ -2452,13 +2470,15 @@ async function generateOCPDF(oc, st, totAmt, disAmt, pctGlobal) {
 }
 
 
-function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateOCNumber, onUpdateItem, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto, onReopenOC }) {
+function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, onUpdateDelivery, onUpdateClient, onUpdateRut, onUpdateOCNumber, onUpdateItem, canDelete, onRequestDel, currentUserId, isAdmin, userEmail, onCerrarPorMonto, onReopenOC }) {
   const canDelGD = isAdmin || (userEmail?.toLowerCase().trim() === "jhaeger@totalmetal.cl");
   const [docFilter, setDocFilter] = useState("all");
   const [editingDate, setEditingDate] = useState(false);
   const [dateVal, setDateVal] = useState(oc.deliveryDate || "");
   const [editingClient, setEditingClient] = useState(false);
   const [clientVal, setClientVal] = useState(oc.client || "");
+  const [editingRut, setEditingRut] = useState(false);
+  const [rutVal, setRutVal] = useState(oc.rut || "");
   const [editingOCNumber, setEditingOCNumber] = useState(false);
   const [ocNumberVal, setOCNumberVal] = useState(oc.ocNumber || "");
   const [editingItem, setEditingItem] = useState(null); // { itemId, field }
@@ -2527,6 +2547,24 @@ function OCDetailModal({ oc, onClose, onAddDispatch, onDelDispatch, onConvert, o
                 </>
               )}
             </div>
+            {(oc.rut || isAdmin) && (
+              <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:2 }}>
+                {editingRut ? (
+                  <>
+                    <span style={{ fontSize:10, color:"var(--fog)", fontFamily:"var(--fM)" }}>RUT</span>
+                    <input value={rutVal} onChange={e => setRutVal(e.target.value)} onKeyDown={e => { if (e.key==="Enter") { onUpdateRut(oc.id, rutVal); setEditingRut(false); } if (e.key==="Escape") setEditingRut(false); }} autoFocus style={{ background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:5, color:"var(--white)", fontFamily:"var(--fM)", fontSize:11, padding:"3px 8px", width:130 }} />
+                    <button className="btn btn-teal btn-sm" onClick={() => { onUpdateRut(oc.id, rutVal); setEditingRut(false); }}>✓</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setEditingRut(false)}>✕</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize:10, color:"var(--fog)", fontFamily:"var(--fM)" }}>RUT</span>
+                    <span style={{ fontSize:11, color:"var(--fog2)" }}>{oc.rut || <span style={{ color:"var(--fog)", fontStyle:"italic" }}>sin RUT</span>}</span>
+                    {isAdmin && <span onClick={() => { setEditingRut(true); setRutVal(oc.rut || ""); }} style={{ cursor:"pointer", color:"var(--fog)", fontSize:9, letterSpacing:1, background:"var(--ink3)", border:"1px solid var(--line2)", borderRadius:4, padding:"1px 5px", marginLeft:4 }}>✎</span>}
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <div style={{ display:"flex", gap:7, alignItems:"center" }}>
             {isAdmin && st !== "closed" && (
@@ -3459,6 +3497,14 @@ export default function App() {
     await persist(ocs.filter(o => o.id !== confirmDel.ocId));
     setConfirmDel(null);
     notify("OC eliminada");
+  };
+
+  const handleUpdateRut = async (ocId, newRut) => {
+    const updated = ocs.map(o => o.id === ocId ? { ...o, rut: newRut.trim() } : o);
+    await persist(updated);
+    setShowDetail(null);
+    setTimeout(() => setShowDetail(updated.find(o => o.id === ocId) || null), 50);
+    notify("RUT actualizado ✓");
   };
 
   const handleUpdateClient = async (ocId, newClient) => {
@@ -5823,7 +5869,7 @@ ${months.map(month => {
           currentUserId={user.id}
         />
       )}
-        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateOCNumber={handleUpdateOCNumber} onUpdateItem={handleUpdateItem} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} onReopenOC={handleReopenOC} />}
+        {liveDetail && <OCDetailModal oc={liveDetail} onClose={() => { setShowDetail(null); if (prevView) { setView(prevView); setPrevView(null); } }} onAddDispatch={oc => setShowDispatch(oc)} onDelDispatch={handleDelDispatch} onConvert={(ocId, d) => setConvertTarget({ ocId, dispatch: d })} onUpdateDelivery={handleUpdateDelivery} onUpdateClient={handleUpdateClient} onUpdateRut={handleUpdateRut} onUpdateOCNumber={handleUpdateOCNumber} onUpdateItem={handleUpdateItem} canDelete={isAdmin} onRequestDel={d => setConfirmDel(d)} currentUserId={user.id} isAdmin={isAdmin} userEmail={user.email} onCerrarPorMonto={handleCerrarPorMonto} onReopenOC={handleReopenOC} />}
       {liveDispOC && <AddDispatchModal oc={liveDispOC} onClose={() => setShowDispatch(null)} onSave={handleSaveDispatch} apiKey={apiKey} isAdmin={isAdmin} ocs={ocs} userEmail={user?.email} createdBy={user?.email} />}
 
       {confirmDel && (
